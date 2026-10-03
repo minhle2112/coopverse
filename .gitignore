@@ -1,0 +1,7 @@
+node_modules
+dist
+!paperclip-plugin/dist
+*.log
+.env*
+!.env.example
+*.tsbuildinfo
