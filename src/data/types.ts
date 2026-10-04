@@ -18,6 +18,10 @@ export interface Agent {
   chatting?: boolean
   /** Agent giả chỉ để demo bố cục */
   demo?: boolean
+  /** Ứng viên: phiếu thuê chưa được duyệt (Paperclip `pending_approval`). Đứng ở sảnh, không có bàn. */
+  candidate?: boolean
+  /** Được phép đề xuất thuê agent (Paperclip `permissions.canCreateAgents`) */
+  canHire?: boolean
 }
 
 /** Một công ty trên Paperclip (mỗi công ty là một văn phòng riêng). */
@@ -26,6 +30,8 @@ export interface Company {
   name: string
   /** Tiền tố mã ticket, vd LAB */
   prefix: string
+  /** Agent thuê agent mới phải chờ bạn duyệt (`requireBoardApprovalForNewAgents`) */
+  hireApproval?: boolean
 }
 
 /** Ticket rút gọn từ Paperclip. */
@@ -97,6 +103,8 @@ export interface Ask {
   inline: boolean
   /** Trang của việc này trong Paperclip */
   href: string
+  /** Phiếu thuê: id agent ứng viên (đang đứng ở sảnh) */
+  candidateId?: string | null
 }
 
 export const APPROVAL_LABEL: Record<string, string> = {

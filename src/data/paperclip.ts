@@ -13,7 +13,7 @@ export const setCompanyId = (id: string) => { companyId = id }
 
 export interface PcHealth { status: string; version: string; deploymentMode: string }
 
-interface PcCompany { id: string; name: string; status: string; issuePrefix: string | null }
+interface PcCompany { id: string; name: string; status: string; issuePrefix: string | null; requireBoardApprovalForNewAgents?: boolean }
 
 interface PcAgent {
   id: string
@@ -24,6 +24,7 @@ interface PcAgent {
   reportsTo: string | null
   pauseReason: string | null
   errorReason: string | null
+  permissions?: { canCreateAgents?: boolean } | null
 }
 
 interface PcIssue {
@@ -72,9 +73,11 @@ interface PcAttentionItem {
 
 interface PcApproval { id: string; type: string; status: string; payload: Record<string, unknown> | null; requestedByAgentId: string | null }
 
+interface PcApprovalComment { id: string; body: string; createdAt: string; authorAgentId: string | null }
+
 /** Chi tiết đầy đủ của một việc chờ, đọc khi mở thẻ. */
 export type AskDetail =
-  | { source: 'approval'; status: string; payload: Record<string, unknown> }
+  | { source: 'approval'; status: string; payload: Record<string, unknown>; comments?: Comment[] }
   | { source: 'interaction'; status: string; kind: string; title: string | null; summary: string | null; payload: Record<string, unknown> }
 
 /** Câu trả lời cho một câu hỏi (POST …/interactions/:id/respond). */
@@ -236,6 +239,8 @@ function toAgents(raw: PcAgent[], issues: Issue[], chats: ChatInfo[], runs: PcLi
       runId: run?.id,
       reason: (status === 'error' ? a.errorReason : status === 'paused' ? a.pauseReason : null) ?? undefined,
       chatting: chatting || undefined,
+      candidate: a.status === 'pending_approval' || undefined,
+      canHire: a.permissions?.canCreateAgents ?? undefined,
     }
   })
 }
@@ -287,7 +292,15 @@ function toAsk(i: PcAttentionItem): Ask | null {
 /** Mọi việc đang chờ bạn quyết (một lần gọi hộp thư "cần chú ý" của Paperclip). */
 async function fetchAsks(): Promise<Ask[]> {
   const feed = await get<{ items: PcAttentionItem[] }>(`/companies/${companyId}/attention?all=true`)
-  return feed.items.map(toAsk).filter((a): a is Ask => !!a)
+  const asks = feed.items.map(toAsk).filter((a): a is Ask => !!a)
+  return asks.some((a) => a.type === 'hire_agent') ? withCandidates(asks) : asks
+}
+
+/** Phiếu thuê → id agent ứng viên (nằm trong payload, hộp thư "cần chú ý" không có). */
+async function withCandidates(asks: Ask[]): Promise<Ask[]> {
+  const list = await get<PcApproval[]>(`/companies/${companyId}/approvals?status=pending`).catch(() => [] as PcApproval[])
+  const cand = new Map(list.map((p) => [p.id, str(p.payload?.agentId)]))
+  return asks.map((a) => (a.type === 'hire_agent' ? { ...a, candidateId: cand.get(a.id) ?? null } : a))
 }
 
 // ── API ──
@@ -298,7 +311,9 @@ export const paperclip = {
   /** Mọi công ty trên Paperclip này (bỏ công ty đã lưu trữ). */
   async companies(): Promise<Company[]> {
     const raw = await get<PcCompany[]>('/companies')
-    return raw.filter((c) => c.status !== 'archived').map((c) => ({ id: c.id, name: c.name, prefix: c.issuePrefix ?? '' }))
+    return raw
+      .filter((c) => c.status !== 'archived')
+      .map((c) => ({ id: c.id, name: c.name, prefix: c.issuePrefix ?? '', hireApproval: c.requireBoardApprovalForNewAgents }))
   },
 
   /** Một lượt đọc đầy đủ: agent + ticket + run đang chạy + việc chờ bạn quyết. */
@@ -370,8 +385,15 @@ export const paperclip = {
   /** Nội dung đầy đủ để hiện thẻ (phiếu: payload; câu hỏi: danh sách câu hỏi / lời nhắn). */
   async askDetail(a: Ask): Promise<AskDetail> {
     if (a.kind === 'approval') {
-      const p = await get<PcApproval>(`/approvals/${a.id}`)
-      return { source: 'approval', status: p.status, payload: p.payload ?? {} }
+      const [p, raw] = await Promise.all([
+        get<PcApproval>(`/approvals/${a.id}`),
+        // Lý do thuê agent viết trong bình luận của phiếu (skill paperclip-create-agent)
+        get<PcApprovalComment[]>(`/approvals/${a.id}/comments`).catch(() => [] as PcApprovalComment[]),
+      ])
+      const comments = raw
+        .map((c) => ({ id: c.id, body: c.body, createdAt: c.createdAt, authorAgentId: c.authorAgentId, authorType: c.authorAgentId ? 'agent' : 'user' }))
+        .sort((x, y) => x.createdAt.localeCompare(y.createdAt))
+      return { source: 'approval', status: p.status, payload: p.payload ?? {}, comments }
     }
     if (!a.issueId) throw new PaperclipError(404, 'Câu hỏi không gắn với ticket nào')
     const list = await get<(PcInteraction & { payload: Record<string, unknown> | null })[]>(`/issues/${a.issueId}/interactions`)
@@ -423,7 +445,7 @@ export const paperclip = {
 
 /** Ý nghĩa của một sự kiện realtime đối với Coopverse. */
 export type LiveChange =
-  | { kind: 'agent-status'; agentId: string; status: AgentStatus }
+  | { kind: 'agent-status'; agentId: string; status: AgentStatus; candidate: boolean }
   | { kind: 'refresh' }
   | { kind: 'ignore' }
 
@@ -432,7 +454,7 @@ export function classifyEvent(e: PcLiveEvent): LiveChange {
     case 'agent.status': {
       const { agentId, status } = e.payload
       if (typeof agentId === 'string' && typeof status === 'string') {
-        return { kind: 'agent-status', agentId, status: toStatus(status) }
+        return { kind: 'agent-status', agentId, status: toStatus(status), candidate: status === 'pending_approval' }
       }
       return { kind: 'refresh' }
     }

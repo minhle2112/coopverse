@@ -81,6 +81,21 @@ export async function resolveAsk(ask: Ask, action: AskAction): Promise<string | 
   s.removeAsk(ask.id)
   s.pushNotes([{ kind: 'info', text: `${what}: ${ask.title}${who ? ` (${who})` : ''}${demo ? ' (demo)' : ''}` }])
   if (ask.agentId) askAnswered(ask.agentId, isGood(action))
+  if (demo && ask.candidateId && action.do === 'approval' && action.verb !== 'request-revision') demoHire(ask.candidateId, action.verb === 'approve')
   requestRefresh()
   return null
+}
+
+/** Bản demo: duyệt thì ứng viên thành nhân viên (đi từ sảnh về bàn phụ), từ chối thì rời văn phòng. */
+function demoHire(id: string, ok: boolean) {
+  const s = useCoop.getState()
+  const a = s.agents.find((x) => x.id === id)
+  if (!a) return
+  const boss = s.agents.find((x) => x.id === a.reportsTo)?.name
+  useCoop.setState({
+    agents: ok ? s.agents.map((x) => (x.id === id ? { ...x, candidate: undefined, status: 'idle' as const } : x)) : s.agents.filter((x) => x.id !== id),
+  })
+  s.pushNotes([ok
+    ? { kind: 'done', text: `🎉 ${a.name} được nhận vào làm${boss ? `, báo cáo cho ${boss}` : ''} (demo)` }
+    : { kind: 'info', text: `Hồ sơ ${a.name} bị từ chối (demo)` }])
 }

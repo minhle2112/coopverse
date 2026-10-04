@@ -16,3 +16,6 @@ export const dev = { overview: false }
 
 /** Vị trí agent, dùng cho va chạm với người chơi và tìm agent gần nhất. */
 export const agentPos = new Map<string, { x: number; z: number }>()
+
+/** Chỗ ứng viên đứng ở sảnh: được duyệt thuê xong thì agent đi bộ từ đây về bàn (AgentActor đọc rồi xoá). */
+export const lobbyPos = new Map<string, { x: number; z: number }>()

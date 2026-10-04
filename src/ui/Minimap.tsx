@@ -84,7 +84,8 @@ export function Minimap({ world }: { world: World }) {
       const { agents, ping, asks } = useCoop.getState()
 
       // Agent đang chờ bạn duyệt / trả lời: vòng cam nhấp nháy + dấu "?"
-      const waiting = new Set(asks.map((a) => a.agentId))
+      // (cả ứng viên ở sảnh đang chờ duyệt thuê)
+      const waiting = new Set(asks.flatMap((a) => [a.agentId, a.candidateId]))
       const blink = 0.55 + 0.45 * Math.sin(performance.now() / 260)
       for (const a of agents) {
         const p = waiting.has(a.id) ? agentPos.get(a.id) : undefined
@@ -105,7 +106,7 @@ export function Minimap({ world }: { world: World }) {
         if (!p) continue
         ctx.beginPath()
         ctx.arc(sx(p.x), sz(p.z), 3.4, 0, Math.PI * 2)
-        ctx.fillStyle = STATUS_COLOR[a.status]
+        ctx.fillStyle = a.candidate ? '#e3b860' : STATUS_COLOR[a.status]
         ctx.fill()
         ctx.lineWidth = 1
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)'

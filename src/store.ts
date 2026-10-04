@@ -187,6 +187,11 @@ export const useCoop = create<CoopState>((set, get) => ({
     if (nearBoard) return openBoard()
     const a = agents.find((x) => x.id === nearId)
     if (!a) return
+    // Ứng viên ở sảnh: mở hồ sơ (phiếu thuê) để duyệt
+    if (a.candidate) {
+      const hire = get().asks.find((x) => x.candidateId === a.id)
+      return hire ? get().openAsk(hire.id) : showToast(`Hồ sơ của ${a.name} chưa tải xong, thử lại sau giây lát.`)
+    }
     if (a.status === 'terminated') return showToast(`${a.name} đã nghỉ việc, máy đã tắt.`)
     openFocus(a.id)
   },

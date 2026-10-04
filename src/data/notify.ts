@@ -16,6 +16,10 @@ export const newAsks = (prev: Ask[], next: Ask[]) => {
 export function askNotes(fresh: Ask[], agents: Agent[]): NoteDraft[] {
   return fresh.map((a) => {
     const who = agents.find((x) => x.id === a.agentId)?.name ?? 'Paperclip'
+    if (a.type === 'hire_agent') {
+      const cand = agents.find((x) => x.id === a.candidateId)?.name
+      return { kind: 'ask', text: `📄 ${who} đề xuất thuê ${cand ? `${cand} (${short(a.title, 30)})` : short(a.title, 40)} · ứng viên chờ ở sảnh` }
+    }
     const verb = a.kind === 'questions' ? 'hỏi bạn' : a.kind === 'confirm' ? 'xin bạn xác nhận' : 'cần bạn duyệt'
     // "Xin bạn duyệt" đã nằm trong động từ, không lặp lại nhãn
     const label = a.kind === 'approval' && a.type !== 'request_board_approval' ? `${askLabel(a)} · ` : ''
@@ -30,8 +34,16 @@ export function diffNotes(prevAgents: Agent[], agents: Agent[], prevIssues: Issu
   const before = new Map(prevAgents.map((a) => [a.id, a]))
   for (const a of agents) {
     const p = before.get(a.id)
+    const boss = agents.find((x) => x.id === a.reportsTo)?.name
     if (!p) {
-      out.push({ kind: 'info', text: `${a.name} vừa vào văn phòng` })
+      // Ứng viên mới: thông báo phiếu thuê (askNotes) đã báo rồi
+      if (!a.candidate) out.push({ kind: 'info', text: `${a.name} vừa vào văn phòng` })
+      continue
+    }
+    if (p.candidate && !a.candidate) {
+      out.push(a.status === 'terminated'
+        ? { kind: 'info', text: `Hồ sơ ${a.name} bị từ chối` }
+        : { kind: 'done', text: `🎉 ${a.name} được nhận vào làm${boss ? `, báo cáo cho ${boss}` : ''}` })
       continue
     }
     if (p.status === a.status) {
@@ -63,7 +75,8 @@ export function diffNotes(prevAgents: Agent[], agents: Agent[], prevIssues: Issu
     }
   }
   for (const p of prevAgents) {
-    if (!agents.some((a) => a.id === p.id)) out.push({ kind: 'info', text: `${p.name} đã rời văn phòng` })
+    if (agents.some((a) => a.id === p.id)) continue
+    out.push({ kind: 'info', text: p.candidate ? `Hồ sơ ${p.name} bị từ chối` : `${p.name} đã rời văn phòng` })
   }
 
   const nameOf = (id: string | null) => agents.find((a) => a.id === id)?.name

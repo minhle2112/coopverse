@@ -671,3 +671,25 @@ a.card:hover { box-shadow: 0 0 0 2px #2c7fc0, 0 4px 12px rgba(0, 0, 0, 0.15); }
 }
 .chat-askcard { margin: 10px 0; }
 .chat-askcard .ask-card { margin: 0; max-width: 82%; }
+
+/* ───────── Giai đoạn B: thuê agent con ───────── */
+
+/* Công ty cho agent tự thuê không cần duyệt */
+.brand-warn {
+  margin-top: 6px; padding: 3px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600;
+  background: rgba(239, 90, 76, 0.16); color: #ff8a7d; cursor: help;
+}
+
+/* Ứng viên ở sảnh */
+.nameplate.np-cand { border: 1px dashed rgba(227, 184, 96, 0.7); }
+.np-cv { font-size: 12px; line-height: 1; }
+.np-dot.dot-cand { background: transparent; border: 1.5px dashed #e3b860; box-sizing: border-box; }
+
+/* Hồ sơ ứng viên: lý do + cảnh báo luật thuê */
+.hire-why { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: rgba(143, 208, 255, 0.07); font-size: 13px; max-height: 220px; overflow: auto; }
+.hire-why b { color: #8fd0ff; }
+.hire-why .ask-md { margin: 4px 0 0; }
+.hire-warns { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.hire-warns li { padding: 6px 10px; border-radius: 8px; }
+.hire-warns .lvl-red { background: rgba(239, 90, 76, 0.16); color: #ff8a7d; font-weight: 600; }
+.hire-warns .lvl-warn { background: rgba(242, 181, 68, 0.12); color: #f2c46d; }

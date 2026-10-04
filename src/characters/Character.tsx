@@ -6,7 +6,7 @@ import type { Look } from './look'
 
 export type PoseMode =
   | 'stand' | 'walk' | 'run' | 'sit' | 'type' | 'sleep'
-  | 'drink' | 'wave' | 'cheer' | 'play' | 'read' | 'talk' | 'facepalm' | 'raise'
+  | 'drink' | 'wave' | 'cheer' | 'play' | 'read' | 'talk' | 'facepalm' | 'raise' | 'cv'
 
 /** Nét mặt: focus = nheo mắt tập trung, shock = mắt tròn miệng chữ O */
 export type Mood = 'normal' | 'happy' | 'focus' | 'shock' | 'sleep'
@@ -174,6 +174,7 @@ export function Character({ look, pose }: { look: Look; pose: RefObject<Pose> })
   const mouth = useRef<Mesh>(null!)
   const cup = useRef<Group>(null!)
   const book = useRef<Group>(null!)
+  const cv = useRef<Group>(null!)
   const t = useRef(Math.random() * 10)
   const blinkAt = useRef(2 + Math.random() * 4)
 
@@ -269,6 +270,13 @@ export function Character({ look, pose }: { look: Look; pose: RefObject<Pose> })
           turn = Math.sin(time * 3.5) * 0.18
           nod = 0.25
           break
+        case 'cv':
+          // Ứng viên cầm hồ sơ trước ngực, đứng chờ, thỉnh thoảng nhìn quanh
+          aL = aR = -1.25
+          sL = sR = -0.2
+          nod = -0.04
+          turn = Math.sin(time * 0.45) * 0.22
+          break
         case 'read':
           aL = aR = -1.0
           sL = sR = -0.14
@@ -310,6 +318,7 @@ export function Character({ look, pose }: { look: Look; pose: RefObject<Pose> })
     // Giữ cốc đứng thẳng, chỉ nghiêng nhẹ khi đưa lên uống
     cup.current.rotation.x = -armR.current.rotation.x * 0.75
     book.current.visible = mode === 'read'
+    cv.current.visible = mode === 'cv'
 
     // ── Nét mặt + chớp mắt ──
     const mood: Mood = mode === 'sleep' ? 'sleep' : p?.mood ?? 'normal'
@@ -371,6 +380,16 @@ export function Character({ look, pose }: { look: Look; pose: RefObject<Pose> })
         <group ref={book} position={[0, 0.2, 0.4]} rotation={[-0.75, 0, 0]} visible={false}>
           <Box size={[0.3, 0.03, 0.22]} pos={[0, 0, 0]} color="#c4553f" />
           <Box size={[0.28, 0.035, 0.2]} pos={[0, 0.003, 0]} color="#f4f1ea" />
+        </group>
+
+        {/* Hồ sơ ứng viên: bìa giấy, ảnh thẻ, vài dòng chữ */}
+        <group ref={cv} position={[0, 0.24, 0.34]} rotation={[-0.2, 0, 0]} visible={false}>
+          <Box size={[0.26, 0.34, 0.02]} pos={[0, 0, 0]} color="#e3b860" />
+          <Box size={[0.22, 0.29, 0.012]} pos={[0, 0.01, 0.008]} color="#f7f4ec" />
+          <Box size={[0.06, 0.075, 0.014]} pos={[-0.06, 0.09, 0.009]} color="#7a8fb8" />
+          <Box size={[0.08, 0.014, 0.014]} pos={[0.04, 0.115, 0.009]} color="#5b6270" />
+          <Box size={[0.08, 0.01, 0.014]} pos={[0.04, 0.08, 0.009]} color="#9aa3b2" />
+          {[0.0, -0.04, -0.08].map((y) => <Box key={y} size={[0.18, 0.01, 0.014]} pos={[0, y, 0.009]} color="#9aa3b2" />)}
         </group>
 
         <group ref={head} position={[0, 0.52, 0]}>

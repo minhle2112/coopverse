@@ -9,7 +9,7 @@ import { damp, lerpAngle, rand } from '../lib/math'
 import { actors, chooseSpot, newActor, release, resetToSeat, type LifeActor, type WP } from '../life/actors'
 import { excuse, onArrive, reactToStatus } from '../life/director'
 import { clock, forget, isSpeaking, useLife } from '../life/store'
-import { agentPos, player } from '../runtime'
+import { agentPos, lobbyPos, player } from '../runtime'
 import { useCoop } from '../store'
 import { GRAPH, findPath, type Activity, type DeskSlot } from '../world/layout'
 
@@ -26,6 +26,9 @@ const HIDE_LABEL_DIST = 2.2
 const LABEL_FULL_DIST = 5
 /** Khoảng cách bắt đầu né người khác khi đi */
 const PERSONAL = 0.85
+
+/** Nút lối đi gần sảnh nhất (giữa hàng bàn gần cửa vào) */
+const LOBBY_NODE = 'g1_3'
 
 const nodeWP = (id: string): WP => ({ x: GRAPH.nodes[id].x, z: GRAPH.nodes[id].z, node: id })
 const seatWP = (s: DeskSlot): WP => ({ x: s.seat.x, z: s.seat.z, seat: true })
@@ -97,7 +100,20 @@ export function AgentActor({ agent, slot, isLead }: { agent: Agent; slot: DeskSl
     actors.set(agent.id, actorRef.current)
   }
 
-  useEffect(() => { resetToSeat(actorRef.current!, slot) }, [slot])
+  useEffect(() => {
+    const a = actorRef.current!
+    // Sơ đồ dựng lại (vd có người mới vào) mà chỗ ngồi giữ nguyên: không kéo agent về ghế
+    const same = a.slot.id === slot.id && a.slot.seat.x === slot.seat.x && a.slot.seat.z === slot.seat.z
+    if (same) a.slot = slot
+    else resetToSeat(a, slot)
+    // Vừa được duyệt thuê: đi bộ từ sảnh (chỗ đứng lúc làm ứng viên) về bàn mới
+    const from = lobbyPos.get(agent.id)
+    if (from) {
+      lobbyPos.delete(agent.id)
+      Object.assign(a, { x: from.x, z: from.z, yaw: Math.PI, where: 'walk', dest: 'seat', i: 0 })
+      a.pts = trim([nodeWP(LOBBY_NODE), ...toSeatPath(slot, LOBBY_NODE)], a)
+    }
+  }, [slot])
   useEffect(() => {
     const a = actorRef.current!
     actors.set(agent.id, a)

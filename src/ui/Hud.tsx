@@ -60,14 +60,23 @@ function CompanyLine() {
   const company = useCoop((s) => s.company)
   const demo = useCoop((s) => s.conn === 'demo')
   if (demo) return <div className="brand-sub">Văn phòng demo</div>
+  // Công ty cho agent tự thuê agent mới mà không cần bạn duyệt
+  const warn = company?.hireApproval === false && (
+    <div className="brand-warn" title="Trong Paperclip, mở cài đặt công ty và bật &quot;Require board approval for new agents&quot;.">
+      ⚠ Agent thuê người mới không cần bạn duyệt
+    </div>
+  )
   if (company && companies.length > 1) {
     return (
+      <>
       <select className="brand-sub company-pick" value={company.id} onChange={(e) => switchCompany(e.target.value)} aria-label="Đổi công ty" title="Đổi công ty">
         {companies.map((c) => <option key={c.id} value={c.id}>Văn phòng {c.name}</option>)}
       </select>
+      {warn}
+      </>
     )
   }
-  return <div className="brand-sub">{company ? `Văn phòng ${company.name}` : 'Văn phòng AI'}</div>
+  return <><div className="brand-sub">{company ? `Văn phòng ${company.name}` : 'Văn phòng AI'}</div>{warn}</>
 }
 
 function Notes() {
@@ -132,6 +141,7 @@ export function Hud({ world }: { world: World }) {
     document.body.classList.toggle('focus-mode', viewing)
   }, [viewing])
   const working = agents.filter((a) => a.status === 'running').length
+  const staff = agents.filter((a) => !a.candidate).length
   const demo = conn === 'demo'
 
   return (
@@ -152,7 +162,7 @@ export function Hud({ world }: { world: World }) {
       <div className="panel roster">
         <div className="roster-head">
           <span>Nhân sự</span>
-          <span className="roster-count">{working}/{agents.length} đang làm</span>
+          <span className="roster-count">{working}/{staff} đang làm</span>
         </div>
         {agents.map((a) => (
           <button
@@ -161,14 +171,14 @@ export function Hud({ world }: { world: World }) {
             onClick={() => (demo ? cycleStatus(a.id) : pingAgent(a.id))}
             title={demo ? 'Demo: bấm để đổi trạng thái' : 'Bấm để đánh dấu trên bản đồ'}
           >
-            <span className="np-dot" style={{ background: STATUS_COLOR[a.status] }} />
+            <span className={`np-dot${a.candidate ? ' dot-cand' : ''}`} style={{ background: a.candidate ? undefined : STATUS_COLOR[a.status] }} />
             <span className="roster-main">
               <span className="roster-row">
                 <span className="roster-name">{a.name}{waitingOn(a.id) > 0 && <span className="roster-ask" title="Đang chờ bạn duyệt / trả lời"> 🙋</span>}</span>
-                <span className="roster-status">{STATUS_LABEL[a.status]}</span>
+                <span className="roster-status">{a.candidate ? 'Ứng viên' : STATUS_LABEL[a.status]}</span>
               </span>
               {a.status === 'running' && a.task && <span className="roster-task">{a.task}</span>}
-              {(a.status === 'error' || a.status === 'paused') && a.reason && <span className="roster-task">{a.reason}</span>}
+              {!a.candidate && (a.status === 'error' || a.status === 'paused') && a.reason && <span className="roster-task">{a.reason}</span>}
             </span>
           </button>
         ))}
@@ -196,7 +206,9 @@ export function Hud({ world }: { world: World }) {
         <div className="prompt">
           <kbd>E</kbd>
           <span>
-            {nearAsks > 0
+            {near.candidate
+              ? `Xem hồ sơ ứng viên · ${near.name}`
+              : nearAsks > 0
               ? `Duyệt / trả lời · ${near.name} · ${nearAsks} việc chờ bạn`
               : near.status === 'running'
               ? `Chat / xem CLI · ${near.name}`

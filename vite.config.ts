@@ -23,6 +23,8 @@ function allowList() {
       // Việc chờ bạn quyết: hộp thư "cần chú ý" + nội dung phiếu duyệt
       new RegExp(`^/api/companies/${UUID}/attention$`),
       new RegExp(`^/api/approvals/${UUID}$`),
+      new RegExp(`^/api/approvals/${UUID}/comments$`),
+      new RegExp(`^/api/companies/${UUID}/approvals$`),
     ],
     POST: [
       new RegExp(`^/api/agents/${UUID}/(wakeup|pause|resume)$`),

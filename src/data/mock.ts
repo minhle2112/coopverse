@@ -3,7 +3,8 @@ import type { Agent, Ask, Comment, Issue } from './types'
 
 /**
  * Dữ liệu giả cho bản demo (mở http://127.0.0.1:5177/?demo). Một đội nội dung giả: Lead và 6 thành viên;
- * các agent "(demo)" chỉ để thấy bố cục và các trạng thái khác nhau.
+ * các agent "(demo)" chỉ để thấy bố cục và các trạng thái khác nhau. Content SEO có một agent con (bàn phụ)
+ * và hai ứng viên đang chờ ở sảnh: một hồ sơ đúng luật, một hồ sơ vượt luật (agent con xin thuê tiếp).
  */
 export const MOCK_AGENTS: Agent[] = [
   { id: 'seo-lead', name: 'SEO Lead', title: 'Trưởng nhóm SEO', status: 'running', reportsTo: null, task: 'LAB-14 · Audit cannibalization', issueId: 'i14' },
@@ -13,6 +14,9 @@ export const MOCK_AGENTS: Agent[] = [
   { id: 'demo-editor', name: 'Biên Tập', title: 'Biên tập phản biện', status: 'paused', reportsTo: 'seo-lead', reason: 'Bạn tạm dừng', demo: true },
   { id: 'demo-translate', name: 'Dịch Bài', title: 'Dịch bài DE', status: 'idle', reportsTo: 'seo-lead', demo: true },
   { id: 'demo-image', name: 'Tạo Ảnh', title: 'Tạo ảnh', status: 'error', reportsTo: 'seo-lead', reason: 'Hết hạn mức API ảnh', demo: true },
+  { id: 'demo-meta', name: 'Viết Meta', title: 'Agent con: viết meta', status: 'running', reportsTo: 'content-seo', task: 'LAB-12 · Meta cho batch A', issueId: 'i12', demo: true, canHire: false },
+  { id: 'cand-link', name: 'Kiểm Tra Link', title: 'Rà link gãy', status: 'paused', reportsTo: 'content-seo', candidate: true, demo: true },
+  { id: 'cand-sub', name: 'Phụ Tá Meta', title: 'Phụ viết meta', status: 'paused', reportsTo: 'demo-meta', candidate: true, demo: true },
 ]
 
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString()
@@ -53,7 +57,8 @@ const ask = (a: Omit<Ask, 'createdAt' | 'inline' | 'href' | 'issueKey'> & { min:
 
 /** Việc chờ bạn quyết trong bản demo: đủ các loại thẻ (phiếu duyệt, xác nhận, câu hỏi, phiếu không gắn agent). */
 export const MOCK_ASKS: Ask[] = [
-  ask({ id: 'ask-hire', kind: 'approval', type: 'hire_agent', agentId: 'seo-lead', title: 'Thuê "Kiểm Tra Link" (QA)', excerpt: 'Cần một agent rà link gãy sau mỗi đợt đăng bài', issueId: 'i14', min: 6 }),
+  ask({ id: 'ask-hire', kind: 'approval', type: 'hire_agent', agentId: 'content-seo', candidateId: 'cand-link', title: 'Hire Agent: Kiểm Tra Link', excerpt: 'Cần một agent rà link gãy sau mỗi đợt đăng bài', issueId: 'i12', min: 6 }),
+  ask({ id: 'ask-hire2', kind: 'approval', type: 'hire_agent', agentId: 'demo-meta', candidateId: 'cand-sub', title: 'Hire Agent: Phụ Tá Meta', excerpt: 'Em cần thêm người viết meta cho kịp', issueId: 'i12', min: 1 }),
   ask({ id: 'ask-confirm', kind: 'confirm', type: 'request_confirmation', agentId: 'demo-research', title: 'Chốt danh sách 20 truy vấn', excerpt: 'Danh sách 20 truy vấn hạng 8–20 đã lọc xong, sếp chốt để em viết brief?', issueId: 'i15', min: 3 }),
   ask({ id: 'ask-q', kind: 'questions', type: 'ask_user_questions', agentId: 'demo-writer', title: 'Giọng văn bài DE', excerpt: 'Bài Größentabelle viết giọng nào?', issueId: 'i16', min: 2 }),
   ask({ id: 'ask-budget', kind: 'approval', type: 'budget_override_required', agentId: null, title: 'Tạo Ảnh đã dùng 92% ngân sách tháng', excerpt: 'Cho phép vượt ngân sách để chạy tiếp?', issueId: null, min: 12 }),
@@ -67,13 +72,35 @@ export const MOCK_ASK_DETAILS: Record<string, AskDetail> = {
       name: 'Kiểm Tra Link',
       role: 'qa',
       title: 'Rà link gãy, redirect',
-      reportsTo: 'seo-lead',
+      reportsTo: 'content-seo',
       capabilities: 'Crawl các trang vừa đăng, báo link 404 / redirect vòng',
       adapterType: 'claude_local',
       adapterConfig: { model: 'claude-haiku-4-5' },
       budgetMonthlyCents: 1500,
-      reason: 'Mỗi đợt đăng 5–8 bài em mất ~20 phút soát link. Giao cho agent riêng chạy model rẻ thì nhanh và rẻ hơn.',
+      permissions: { canCreateAgents: false },
     },
+    comments: [
+      {
+        id: 'hc1', authorAgentId: 'content-seo', authorType: 'agent', createdAt: ago(6),
+        body: '**Vì sao cần:** 4 đợt đăng gần nhất (LAB-9, 10, 11, 12) lần nào em cũng mất ~20 phút soát link gãy.\n\n**Giao gì:** sau mỗi đợt đăng, crawl các trang mới và báo link 404 / redirect vòng.\n\n**Chi phí:** model rẻ (haiku), ước ~$15/tháng.',
+      },
+    ],
+  },
+  'ask-hire2': {
+    source: 'approval',
+    status: 'pending',
+    payload: {
+      name: 'Phụ Tá Meta',
+      role: 'general',
+      title: 'Phụ viết meta',
+      reportsTo: 'demo-meta',
+      capabilities: 'Viết meta title / description cho trang mới',
+      adapterType: 'claude_local',
+      adapterConfig: { model: 'claude-opus-5-5' },
+    },
+    comments: [
+      { id: 'hc2', authorAgentId: 'demo-meta', authorType: 'agent', createdAt: ago(1), body: 'Batch A nhiều trang quá, em cần thêm một người viết meta cho kịp.' },
+    ],
   },
   'ask-confirm': {
     source: 'interaction',

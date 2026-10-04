@@ -2,7 +2,8 @@ import { useState, type ReactNode } from 'react'
 import { uiTick } from '../audio/engine'
 import { resolveAsk, useAskDetail, type AskAction } from '../data/asks'
 import { issueUrl, PAPERCLIP_UI, type ApprovalVerb, type AskAnswer } from '../data/paperclip'
-import { askLabel, type Agent, type Ask } from '../data/types'
+import { candidateCanHire, hireWarnings } from '../data/hire'
+import { askLabel, type Agent, type Ask, type Comment } from '../data/types'
 import { useCoop } from '../store'
 import { Md } from './Md'
 
@@ -87,7 +88,7 @@ function extraRows(payload: Record<string, unknown>) {
 
 // ───────── Phiếu duyệt ─────────
 
-function ApprovalBody({ ask, payload, who, agents }: { ask: Ask; payload: Record<string, unknown>; who?: Agent; agents: Agent[] }) {
+function ApprovalBody({ ask, payload, who, agents, comments = [] }: { ask: Ask; payload: Record<string, unknown>; who?: Agent; agents: Agent[]; comments?: Comment[] }) {
   const r = useResolve(ask)
   const [note, setNote] = useState('')
   const hire = ask.type === 'hire_agent'
@@ -99,6 +100,11 @@ function ApprovalBody({ ask, payload, who, agents }: { ask: Ask; payload: Record
   const budget = typeof payload.budgetMonthlyCents === 'number' ? `$${(payload.budgetMonthlyCents / 100).toFixed(2)} / tháng` : null
   const risks = list(payload.risks).map(text).filter(Boolean) as string[]
   const skills = list(payload.desiredSkills).map((s) => text(s) ?? text(rec(s).key) ?? text(rec(s).name)).filter(Boolean) as string[]
+  // Hồ sơ ứng viên: lý do thuê nằm trong bình luận của agent trên phiếu; cảnh báo khi vượt luật thuê
+  const warns = hire ? hireWarnings(agents, ask.agentId, payload) : []
+  const overRule = warns.some((w) => w.level === 'red')
+  const why = comments.filter((c) => c.authorAgentId)
+  const canHire = candidateCanHire(agents, payload)
 
   const wake = who ? ` Paperclip sẽ đánh thức ${who.name} để làm tiếp (một lượt chạy, tốn token).` : ''
   const choose = (verb: ApprovalVerb) => {
@@ -106,8 +112,8 @@ function ApprovalBody({ ask, payload, who, agents }: { ask: Ask; payload: Record
     const n = note.trim()
     const p: Record<ApprovalVerb, Pending> = {
       approve: {
-        label: 'Duyệt phiếu này?',
-        body: (hire ? `Agent "${text(payload.name) ?? 'mới'}" được tạo và bắt đầu nhận việc.` : '') + wake,
+        label: overRule ? 'Duyệt dù vượt luật thuê?' : hire ? 'Nhận ứng viên này?' : 'Duyệt phiếu này?',
+        body: (hire ? `Agent "${text(payload.name) ?? 'mới'}" được tạo, về bàn và bắt đầu nhận việc.` : '') + wake,
         ok: 'Duyệt', cls: 't-btn-wake', action: { do: 'approval', verb, note: n },
       },
       'request-revision': {
@@ -117,7 +123,7 @@ function ApprovalBody({ ask, payload, who, agents }: { ask: Ask; payload: Record
       },
       reject: {
         label: 'Từ chối phiếu này?',
-        body: hire ? 'Agent ứng viên không được tạo.' : 'Phiếu đóng lại, agent không được làm việc này.',
+        body: hire ? 'Ứng viên rời sảnh, agent không được tạo.' : 'Phiếu đóng lại, agent không được làm việc này.',
         ok: 'Từ chối', cls: 't-btn-reject', action: { do: 'approval', verb, note: n },
       },
     }
@@ -135,7 +141,20 @@ function ApprovalBody({ ask, payload, who, agents }: { ask: Ask; payload: Record
           <Row k="Model">{text(cfg.model) ?? 'mặc định'} <span className="muted">· {text(payload.adapterType) ?? '?'}</span></Row>
           {budget && <Row k="Ngân sách">{budget}</Row>}
           {skills.length > 0 && <Row k="Kỹ năng">{skills.join(', ')}</Row>}
+          <Row k="Được thuê tiếp">{canHire === false ? 'Không' : canHire ? 'Có' : 'Không rõ'}</Row>
         </div>
+      )}
+      {hire && why.length > 0 && (
+        <div className="hire-why">
+          <b>Lý do{who ? ` của ${who.name}` : ''}</b>
+          {why.map((c) => <div key={c.id} className="ask-md"><Md text={c.body} /></div>)}
+        </div>
+      )}
+      {hire && !why.length && !text(payload.reason) && <div className="ask-muted">Agent chưa viết lý do thuê trong bình luận phiếu.</div>}
+      {warns.length > 0 && (
+        <ul className="hire-warns">
+          {warns.map((w) => <li key={w.text} className={`lvl-${w.level}`}>{w.level === 'red' ? '⛔' : '⚠'} {w.text}</li>)}
+        </ul>
       )}
       {text(payload.summary) && <div className="ask-md"><Md text={text(payload.summary)!} /></div>}
       {text(payload.reason) && <Row k="Lý do">{text(payload.reason)}</Row>}
@@ -347,7 +366,7 @@ export function AskCard({ ask }: { ask: Ask }) {
   if (view.state === 'loading') body = <div className="ask-muted">Đang mở…</div>
   else if (view.state === 'error' || !d) body = <div className="ask-muted t-errbox">Không đọc được: {view.error}</div>
   else if (d.status !== 'pending') body = <div className="ask-muted">Việc này đã được xử lý.</div>
-  else if (ask.kind === 'approval') body = <ApprovalBody ask={ask} payload={d.payload} who={who} agents={agents} />
+  else if (ask.kind === 'approval') body = <ApprovalBody ask={ask} payload={d.payload} who={who} agents={agents} comments={d.source === 'approval' ? d.comments : undefined} />
   else if (ask.kind === 'confirm') body = <ConfirmBody ask={ask} payload={d.payload} who={who} />
   else if (ask.kind === 'questions') body = <QuestionsBody ask={ask} payload={d.payload} who={who} />
   else {

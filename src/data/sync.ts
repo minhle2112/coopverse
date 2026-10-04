@@ -135,7 +135,7 @@ export function startSync(): () => void {
     if (c.kind === 'ignore') return
     if (c.kind === 'agent-status' && snap) {
       gen++
-      apply({ ...snap, agents: snap.agents.map((a) => (a.id === c.agentId ? { ...a, status: c.status } : a)) })
+      apply({ ...snap, agents: snap.agents.map((a) => (a.id === c.agentId ? { ...a, status: c.status, candidate: c.candidate || (c.status === 'terminated' && a.candidate) || undefined } : a)) })
     }
     if (!opts?.noRefresh) schedule()
   }

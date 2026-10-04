@@ -18,7 +18,8 @@ export interface AABB { minX: number; maxX: number; minZ: number; maxZ: number; 
 
 export interface DeskSlot {
   id: string
-  zone: 'lead' | 'open'
+  /** side = bàn phụ của agent con, nối dài dãy bàn của agent cha */
+  zone: 'lead' | 'open' | 'side'
   seat: Vec2
   /** Hướng agent nhìn khi ngồi (bàn nằm phía trước). forward = (sin yaw, cos yaw) */
   yaw: number
@@ -47,6 +48,17 @@ export interface Graph { nodes: Record<string, GraphNode>; adj: Record<string, s
 
 export const OFFICE = { minX: -16, maxX: 16, minZ: -11, maxZ: 11, wallH: 3.2, wallT: 0.3 }
 export const SPAWN: Vec2 = { x: 0, z: 5.5 }
+
+/**
+ * Sảnh chờ bên phải cửa vào: ứng viên xếp hàng chờ bạn duyệt hồ sơ, mặt nhìn vào văn phòng.
+ * Nằm sau lưng camera lúc mới vào, để bảng tên không che màn hình; quay lại phía cửa là thấy.
+ */
+export const LOBBY: (Vec2 & { yaw: number })[] = [
+  { x: 3.4, z: 9.8, yaw: Math.PI - 0.25 },
+  { x: 5.1, z: 9.3, yaw: Math.PI - 0.25 },
+  { x: 6.8, z: 9.8, yaw: Math.PI - 0.25 },
+  { x: 8.3, z: 9.3, yaw: Math.PI - 0.25 },
+]
 
 export const LEAD_ROOM = { minX: -16, maxX: -9, minZ: -11, maxZ: -4, door: [-11.5, -10.3] as const }
 export const MEET_ROOM = { minX: 9, maxX: 16, minZ: -11, maxZ: -4, door: [10.3, 11.5] as const }
@@ -252,27 +264,27 @@ const PODS: Vec2[] = [
 const nearestIdx = (arr: number[], v: number) =>
   arr.reduce((bi, x, i) => (Math.abs(x - v) < Math.abs(arr[bi] - v) ? i : bi), 0)
 
+const podRows = (p: Vec2) => [
+  { dz: -1.2, yaw: 0, corridor: p.z - 2.75 },
+  { dz: 1.2, yaw: Math.PI, corridor: p.z + 2.75 },
+]
+
+function rowSlot(id: string, zone: DeskSlot['zone'], seat: Vec2, yaw: number, corridor: number): DeskSlot {
+  const j = nearestIdx(ZL, corridor)
+  return { id, zone, seat, yaw, exits: [{ x: seat.x, z: ZL[j] }], attach: gid(nearestIdx(XL, seat.x), j) }
+}
+
 function podSlots(p: Vec2, pi: number): DeskSlot[] {
-  const rows = [
-    { dz: -1.2, yaw: 0, corridor: p.z - 2.75 },
-    { dz: 1.2, yaw: Math.PI, corridor: p.z + 2.75 },
-  ]
-  const out: DeskSlot[] = []
-  for (const [ri, r] of rows.entries()) {
-    for (const [ci, dx] of [-0.7, 0.7].entries()) {
-      const seat = { x: p.x + dx, z: p.z + r.dz }
-      const j = nearestIdx(ZL, r.corridor)
-      out.push({
-        id: `pod${pi}-${ri}${ci}`,
-        zone: 'open',
-        seat,
-        yaw: r.yaw,
-        exits: [{ x: seat.x, z: ZL[j] }],
-        attach: gid(nearestIdx(XL, seat.x), j),
-      })
-    }
-  }
-  return out
+  return podRows(p).flatMap((r, ri) =>
+    [-0.7, 0.7].map((dx, ci) => rowSlot(`pod${pi}-${ri}${ci}`, 'open', { x: p.x + dx, z: p.z + r.dz }, r.yaw, r.corridor)),
+  )
+}
+
+/** Bàn phụ ở hai đầu dãy bàn (mỗi cụm 4 chỗ: trái/phải × hai hàng) */
+const SIDE_DX = 2.1
+function sideSlot(p: Vec2, pi: number, ri: number, side: -1 | 1): DeskSlot {
+  const r = podRows(p)[ri]
+  return rowSlot(`side${pi}-${ri}${side < 0 ? 'L' : 'R'}`, 'side', { x: p.x + side * SIDE_DX, z: p.z + r.dz }, r.yaw, r.corridor)
 }
 
 const LEAD_SLOTS: DeskSlot[] = [-7.5, -9.8].map((z, i) => ({
@@ -294,15 +306,19 @@ export interface World {
 }
 
 /**
- * Xếp chỗ theo sơ đồ tổ chức: agent có người báo cáo = Lead → phòng kính (tối đa 2),
- * còn lại ngồi open space, theo từng nhóm của Lead (duyệt cây reportsTo).
+ * Xếp chỗ theo sơ đồ tổ chức: agent gốc có người báo cáo = Lead → phòng kính (tối đa 2),
+ * thành viên ngồi open space theo từng nhóm của Lead (duyệt cây reportsTo).
+ * Agent con (báo cáo cho một thành viên) ngồi bàn phụ ngay cạnh bàn agent cha; cha giữ nguyên chỗ.
+ * Ứng viên chưa được duyệt không có bàn (đứng ở sảnh).
  */
-export function buildWorld(agents: Agent[]): World {
+export function buildWorld(all: Agent[]): World {
+  const agents = all.filter((a) => !a.candidate)
   const children = new Map<string | null, Agent[]>()
   for (const a of agents) {
     const k = agents.some((b) => b.id === a.reportsTo) ? a.reportsTo : null
     children.set(k, [...(children.get(k) ?? []), a])
   }
+  const parentOf = new Map(agents.map((a) => [a.id, agents.find((b) => b.id === a.reportsTo)]))
   const isLead = (a: Agent) => (children.get(a.id)?.length ?? 0) > 0
   const roots = children.get(null) ?? []
 
@@ -314,14 +330,37 @@ export function buildWorld(agents: Agent[]): World {
   const seatOf = new Map<string, DeskSlot>()
   const usedLead = leads.slice(0, LEAD_SLOTS.length)
   usedLead.forEach((a, i) => seatOf.set(a.id, LEAD_SLOTS[i]))
-  const openAgents = ordered.filter((a) => !seatOf.has(a.id))
+  // Agent con = cha của nó cũng báo cáo cho người khác
+  const isSub = (a: Agent) => !!parentOf.get(a.id) && !!parentOf.get(parentOf.get(a.id)!.id)
+  const subs = ordered.filter((a) => !seatOf.has(a.id) && isSub(a))
+  const openAgents = ordered.filter((a) => !seatOf.has(a.id) && !isSub(a))
 
   const podCount = Math.min(PODS.length, Math.max(2, Math.ceil(openAgents.length / 4)))
   const pods = PODS.slice(0, podCount)
   const openSlots = pods.flatMap(podSlots)
   openAgents.slice(0, openSlots.length).forEach((a, i) => seatOf.set(a.id, openSlots[i]))
 
-  const slots = [...LEAD_SLOTS.slice(0, Math.max(1, usedLead.length)), ...openSlots]
+  // Bàn phụ: ưu tiên cùng phía với ghế cha, cùng hàng trước rồi hàng đối diện
+  const sideSlots: DeskSlot[] = []
+  const taken = new Set<string>()
+  const homeless: Agent[] = []
+  for (const a of subs) {
+    const ps = seatOf.get(parentOf.get(a.id)!.id)
+    const m = ps && /^pod(\d+)-(\d)(\d)$/.exec(ps.id)
+    if (!m) { homeless.push(a); continue }
+    const pi = +m[1], ri = +m[2], side: -1 | 1 = m[3] === '0' ? -1 : 1
+    const order: [number, -1 | 1][] = [[ri, side], [1 - ri, side], [ri, -side as -1 | 1], [1 - ri, -side as -1 | 1]]
+    const pick = order.map(([r, sd]) => sideSlot(pods[pi], pi, r, sd)).find((s) => !taken.has(s.id))
+    if (!pick) { homeless.push(a); continue }
+    taken.add(pick.id)
+    sideSlots.push(pick)
+    seatOf.set(a.id, pick)
+  }
+  // Hết bàn phụ: ngồi chỗ trống ở open space như thành viên thường
+  const free = openSlots.filter((s) => ![...seatOf.values()].includes(s))
+  homeless.slice(0, free.length).forEach((a, i) => seatOf.set(a.id, free[i]))
+
+  const slots = [...LEAD_SLOTS.slice(0, Math.max(1, usedLead.length)), ...openSlots, ...sideSlots]
   return { slots, seatOf, colliders: buildColliders(slots), pods }
 }
 

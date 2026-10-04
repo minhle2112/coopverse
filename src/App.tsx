@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { AgentActor } from './agents/AgentActor'
+import { Candidate } from './agents/Candidate'
 import { SoundDirector } from './audio/SoundDirector'
 import { startSync } from './data/sync'
 import type { AgentStatus } from './data/types'
@@ -13,7 +14,7 @@ import { useCoop } from './store'
 import { AutoQuality } from './world/Quality'
 import { Hud } from './ui/Hud'
 import { DayNight } from './world/DayNight'
-import { buildWorld } from './world/layout'
+import { LOBBY, buildWorld } from './world/layout'
 import { KanbanBoard } from './world/Kanban'
 import { Office } from './world/Office'
 
@@ -25,7 +26,7 @@ export default function App() {
   const agents = useCoop((s) => s.agents)
   const quality = useSettings((s) => s.quality)
   // Bố cục chỉ dựng lại khi sơ đồ tổ chức đổi, không phải khi trạng thái đổi
-  const orgKey = agents.map((a) => `${a.id}>${a.reportsTo}`).join('|')
+  const orgKey = agents.map((a) => `${a.id}>${a.reportsTo}${a.candidate ? '?' : ''}`).join('|')
   const world = useMemo(() => buildWorld(useCoop.getState().agents), [orgKey])
 
   const statusOfSlot = useMemo(() => {
@@ -37,7 +38,9 @@ export default function App() {
     return m
   }, [agents, world])
 
-  const leadIds = useMemo(() => new Set(agents.map((a) => a.reportsTo).filter(Boolean)), [agents])
+  const leadIds = useMemo(() => new Set(agents.filter((a) => !a.candidate).map((a) => a.reportsTo).filter(Boolean)), [agents])
+  // Ứng viên chờ duyệt thuê: đứng ở sảnh (tối đa số chỗ ở sảnh, còn lại xem trong danh sách Q)
+  const candidates = agents.filter((a) => a.candidate && a.status !== 'terminated').slice(0, LOBBY.length)
 
   return (
     <>
@@ -54,6 +57,7 @@ export default function App() {
             .map((a) => (
               <AgentActor key={a.id} agent={a} slot={world.seatOf.get(a.id)!} isLead={leadIds.has(a.id)} />
             ))}
+          {candidates.map((a, i) => <Candidate key={a.id} agent={a} spot={LOBBY[i]} />)}
           <Player world={world} />
           {import.meta.env.DEV && <DevHooks />}
         </Canvas>
