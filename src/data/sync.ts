@@ -1,10 +1,11 @@
 import { snippet } from '../life/comments'
+import { raiseHand } from '../life/director'
 import { say } from '../life/store'
 import { useCoop } from '../store'
-import { MOCK_AGENTS, MOCK_ISSUES } from './mock'
-import { diffNotes } from './notify'
+import { MOCK_AGENTS, MOCK_ASKS, MOCK_ISSUES } from './mock'
+import { askNotes, diffNotes, newAsks } from './notify'
 import { classifyEvent, paperclip, setCompanyId, type PcLiveEvent, type Snapshot } from './paperclip'
-import type { ChatInfo, Company } from './types'
+import type { Ask, ChatInfo, Company } from './types'
 
 /** Ai cần nghe sự kiện realtime thô (vd. ô chat đọc lại tin mới ngay). */
 export const liveListeners = new Set<(e: PcLiveEvent) => void>()
@@ -57,6 +58,17 @@ export function switchCompany(id: string) {
   location.replace(url.toString())
 }
 
+/** Đọc lại dữ liệu Paperclip sớm (vd ngay sau khi bạn duyệt một phiếu). Không làm gì ở bản demo. */
+export let requestRefresh: () => void = () => {}
+
+/** Việc chờ mới: báo một dòng, agent gửi giơ tay gọi bạn. */
+function announceAsks(prev: Ask[], next: Ask[]) {
+  const fresh = newAsks(prev, next)
+  if (!fresh.length) return
+  useCoop.getState().pushNotes(askNotes(fresh, useCoop.getState().agents))
+  for (const a of fresh) if (a.agentId) raiseHand(a.agentId, a.kind)
+}
+
 /** Dev: bơm sự kiện giả vào luồng realtime để kiểm tra (window.__coop.inject). */
 export let injectLiveEvent: ((e: PcLiveEvent, opts?: { noRefresh?: boolean }) => void) | null = null
 
@@ -68,7 +80,7 @@ export let injectLiveEvent: ((e: PcLiveEvent, opts?: { noRefresh?: boolean }) =>
 export function startSync(): () => void {
   const store = useCoop.getState
   if (new URLSearchParams(location.search).has('demo')) {
-    store().setSnapshot(MOCK_AGENTS, MOCK_ISSUES)
+    store().setSnapshot(MOCK_AGENTS, MOCK_ISSUES, [], MOCK_ASKS)
     store().setConn('demo')
     return () => {}
   }
@@ -88,12 +100,16 @@ export function startSync(): () => void {
 
   const apply = (next: Snapshot) => {
     const s = store()
+    // Không đọc được hộp thư việc chờ lần này: giữ danh sách đang có
+    const asks = next.asks ?? snap?.asks ?? null
     if (snap) {
       s.pushNotes(diffNotes(snap.agents, next.agents, snap.issues, next.issues))
       announceReplies(snap.chats, next.chats)
+      // Lần đọc đầu tiên không báo: việc chờ có sẵn từ trước, không phải "mới"
+      if (asks && snap.asks) announceAsks(snap.asks, asks)
     }
-    snap = next
-    s.setSnapshot(next.agents, next.issues, next.chats)
+    snap = { ...next, asks }
+    s.setSnapshot(next.agents, next.issues, next.chats, asks ?? undefined)
   }
 
   async function refresh() {
@@ -124,6 +140,7 @@ export function startSync(): () => void {
     if (!opts?.noRefresh) schedule()
   }
   if (import.meta.env.DEV) injectLiveEvent = onEvent
+  requestRefresh = () => schedule(0)
 
   function connect() {
     if (stopped) return
@@ -185,5 +202,6 @@ export function startSync(): () => void {
     clearInterval(poll)
     closeWs?.()
     injectLiveEvent = null
+    requestRefresh = () => {}
   }
 }

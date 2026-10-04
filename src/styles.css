@@ -437,7 +437,7 @@ a.card:hover { box-shadow: 0 0 0 2px #2c7fc0, 0 4px 12px rgba(0, 0, 0, 0.15); }
 .wd-chip.on { background: var(--accent); border-color: var(--accent); color: #1d2230; }
 .wd-actions { display: flex; gap: 8px; margin-top: 14px; }
 .wd-note { margin: 10px 0 0; font-size: 11.5px; color: var(--muted); }
-.focus-mode .toolbar, .focus-mode .settings { display: none; }
+.focus-mode .toolbar, .focus-mode .settings, .focus-mode .inbox { display: none; }
 
 @media (max-width: 760px) {
   .wd-body { grid-template-columns: 1fr; }
@@ -544,3 +544,130 @@ a.card:hover { box-shadow: 0 0 0 2px #2c7fc0, 0 4px 12px rgba(0, 0, 0, 0.15); }
 .md a { color: #8fd0ff; }
 .chat-ask .md, .chat-ask b { color: var(--text); }
 .chat > .t-jump { bottom: 100px; }
+
+/* ───────── Duyệt tại chỗ: phiếu duyệt + câu hỏi của agent ───────── */
+
+/* Dấu "?" trên đầu agent đang chờ bạn: cam = phiếu duyệt, vàng = câu hỏi */
+.ask-mark {
+  position: absolute; left: 50%; bottom: calc(100% + 4px);
+  width: 30px; height: 30px; margin-left: -15px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: 900 21px/1 'Segoe UI', system-ui, sans-serif; color: #1d2230;
+  border: 2px solid #1d2230; box-shadow: 0 3px 0 rgba(29, 34, 48, 0.3);
+  animation: ask-bob 1.1s ease-in-out infinite;
+}
+.ask-mark.mark-approval { background: #ff9140; }
+.ask-mark.mark-question { background: #f2d044; }
+@keyframes ask-bob { 50% { transform: translateY(-6px); } }
+.np-sub.np-ask { color: #ffb066; font-weight: 600; }
+.roster-ask { font-size: 12px; }
+.note-ask { border-left-color: #ff9140; }
+
+/* Nút + danh sách "việc chờ bạn" ở cột trái */
+.inbox { pointer-events: auto; display: flex; flex-direction: column; gap: 6px; max-width: 300px; min-height: 0; }
+.left-col > .inbox { position: static; flex: 0 1 auto; }
+.inbox-btn {
+  align-self: flex-start; display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border: 1px solid rgba(255, 145, 64, 0.7); border-radius: 999px; background: rgba(60, 34, 14, 0.85);
+  color: #ffd2ad; font: 600 13px 'Segoe UI', system-ui, sans-serif; cursor: pointer;
+  backdrop-filter: blur(6px); animation: inbox-glow 1.8s ease-in-out infinite;
+}
+.inbox-btn b { color: #fff; }
+.inbox-btn kbd { font-size: 10px; margin: 0 0 0 4px; }
+.inbox-btn.on { animation: none; background: rgba(90, 50, 20, 0.95); }
+@keyframes inbox-glow { 50% { box-shadow: 0 0 0 4px rgba(255, 145, 64, 0.25); } }
+.inbox-list { position: static; padding: 6px; max-height: 300px; overflow-y: auto; scrollbar-color: #2e3b52 transparent; }
+.inbox-item { display: flex; align-items: stretch; gap: 4px; border-radius: 8px; }
+.inbox-item + .inbox-item { margin-top: 4px; }
+.inbox-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 6px 8px;
+  border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.04); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.inbox-main:hover, .inbox-find:hover { background: rgba(255, 255, 255, 0.1); }
+.inbox-top { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.inbox-who { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-find { flex: none; width: 32px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.04); cursor: pointer; font-size: 14px; }
+
+/* Thẻ một việc chờ */
+.ask-pane { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px; font-family: 'Segoe UI', system-ui, sans-serif; scrollbar-color: #2e3b52 transparent; }
+.ask-card {
+  max-width: 640px; margin: 0 auto 12px; padding: 12px 14px; border-radius: 12px;
+  background: #16202f; border: 1px solid rgba(255, 255, 255, 0.1); border-left: 4px solid #f2d044;
+  color: var(--text); font: 14px/1.5 'Segoe UI', system-ui, sans-serif;
+}
+.ask-card.kind-approval { border-left-color: #ff9140; }
+.ask-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.ask-tag {
+  padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap;
+  background: rgba(242, 208, 68, 0.18); color: #f2d044;
+}
+.kind-approval .ask-tag { background: rgba(255, 145, 64, 0.18); color: #ffb066; }
+.ask-who { color: var(--muted); }
+.ask-issue { margin-left: auto; color: #8fd0ff; text-decoration: none; }
+.ask-issue:hover { text-decoration: underline; }
+.ask-title { margin: 6px 0 8px; font-size: 16px; font-weight: 700; }
+.ask-muted { color: var(--muted); padding: 6px 0; }
+.ask-prompt { font-weight: 600; margin-bottom: 6px; }
+.ask-md { margin: 4px 0 8px; color: #d6dce6; }
+.ask-target { display: inline-block; margin-bottom: 8px; color: #8fd0ff; font-size: 13px; }
+.ask-rows { display: grid; gap: 3px; margin-bottom: 6px; }
+.ask-rows:empty { display: none; }
+.ask-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; font-size: 13px; }
+.ask-k { color: var(--muted); }
+.ask-v { overflow-wrap: anywhere; }
+.ask-v .muted { color: var(--muted); }
+.ask-risks { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: rgba(239, 90, 76, 0.1); font-size: 13px; }
+.ask-risks b { color: #ff8a7d; }
+.ask-risks ul { margin: 4px 0 0; padding-left: 18px; }
+.ask-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: #c4cad6; font-size: 13px; }
+.ask-text, .ask-other {
+  display: block; width: 100%; margin-top: 8px; padding: 7px 10px; border-radius: 8px; resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.15); background: #0d1420; color: var(--text); font: 13px/1.45 'Segoe UI', system-ui, sans-serif;
+}
+.ask-text:focus, .ask-other:focus { outline: none; border-color: var(--accent); }
+.ask-btns { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ask-miss { margin-right: auto; color: var(--muted); font-size: 12px; }
+.ask-confirm { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(242, 181, 68, 0.1); border: 1px solid rgba(242, 181, 68, 0.4); }
+.ask-confirm-text { font-size: 13px; color: #d6dce6; }
+.ask-confirm-text b { color: var(--text); }
+.ask-confirm .ask-btns { margin-top: 8px; }
+.t-btn-reject { border-color: rgba(239, 90, 76, 0.5); color: #ff8a7d; }
+.t-primary.t-btn-reject { background: #c0443a; color: #fff; border-color: transparent; }
+
+/* Câu hỏi có lựa chọn */
+.ask-q { margin: 8px 0 0; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; }
+.ask-q legend { padding: 0 4px; font-weight: 600; }
+.ask-req { color: #ff8a7d; }
+.ask-help { margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+.ask-opt { display: flex; align-items: flex-start; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+.ask-opt:hover { background: rgba(255, 255, 255, 0.05); }
+.ask-opt.on { background: rgba(60, 207, 110, 0.1); }
+.ask-opt input { margin-top: 4px; accent-color: #3ccf6e; }
+.ask-opt small { display: block; color: var(--muted); font-size: 12px; }
+
+/* Thẻ duyệt nhanh giữa màn hình */
+.ask-sheet {
+  position: fixed; inset: 0; z-index: 35; pointer-events: auto;
+  display: flex; align-items: center; justify-content: center; background: rgba(8, 12, 20, 0.55);
+}
+.ask-sheet-box {
+  width: min(660px, 92vw); max-height: 86vh; overflow-y: auto; border-radius: 14px;
+  background: #0d1420; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  scrollbar-color: #2e3b52 transparent;
+}
+.ask-sheet-box:focus { outline: none; }
+.ask-sheet-bar {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: #1b2638; font: 600 13px 'Segoe UI', system-ui, sans-serif;
+}
+.ask-sheet .ask-card { margin: 12px; }
+
+/* Tab "Duyệt" ở màn hình agent */
+.term-tabs .tab-ask { color: #ffb066; }
+.tab-count {
+  display: inline-block; min-width: 16px; margin-left: 5px; padding: 0 4px; border-radius: 999px;
+  background: #ff9140; color: #1d2230; font-size: 10px; line-height: 16px; text-align: center;
+}
+.chat-askcard { margin: 10px 0; }
+.chat-askcard .ask-card { margin: 0; max-width: 82%; }

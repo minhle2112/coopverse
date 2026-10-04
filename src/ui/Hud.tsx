@@ -4,6 +4,7 @@ import { switchCompany } from '../data/sync'
 import { STATUS_COLOR, STATUS_LABEL } from '../data/types'
 import { useCoop } from '../store'
 import type { World } from '../world/layout'
+import { AskSheet, Inbox } from './Inbox'
 import { KanbanView } from './KanbanView'
 import { Minimap } from './Minimap'
 import { Clock, SettingsPanel, Toolbar } from './Settings'
@@ -118,9 +119,13 @@ export function Hud({ world }: { world: World }) {
   const wardrobeId = useCoop((s) => s.wardrobeId)
   const settingsOpen = useCoop((s) => s.settingsOpen)
   const company = useCoop((s) => s.company)
+  const asks = useCoop((s) => s.asks)
+  const askId = useCoop((s) => s.askId)
   const near = agents.find((a) => a.id === nearId)
   const focused = agents.find((a) => a.id === focusId)
-  const viewing = !!focusId || boardOpen || !!wardrobeId
+  const viewing = !!focusId || boardOpen || !!wardrobeId || !!askId
+  const waitingOn = (id: string) => asks.filter((a) => a.agentId === id).length
+  const nearAsks = near ? waitingOn(near.id) : 0
 
   // Đang xem CLI / bảng ticket: ẩn bảng tên và các bảng HUD che màn hình
   useEffect(() => {
@@ -139,6 +144,7 @@ export function Hud({ world }: { world: World }) {
           <Clock />
         </div>
         <Toolbar />
+        <Inbox />
         {settingsOpen && <SettingsPanel />}
         <Notes />
       </div>
@@ -158,7 +164,7 @@ export function Hud({ world }: { world: World }) {
             <span className="np-dot" style={{ background: STATUS_COLOR[a.status] }} />
             <span className="roster-main">
               <span className="roster-row">
-                <span className="roster-name">{a.name}</span>
+                <span className="roster-name">{a.name}{waitingOn(a.id) > 0 && <span className="roster-ask" title="Đang chờ bạn duyệt / trả lời"> 🙋</span>}</span>
                 <span className="roster-status">{STATUS_LABEL[a.status]}</span>
               </span>
               {a.status === 'running' && a.task && <span className="roster-task">{a.task}</span>}
@@ -190,7 +196,9 @@ export function Hud({ world }: { world: World }) {
         <div className="prompt">
           <kbd>E</kbd>
           <span>
-            {near.status === 'running'
+            {nearAsks > 0
+              ? `Duyệt / trả lời · ${near.name} · ${nearAsks} việc chờ bạn`
+              : near.status === 'running'
               ? `Chat / xem CLI · ${near.name}`
               : near.status === 'terminated'
                 ? `${near.name} · ${STATUS_LABEL[near.status]}`
@@ -207,6 +215,7 @@ export function Hud({ world }: { world: World }) {
           <span>Chuột: xoay</span>
           <span>Lăn chuột: gần/xa</span>
           <span><kbd>E</kbd> chat với agent / xem bảng ticket</span>
+          <span><kbd>Q</kbd> việc chờ duyệt</span>
           <span><kbd>C</kbd> tủ đồ</span>
           <span><kbd>M</kbd> nhạc</span>
           <span><kbd>Esc</kbd> nhả chuột / đóng</span>
@@ -218,6 +227,7 @@ export function Hud({ world }: { world: World }) {
       {focused && <Terminal key={focused.id} agent={focused} />}
       {boardOpen && <KanbanView />}
       {wardrobeId && <Wardrobe id={wardrobeId} />}
+      <AskSheet />
       <Toast />
     </div>
   )

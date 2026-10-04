@@ -63,12 +63,58 @@ export interface ChatMessage {
   sending?: boolean
 }
 
-/** Câu hỏi / yêu cầu duyệt agent gửi trong chat, đang chờ bạn trả lời (trả lời trong Paperclip). */
+/** Câu hỏi / yêu cầu duyệt agent gửi trong chat, đang chờ bạn trả lời. */
 export interface ChatAsk {
   id: string
   title: string
   text: string
 }
+
+/**
+ * Một việc đang chờ bạn quyết (lấy từ hộp thư "cần chú ý" của Paperclip):
+ * - approval: phiếu duyệt (thuê agent, chiến lược CEO, vượt ngân sách, xin board duyệt)
+ * - confirm / questions: agent hỏi bạn trong một ticket (xác nhận, hoặc vài câu hỏi có lựa chọn)
+ * - other: loại hiếm (chấm từng mục, gợi ý ticket, checklist…), chỉ mở được trong Paperclip
+ */
+export type AskKind = 'approval' | 'confirm' | 'questions' | 'other'
+
+export interface Ask {
+  /** Id phiếu duyệt hoặc id câu hỏi */
+  id: string
+  kind: AskKind
+  /** Loại gốc của Paperclip: kiểu phiếu (hire_agent…) hoặc kiểu câu hỏi (request_confirmation…) */
+  type: string
+  /** Agent gửi (giơ tay ở bàn); null = phiếu của hệ thống, vd vượt ngân sách */
+  agentId: string | null
+  title: string
+  /** Một đoạn ngắn để xem trước */
+  excerpt: string
+  /** Ticket chứa câu hỏi (với phiếu duyệt: ticket gắn kèm nếu có) */
+  issueId: string | null
+  issueKey: string | null
+  createdAt: string
+  /** Paperclip cho xử lý ngay; false = phải mở trang của Paperclip (vd duyệt thao tác nguy hiểm) */
+  inline: boolean
+  /** Trang của việc này trong Paperclip */
+  href: string
+}
+
+export const APPROVAL_LABEL: Record<string, string> = {
+  hire_agent: 'Thuê agent mới',
+  approve_ceo_strategy: 'Duyệt chiến lược',
+  budget_override_required: 'Vượt ngân sách',
+  request_board_approval: 'Xin bạn duyệt',
+}
+
+export const ASK_KIND_LABEL: Record<AskKind, string> = {
+  approval: 'Phiếu duyệt',
+  confirm: 'Xin xác nhận',
+  questions: 'Câu hỏi',
+  other: 'Cần bạn quyết',
+}
+
+/** Nhãn ngắn cho một việc chờ: "Thuê agent mới", "Câu hỏi"… */
+export const askLabel = (a: Ask) => (a.kind === 'approval' ? APPROVAL_LABEL[a.type] ?? ASK_KIND_LABEL.approval : ASK_KIND_LABEL[a.kind])
 
 /** Comment rút gọn của ticket. */
 export interface Comment {

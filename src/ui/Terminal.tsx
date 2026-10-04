@@ -4,10 +4,12 @@ import { useRunLog } from '../data/runlog'
 import type { TermLine } from '../data/streamjson'
 import { STATUS_COLOR, STATUS_LABEL, type Agent, type AgentStatus } from '../data/types'
 import { useCoop } from '../store'
+import { AskCard } from './AskCard'
 import { ChatPane } from './Chat'
 
 type Act = 'wake' | 'pause' | 'resume' | 'comment'
-type Tab = 'chat' | 'log'
+/** ask = việc chờ bạn duyệt / trả lời (chỉ hiện khi agent có việc chờ) */
+type Tab = 'chat' | 'log' | 'ask'
 
 /** Nhớ tab xem lần trước (chat hay log) trên trình duyệt này */
 const TAB_KEY = 'coopverse.termTab.v1'
@@ -95,10 +97,14 @@ export function Terminal({ agent }: { agent: Agent }) {
   const issue = issues.find((i) => i.id === issueId)
   const active = !!view.run && isRunActive(view.run.status)
 
-  const [tab, setTabState] = useState<Tab>(loadTab)
+  const asks = useCoop((s) => s.asks)
+  const mine = asks.filter((a) => a.agentId === agent.id)
+  // Agent đang giơ tay thì mở thẳng tab Duyệt
+  const [tab, setTabState] = useState<Tab>(() => (mine.length ? 'ask' : loadTab()))
   const setTab = (t: Tab) => {
     setTabState(t)
-    try { localStorage.setItem(TAB_KEY, t) } catch { /* bỏ qua */ }
+    // Tab Duyệt chỉ có lúc có việc chờ, không nhớ làm tab mặc định
+    if (t !== 'ask') try { localStorage.setItem(TAB_KEY, t) } catch { /* bỏ qua */ }
   }
   const chatting = useCoop((s) => s.chats.find((c) => c.agentId === agent.id)?.state === 'active')
   const [ask, setAsk] = useState<Act | null>(null)
@@ -204,6 +210,11 @@ export function Terminal({ agent }: { agent: Agent }) {
             {agent.name} <span className="muted">· {agent.title} · {STATUS_LABEL[agent.status]}</span>
           </span>
           <div className="term-tabs" role="tablist" aria-label="Xem">
+            {(mine.length > 0 || tab === 'ask') && (
+              <button role="tab" aria-selected={tab === 'ask'} className={`tab-ask${tab === 'ask' ? ' on' : ''}`} onClick={() => setTab('ask')}>
+                Duyệt{mine.length > 0 && <span className="tab-count">{mine.length}</span>}
+              </button>
+            )}
             <button role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'on' : ''} onClick={() => setTab('chat')}>
               Chat{chatting && <i className="tab-dot" title="Đang trả lời" />}
             </button>
@@ -216,7 +227,15 @@ export function Terminal({ agent }: { agent: Agent }) {
           </button>
         </div>
 
-        {tab === 'chat' ? <ChatPane agent={agent} /> : <>
+        {tab === 'ask' ? (
+          <div className="ask-pane">
+            {mine.length ? (
+              mine.map((a) => <AskCard key={a.id} ask={a} />)
+            ) : (
+              <div className="t-empty">Xong hết rồi! {agent.name} không còn việc nào chờ bạn.</div>
+            )}
+          </div>
+        ) : tab === 'chat' ? <ChatPane agent={agent} /> : <>
         <div className="term-sub">
           <span className="t-issue">{issue ? `${issue.key} · ${issue.title}` : agent.task ?? agent.reason ?? 'Không gắn ticket'}</span>
           <RunInfo run={view.run} state={view.state} />

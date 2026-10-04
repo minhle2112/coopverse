@@ -42,7 +42,7 @@ export function SoundDirector() {
         const known = new Set(p.notes.map((n) => n.id))
         const fresh = s.notes.filter((n) => !known.has(n.id))
         // Nhiều thông báo cùng lúc: chỉ kêu một tiếng, ưu tiên loại quan trọng nhất
-        const order = ['error', 'warn', 'done', 'start', 'info'] as const
+        const order = ['error', 'ask', 'warn', 'done', 'start', 'info'] as const
         const top = order.find((k) => fresh.some((n) => n.kind === k))
         if (top) ting(top)
       }

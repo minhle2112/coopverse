@@ -81,7 +81,24 @@ export function Minimap({ world }: { world: World }) {
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.drawImage(bg, 0, 0)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      const { agents, ping } = useCoop.getState()
+      const { agents, ping, asks } = useCoop.getState()
+
+      // Agent đang chờ bạn duyệt / trả lời: vòng cam nhấp nháy + dấu "?"
+      const waiting = new Set(asks.map((a) => a.agentId))
+      const blink = 0.55 + 0.45 * Math.sin(performance.now() / 260)
+      for (const a of agents) {
+        const p = waiting.has(a.id) ? agentPos.get(a.id) : undefined
+        if (!p) continue
+        ctx.beginPath()
+        ctx.arc(sx(p.x), sz(p.z), 7, 0, Math.PI * 2)
+        ctx.strokeStyle = `rgba(255, 145, 64, ${blink})`
+        ctx.lineWidth = 2
+        ctx.stroke()
+        ctx.fillStyle = '#ffb066'
+        ctx.font = '700 10px "Segoe UI", system-ui, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('?', sx(p.x) + 8, sz(p.z) - 6)
+      }
 
       for (const a of agents) {
         const p = agentPos.get(a.id)

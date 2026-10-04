@@ -6,7 +6,7 @@ import type { Look } from './look'
 
 export type PoseMode =
   | 'stand' | 'walk' | 'run' | 'sit' | 'type' | 'sleep'
-  | 'drink' | 'wave' | 'cheer' | 'play' | 'read' | 'talk' | 'facepalm'
+  | 'drink' | 'wave' | 'cheer' | 'play' | 'read' | 'talk' | 'facepalm' | 'raise'
 
 /** Nét mặt: focus = nheo mắt tập trung, shock = mắt tròn miệng chữ O */
 export type Mood = 'normal' | 'happy' | 'focus' | 'shock' | 'sleep'
@@ -242,6 +242,16 @@ export function Character({ look, pose }: { look: Look; pose: RefObject<Pose> })
           nod = -0.06
           turn = Math.sin(time * 3) * 0.1
           break
+        case 'raise': {
+          // Giơ thẳng tay phải xin bạn chú ý, thỉnh thoảng vẫy nhẹ, mặt ngước lên
+          const wig = Math.max(0, Math.sin(time * 2.2)) * Math.sin(time * 12) * 0.12
+          aR = -3.0
+          sR = 0.08 + wig
+          aL = seated ? -0.55 : 0.04
+          nod = -0.12
+          turn = Math.sin(time * 0.9) * 0.12
+          break
+        }
         case 'cheer': {
           const b = Math.abs(Math.sin(time * 8))
           aL = aR = -2.85 + b * 0.25

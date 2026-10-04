@@ -1,9 +1,9 @@
-import type { Agent } from '../data/types'
+import type { Agent, AskKind } from '../data/types'
 import { player } from '../runtime'
 import { useCoop } from '../store'
 import { GRAPH } from '../world/layout'
 import { actors, type LifeActor } from './actors'
-import { ACT_EMOTE, EXCUSE, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
+import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, EXCUSE, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
 import { clock, emote, expireLife, isSpeaking, readTime, say, useLife } from './store'
 
 /**
@@ -205,6 +205,35 @@ export function reactToStatus(agent: Agent, prev: string, prevTask: string | und
   }
   const line = onStatus(agent, prev, prevTask)
   if (line) say(a.id, line.text, { real: line.real })
+  a.nextMuse = Math.max(a.nextMuse, t + 15)
+}
+
+const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
+
+/** Agent vừa gửi phiếu duyệt / câu hỏi cho bạn: gọi một câu (dáng giơ tay do AgentActor lo). */
+export function raiseHand(agentId: string, kind: AskKind) {
+  const a = actors.get(agentId)
+  if (!a) return
+  emote(a.id, '🙋', 3)
+  say(a.id, pick(kind === 'approval' ? ASK_APPROVAL : ASK_QUESTION))
+  a.nextMuse = Math.max(a.nextMuse, clock.t + 15)
+}
+
+/** Bạn vừa xử lý xong việc agent chờ: vui khi được duyệt, xụ mặt khi bị từ chối. */
+export function askAnswered(agentId: string, good: boolean) {
+  const a = actors.get(agentId)
+  if (!a) return
+  const t = clock.t
+  if (good) {
+    emote(a.id, '🙏', 3)
+    a.gesture = 'cheer'
+    a.gestureUntil = t + 2.2
+    a.mood = 'happy'
+    a.moodUntil = t + 4
+  } else {
+    emote(a.id, '😅', 3)
+  }
+  say(a.id, pick(good ? ASK_THANKS : ASK_DENIED))
   a.nextMuse = Math.max(a.nextMuse, t + 15)
 }
 

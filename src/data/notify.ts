@@ -1,9 +1,27 @@
-import { ISSUE_STATUS_LABEL, type Agent, type Issue } from './types'
+import { ISSUE_STATUS_LABEL, askLabel, type Agent, type Ask, type Issue } from './types'
 
-export type NoteKind = 'start' | 'done' | 'warn' | 'error' | 'info'
+/** ask = có việc mới chờ bạn duyệt / trả lời */
+export type NoteKind = 'start' | 'done' | 'warn' | 'error' | 'info' | 'ask'
 export interface NoteDraft { kind: NoteKind; text: string }
 
 const short = (s: string, n = 48) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s)
+
+/** Việc chờ mới xuất hiện (so với lượt trước). */
+export const newAsks = (prev: Ask[], next: Ask[]) => {
+  const known = new Set(prev.map((a) => a.id))
+  return next.filter((a) => !known.has(a.id))
+}
+
+/** "🙋 SEO Lead cần bạn duyệt: Thuê agent mới · …" */
+export function askNotes(fresh: Ask[], agents: Agent[]): NoteDraft[] {
+  return fresh.map((a) => {
+    const who = agents.find((x) => x.id === a.agentId)?.name ?? 'Paperclip'
+    const verb = a.kind === 'questions' ? 'hỏi bạn' : a.kind === 'confirm' ? 'xin bạn xác nhận' : 'cần bạn duyệt'
+    // "Xin bạn duyệt" đã nằm trong động từ, không lặp lại nhãn
+    const label = a.kind === 'approval' && a.type !== 'request_board_approval' ? `${askLabel(a)} · ` : ''
+    return { kind: 'ask', text: `🙋 ${who} ${verb}: ${short(`${label}${a.title}`, 60)}` }
+  })
+}
 
 /** So sánh hai lượt dữ liệu và sinh thông báo tiếng Việt cho những gì vừa đổi. */
 export function diffNotes(prevAgents: Agent[], agents: Agent[], prevIssues: Issue[], issues: Issue[]): NoteDraft[] {

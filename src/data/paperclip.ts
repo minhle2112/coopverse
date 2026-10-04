@@ -1,5 +1,5 @@
 import { paperclipUrl } from '../config'
-import type { Agent, AgentStatus, ChatAsk, ChatInfo, ChatMessage, Comment, Company, Issue } from './types'
+import type { Agent, AgentStatus, Ask, AskKind, ChatAsk, ChatInfo, ChatMessage, Comment, Company, Issue } from './types'
 
 /**
  * Lớp adapter DUY NHẤT nói chuyện với Paperclip (bản 2026.916.1). Đây là API nội bộ, không cam kết ổn định:
@@ -60,13 +60,36 @@ interface PcInteraction {
   payload: { prompt?: string; questions?: { prompt?: string; question?: string }[] } | null
 }
 
+/** Một mục trong hộp thư "cần chú ý" (GET /companies/:id/attention). */
+interface PcAttentionItem {
+  sourceKind: string
+  subject: { kind: string; id: string; title: string; status: string; href: string; metadata: Record<string, unknown> | null }
+  inlineResolvable: boolean
+  createdAt: string
+  relatedIssue: { id: string; identifier: string | null } | null
+  detail: Record<string, unknown> | null
+}
+
+interface PcApproval { id: string; type: string; status: string; payload: Record<string, unknown> | null; requestedByAgentId: string | null }
+
+/** Chi tiết đầy đủ của một việc chờ, đọc khi mở thẻ. */
+export type AskDetail =
+  | { source: 'approval'; status: string; payload: Record<string, unknown> }
+  | { source: 'interaction'; status: string; kind: string; title: string | null; summary: string | null; payload: Record<string, unknown> }
+
+/** Câu trả lời cho một câu hỏi (POST …/interactions/:id/respond). */
+export interface AskAnswer { questionId: string; optionIds: string[]; otherText?: string | null }
+
+export type ApprovalVerb = 'approve' | 'reject' | 'request-revision'
+
 /** GET /companies/:id/live-runs chỉ trả run đang `queued` hoặc `running`. */
 interface PcLiveRun { id: string; agentId: string; status: string; issueId: string | null }
 
 /** Sự kiện từ WebSocket /api/companies/:id/events/ws */
 export interface PcLiveEvent { id: number; type: string; createdAt: string; payload: Record<string, unknown> }
 
-export interface Snapshot { agents: Agent[]; issues: Issue[]; chats: ChatInfo[] }
+/** `asks` = null khi không đọc được hộp thư "cần chú ý" (giữ danh sách cũ, không coi là đã hết việc chờ). */
+export interface Snapshot { agents: Agent[]; issues: Issue[]; chats: ChatInfo[]; asks: Ask[] | null }
 
 export class PaperclipError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -229,10 +252,42 @@ function toMessages(raw: PcComment[]): ChatMessage[] {
     })
 }
 
-function toAsk(i: PcInteraction): ChatAsk {
+function toChatAsk(i: PcInteraction): ChatAsk {
   const qs = i.payload?.questions?.map((q) => q.prompt ?? q.question).filter(Boolean) ?? []
   const text = i.payload?.prompt ?? (qs.length ? qs.join('\n') : i.summary ?? '')
   return { id: i.id, title: i.title ?? 'Agent đang hỏi bạn', text }
+}
+
+const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+
+const INTERACTION_KIND: Record<string, AskKind> = { request_confirmation: 'confirm', ask_user_questions: 'questions' }
+
+/** Mục "cần chú ý" → việc chờ. Chỉ lấy phiếu duyệt và câu hỏi của agent; các loại khác (lỗi run, ngân sách…) bỏ qua. */
+function toAsk(i: PcAttentionItem): Ask | null {
+  const m = i.subject.metadata ?? {}
+  const d = i.detail ?? {}
+  const approval = i.sourceKind === 'approval'
+  if (!approval && i.sourceKind !== 'issue_thread_interaction') return null
+  const type = str(approval ? m.type : m.kind) ?? ''
+  return {
+    id: i.subject.id,
+    kind: approval ? 'approval' : INTERACTION_KIND[type] ?? 'other',
+    type,
+    agentId: str(approval ? m.requestedByAgentId : m.createdByAgentId),
+    title: i.subject.title,
+    excerpt: str(d.summaryExcerpt) ?? str(d.promptExcerpt) ?? str(d.firstQuestionText) ?? '',
+    issueId: str(m.issueId) ?? i.relatedIssue?.id ?? null,
+    issueKey: i.relatedIssue?.identifier ?? null,
+    createdAt: i.createdAt,
+    inline: i.inlineResolvable,
+    href: `${PAPERCLIP_UI}${i.subject.href}`,
+  }
+}
+
+/** Mọi việc đang chờ bạn quyết (một lần gọi hộp thư "cần chú ý" của Paperclip). */
+async function fetchAsks(): Promise<Ask[]> {
+  const feed = await get<{ items: PcAttentionItem[] }>(`/companies/${companyId}/attention?all=true`)
+  return feed.items.map(toAsk).filter((a): a is Ask => !!a)
 }
 
 // ── API ──
@@ -246,17 +301,18 @@ export const paperclip = {
     return raw.filter((c) => c.status !== 'archived').map((c) => ({ id: c.id, name: c.name, prefix: c.issuePrefix ?? '' }))
   },
 
-  /** Một lượt đọc đầy đủ: agent + ticket + run đang chạy. */
+  /** Một lượt đọc đầy đủ: agent + ticket + run đang chạy + việc chờ bạn quyết. */
   async snapshot(): Promise<Snapshot> {
-    const [agents, issues, runs] = await Promise.all([
+    const [agents, issues, runs, asks] = await Promise.all([
       get<PcAgent[]>(`/companies/${companyId}/agents`),
       get<PcIssue[]>(`/companies/${companyId}/issues`),
       get<PcLiveRun[]>(`/companies/${companyId}/live-runs`),
+      fetchAsks().catch(() => null),
     ])
     // Cuộc trò chuyện Agent Chat cũng là "ticket" trong Paperclip: tách riêng
     const chats = toChats(issues)
     const iss = toIssues(issues.filter((i) => !i.conversationAgentId))
-    return { agents: toAgents(agents, iss, chats, runs), issues: iss, chats }
+    return { agents: toAgents(agents, iss, chats, runs), issues: iss, chats, asks }
   },
 
   /** Run mới nhất của một agent (kể cả đã xong). */
@@ -304,8 +360,38 @@ export const paperclip = {
   /** Câu hỏi / thẻ duyệt agent gửi trong chat mà bạn chưa trả lời. */
   async chatAsks(issueId: string): Promise<ChatAsk[]> {
     const raw = await get<PcInteraction[]>(`/issues/${issueId}/interactions`)
-    return raw.filter((i) => i.status === 'pending').map(toAsk)
+    return raw.filter((i) => i.status === 'pending').map(toChatAsk)
   },
+
+  // ── Việc chờ bạn quyết: phiếu duyệt + câu hỏi của agent ──
+
+  asks: fetchAsks,
+
+  /** Nội dung đầy đủ để hiện thẻ (phiếu: payload; câu hỏi: danh sách câu hỏi / lời nhắn). */
+  async askDetail(a: Ask): Promise<AskDetail> {
+    if (a.kind === 'approval') {
+      const p = await get<PcApproval>(`/approvals/${a.id}`)
+      return { source: 'approval', status: p.status, payload: p.payload ?? {} }
+    }
+    if (!a.issueId) throw new PaperclipError(404, 'Câu hỏi không gắn với ticket nào')
+    const list = await get<(PcInteraction & { payload: Record<string, unknown> | null })[]>(`/issues/${a.issueId}/interactions`)
+    const i = list.find((x) => x.id === a.id)
+    if (!i) throw new PaperclipError(404, 'Không tìm thấy câu hỏi (có thể đã được trả lời)')
+    return { source: 'interaction', status: i.status, kind: i.kind, title: i.title, summary: i.summary, payload: i.payload ?? {} }
+  },
+
+  /** Duyệt / từ chối / yêu cầu sửa một phiếu. Duyệt xong Paperclip tự đánh thức agent gửi phiếu. */
+  decideApproval: (id: string, verb: ApprovalVerb, note?: string) =>
+    post(`/approvals/${id}/${verb}`, note?.trim() ? { decisionNote: note.trim() } : {}),
+
+  /** Đồng ý một yêu cầu xác nhận. */
+  acceptAsk: (issueId: string, id: string) => post(`/issues/${issueId}/interactions/${id}/accept`, {}),
+  /** Từ chối một yêu cầu xác nhận (lý do tuỳ chọn). */
+  rejectAsk: (issueId: string, id: string, reason?: string) =>
+    post(`/issues/${issueId}/interactions/${id}/reject`, reason?.trim() ? { reason: reason.trim() } : {}),
+  /** Trả lời bộ câu hỏi. */
+  answerAsk: (issueId: string, id: string, answers: AskAnswer[]) =>
+    post(`/issues/${issueId}/interactions/${id}/respond`, { answers }),
 
   /**
    * Gửi một tin. Paperclip tự đánh thức agent trả lời (một lượt chạy, tốn hạn mức).

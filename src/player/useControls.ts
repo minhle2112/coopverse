@@ -28,7 +28,7 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
     /** Đang xem CLI / bảng ticket / tủ đồ: nhân vật đứng yên. Bảng cài đặt nhỏ thì vẫn đi lại được. */
     const focused = () => {
       const s = useCoop.getState()
-      return s.focusId !== null || s.boardOpen || s.wardrobeId !== null
+      return s.focusId !== null || s.boardOpen || s.wardrobeId !== null || s.askId !== null
     }
 
     const down = (e: KeyboardEvent) => {
@@ -49,6 +49,11 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
       if (shortcut && e.code === 'KeyM') {
         const st = useSettings.getState()
         st.set({ music: !st.music })
+      }
+      // Q: danh sách việc chờ bạn duyệt / trả lời
+      if (shortcut && e.code === 'KeyQ' && !focused()) {
+        useCoop.getState().toggleInbox()
+        return
       }
       if (shortcut && e.code === 'KeyC' && !focused()) {
         useCoop.getState().openWardrobe()

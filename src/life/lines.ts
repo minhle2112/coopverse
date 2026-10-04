@@ -42,6 +42,13 @@ const WORKING = ['Để xem nào…', 'Chạy lint lại cái', 'Gần xong rồ
 const SLEEPING = ['Zzz…', 'Zzz… 5 phút nữa thôi…']
 const ERRORING = ['Ơ… lỗi rồi', 'Ai cứu với 😵', 'Chắc lại timeout…', 'Sao lại thế này…']
 
+/** Agent vừa gửi phiếu duyệt / câu hỏi cho bạn */
+export const ASK_APPROVAL = ['Sếp ơi, duyệt giúp em với! 🙋', 'Em gửi phiếu rồi, sếp xem giúp ạ', 'Chờ sếp gật đầu là em làm tiếp 🙏']
+export const ASK_QUESTION = ['Sếp ơi, em hỏi chút! 🙋', 'Em cần sếp trả lời mới làm tiếp được', 'Sếp rảnh ghé bàn em xíu nha']
+/** Bạn vừa xử lý xong việc agent chờ */
+export const ASK_THANKS = ['Cảm ơn sếp! 🙏', 'Ok sếp, em làm tiếp liền!', 'Tuyệt, cảm ơn sếp 😄']
+export const ASK_DENIED = ['Dạ, em hiểu rồi…', 'Ok sếp, để em xem lại', 'Hơi buồn xíu, nhưng ok 😅']
+
 export const GREET_IDLE = ['Chào sếp! 👋', 'Sếp ghé chơi à?', 'Hello sếp!', 'Sếp uống cà phê không?', 'Sếp khoẻ không?']
 
 // ───────────────────────── Câu theo giờ Việt Nam ─────────────────────────

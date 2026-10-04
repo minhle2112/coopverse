@@ -6,6 +6,7 @@ import type { Agent } from '../data/types'
 import { snippet } from '../life/comments'
 import { say } from '../life/store'
 import { useCoop } from '../store'
+import { AskCard } from './AskCard'
 import { Md } from './Md'
 
 /** Đã đồng ý "mỗi tin đánh thức agent" một lần thì không hỏi lại */
@@ -26,6 +27,7 @@ function time(iso: string) {
 export function ChatPane({ agent }: { agent: Agent }) {
   const demo = useCoop((s) => s.conn === 'demo')
   const prefix = useCoop((s) => s.company?.prefix ?? '')
+  const storeAsks = useCoop((s) => s.asks)
   const { view, send } = useChat(agent.id, (m) => {
     // Bản thật: sync.ts đã cho agent nói câu đầu trong bong bóng
     if (demo) say(agent.id, snippet(m.body, 90), { real: true, sec: 8 })
@@ -125,7 +127,11 @@ export function ChatPane({ agent }: { agent: Agent }) {
             </div>
           ),
         )}
-        {view.asks.map((a) => (
+        {view.asks.map((a) => {
+          // Câu hỏi đã có trong danh sách việc chờ: trả lời ngay trong khung chat
+          const full = storeAsks.find((x) => x.id === a.id)
+          if (full) return <div key={a.id} className="chat-askcard"><AskCard ask={full} /></div>
+          return (
           <div key={a.id} className="chat-ask">
             <b>❓ {a.title}</b>
             {a.text && <Md text={a.text} />}
@@ -133,7 +139,8 @@ export function ChatPane({ agent }: { agent: Agent }) {
               <a className="t-btn" href={chatUrl(prefix, agent.id)} target="_blank" rel="noreferrer">Trả lời trong Paperclip ↗</a>
             )}
           </div>
-        ))}
+          )
+        })}
         {view.replying && (
           <div className="chat-typing">
             <span className="t-spin">✻</span> {agent.name} đang trả lời… <span className="muted">(xem agent làm gì ở tab Log)</span>

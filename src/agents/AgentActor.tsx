@@ -69,8 +69,11 @@ function visitWPs(m: DeskSlot): WP[] {
 /** Dáng khi dừng ở một chỗ */
 const ACT_POSE: Partial<Record<Activity, PoseMode>> = { coffee: 'drink', water: 'drink', foos: 'play', books: 'read' }
 
+/** Agent đang chờ bạn: 'approval' = có phiếu duyệt (dấu ? cam), 'question' = chỉ có câu hỏi (dấu ? vàng) */
+type Asking = 'approval' | 'question' | null
+
 /**
- * Một agent trong văn phòng. Đang làm / tạm dừng / lỗi → ngồi ở bàn.
+ * Một agent trong văn phòng. Đang làm / tạm dừng / lỗi / chờ bạn duyệt → ngồi ở bàn (chờ duyệt thì giơ tay).
  * Rảnh → đi tới các chỗ trong văn phòng (cà phê, sofa, bi lắc, bảng ticket...), tụ tập nói chuyện, thỉnh thoảng về bàn.
  * Lời thoại và hội thoại do life/director điều khiển.
  */
@@ -81,6 +84,12 @@ export function AgentActor({ agent, slot, isLead }: { agent: Agent; slot: DeskSl
   const status = useRef(agent.status)
   status.current = agent.status
   const look = useLook(agent.id, agent.name, isLead)
+  const asking = useCoop((s): Asking => {
+    const mine = s.asks.filter((a) => a.agentId === agent.id)
+    return !mine.length ? null : mine.some((a) => a.kind === 'approval') ? 'approval' : 'question'
+  })
+  const askingRef = useRef(asking)
+  askingRef.current = asking
 
   const actorRef = useRef<LifeActor | null>(null)
   if (!actorRef.current) {
@@ -113,7 +122,9 @@ export function AgentActor({ agent, slot, isLead }: { agent: Agent; slot: DeskSl
     const a = actorRef.current!
     const t = clock.t
     const st = status.current
-    const wantsSeat = st !== 'idle'
+    const ask = askingRef.current
+    // Có việc chờ bạn: về bàn ngồi giơ tay, để bạn biết tìm ở đâu
+    const wantsSeat = st !== 'idle' || ask !== null
     const talking = a.talkUntil > t
 
     const walk = (pts: WP[], dest: LifeActor['dest']) => {
@@ -254,6 +265,8 @@ export function AgentActor({ agent, slot, isLead }: { agent: Agent; slot: DeskSl
     if (a.where === 'seat') {
       p.seat = true
       mode =
+        // Đang làm mà vẫn chờ bạn: gõ phím, thỉnh thoảng giơ tay
+        ask && (st !== 'running' || Math.sin(t * 0.6 + a.phase) > 0.35) ? 'raise' :
         st === 'running' ? 'type' :
         st === 'paused' ? 'sleep' :
         st === 'error' ? (Math.sin(t * 0.7 + a.phase) > -0.2 ? 'facepalm' : 'sit') :
@@ -300,7 +313,7 @@ export function AgentActor({ agent, slot, isLead }: { agent: Agent; slot: DeskSl
   return (
     <group ref={group}>
       <Character look={look} pose={pose} />
-      <Overhead agent={agent} innerRef={overhead} />
+      <Overhead agent={agent} innerRef={overhead} asking={asking} />
     </group>
   )
 }
@@ -309,11 +322,12 @@ export function AgentActor({ agent, slot, isLead }: { agent: Agent; slot: DeskSl
 const STATUS_EMOTE: Partial<Record<Agent['status'], string>> = { paused: '💤', error: '❗' }
 
 /** Trên đầu agent: bong bóng thoại, biểu tượng cảm xúc, bảng tên. */
-function Overhead({ agent, innerRef }: { agent: Agent; innerRef: RefObject<HTMLDivElement | null> }) {
+function Overhead({ agent, innerRef, asking }: { agent: Agent; innerRef: RefObject<HTMLDivElement | null>; asking: Asking }) {
   const near = useCoop((s) => s.nearId === agent.id)
   const bubble = useLife((s) => s.bubbles[agent.id])
   const em = useLife((s) => s.emotes[agent.id])
-  const icon = em?.icon ?? STATUS_EMOTE[agent.status]
+  // Dấu "?" chờ bạn thay cho biểu tượng trạng thái (💤, ❗); biểu cảm thoáng qua vẫn hiện trước
+  const icon = em?.icon ?? (asking ? null : STATUS_EMOTE[agent.status])
   return (
     <Html portal={nameplateLayer} position={[0, 1.95, 0]} center distanceFactor={12} zIndexRange={[10, 0]} pointerEvents="none">
       <div className="overhead" ref={innerRef}>
@@ -327,13 +341,16 @@ function Overhead({ agent, innerRef }: { agent: Agent; innerRef: RefObject<HTMLD
             {icon}
           </div>
         )}
+        {!icon && asking && <div className={`ask-mark mark-${asking}`} aria-hidden>?</div>}
         <div className={`nameplate${near ? ' near' : ''}`}>
           <div className="np-row">
             <span className="np-dot" style={{ background: STATUS_COLOR[agent.status] }} />
             <span className="np-name">{agent.name}</span>
             {agent.demo && <span className="np-demo">demo</span>}
           </div>
-          <div className="np-sub">{agent.status === 'running' && agent.task ? agent.task : STATUS_LABEL[agent.status]}</div>
+          <div className={`np-sub${asking ? ' np-ask' : ''}`}>
+            {asking === 'approval' ? '🙋 Chờ bạn duyệt' : asking ? '🙋 Chờ bạn trả lời' : agent.status === 'running' && agent.task ? agent.task : STATUS_LABEL[agent.status]}
+          </div>
         </div>
       </div>
     </Html>

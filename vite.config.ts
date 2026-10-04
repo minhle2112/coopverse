@@ -20,12 +20,18 @@ function allowList() {
       // Agent Chat (tính năng thử nghiệm của Paperclip): đọc cuộc trò chuyện + xem tính năng có đang bật không
       new RegExp(`^/api/companies/${UUID}/chats/${UUID}$`),
       /^\/api\/instance\/settings\/experimental$/,
+      // Việc chờ bạn quyết: hộp thư "cần chú ý" + nội dung phiếu duyệt
+      new RegExp(`^/api/companies/${UUID}/attention$`),
+      new RegExp(`^/api/approvals/${UUID}$`),
     ],
     POST: [
       new RegExp(`^/api/agents/${UUID}/(wakeup|pause|resume)$`),
       new RegExp(`^/api/issues/${UUID}/comments$`),
       // Mở cuộc trò chuyện với agent (lần gửi tin đầu tiên)
       new RegExp(`^/api/companies/${UUID}/chats/${UUID}$`),
+      // Duyệt tại chỗ: quyết phiếu duyệt, trả lời / xác nhận câu hỏi của agent
+      new RegExp(`^/api/approvals/${UUID}/(approve|reject|request-revision)$`),
+      new RegExp(`^/api/issues/${UUID}/interactions/${UUID}/(accept|reject|respond)$`),
     ],
     WS: new RegExp(`^/api/companies/${UUID}/events/ws$`),
   }

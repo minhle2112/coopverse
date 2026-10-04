@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { input } from './runtime'
 import type { NoteDraft, NoteKind } from './data/notify'
-import { STATUS_CYCLE, type Agent, type ChatInfo, type Company, type Issue } from './data/types'
+import { STATUS_CYCLE, type Agent, type Ask, type ChatInfo, type Company, type Issue } from './data/types'
 
 interface Toast { id: number; text: string }
 export interface Note { id: number; kind: NoteKind; text: string }
@@ -20,6 +20,8 @@ interface CoopState {
   issues: Issue[]
   /** Cuộc trò chuyện Agent Chat của bạn với từng agent (đã nhắn ít nhất một lần) */
   chats: ChatInfo[]
+  /** Việc đang chờ bạn quyết: phiếu duyệt + câu hỏi của agent */
+  asks: Ask[]
   conn: Conn
   /** Đã từng nhận được dữ liệu thật chưa */
   hasData: boolean
@@ -39,11 +41,21 @@ interface CoopState {
   /** Tủ đồ đang mở cho ai ('player' = bạn, hoặc id agent) */
   wardrobeId: string | null
   settingsOpen: boolean
+  /** Danh sách "Chờ duyệt" (phím Q) đang mở */
+  inboxOpen: boolean
+  /** Thẻ duyệt nhanh đang mở (id việc chờ): mở từ danh sách, không cần đi tới bàn */
+  askId: string | null
   locked: boolean
   toast: Toast | null
 
   setCompanies: (companies: Company[], company: Company | null) => void
-  setSnapshot: (agents: Agent[], issues: Issue[], chats?: ChatInfo[]) => void
+  /** `asks` không truyền = giữ danh sách việc chờ hiện tại */
+  setSnapshot: (agents: Agent[], issues: Issue[], chats?: ChatInfo[], asks?: Ask[]) => void
+  /** Bỏ một việc chờ ngay khi bạn vừa xử lý xong (không chờ Paperclip đọc lại) */
+  removeAsk: (id: string) => void
+  toggleInbox: () => void
+  openAsk: (id: string) => void
+  closeAsk: () => void
   setConn: (conn: Conn, retryAt?: number | null) => void
   setVersion: (v: string | null) => void
   pushNotes: (drafts: NoteDraft[]) => void
@@ -74,6 +86,7 @@ export const useCoop = create<CoopState>((set, get) => ({
   agents: [],
   issues: [],
   chats: [],
+  asks: [],
   conn: 'connecting',
   hasData: false,
   version: null,
@@ -86,11 +99,30 @@ export const useCoop = create<CoopState>((set, get) => ({
   boardOpen: false,
   wardrobeId: null,
   settingsOpen: false,
+  inboxOpen: false,
+  askId: null,
   locked: false,
   toast: null,
 
   setCompanies: (companies, company) => set({ companies, company }),
-  setSnapshot: (agents, issues, chats = []) => set({ agents, issues, chats, hasData: true }),
+  setSnapshot: (agents, issues, chats = [], asks) =>
+    set((s) => {
+      const list = asks ?? s.asks
+      // Việc đang mở đã được xử lý ở nơi khác (vd trong Paperclip): đóng thẻ
+      const askId = s.askId && list.some((a) => a.id === s.askId) ? s.askId : null
+      return { agents, issues, chats, asks: list, askId, hasData: true }
+    }),
+  removeAsk: (id) => set((s) => ({ asks: s.asks.filter((a) => a.id !== id), askId: s.askId === id ? null : s.askId })),
+  toggleInbox: () => {
+    if (!get().inboxOpen && document.pointerLockElement) document.exitPointerLock()
+    set((s) => ({ inboxOpen: !s.inboxOpen }))
+  },
+  openAsk: (id) => {
+    if (document.pointerLockElement) document.exitPointerLock()
+    input.keys.clear()
+    set({ askId: id, settingsOpen: false })
+  },
+  closeAsk: () => set({ askId: null }),
   setConn: (conn, retryAt = null) => set({ conn, retryAt }),
   setVersion: (version) => set({ version }),
   pushNotes: (drafts) => {
@@ -137,7 +169,9 @@ export const useCoop = create<CoopState>((set, get) => ({
   },
   closeTop: () => {
     const s = get()
-    if (s.wardrobeId) set({ wardrobeId: null })
+    if (s.askId) set({ askId: null })
+    else if (s.wardrobeId) set({ wardrobeId: null })
+    else if (s.inboxOpen) set({ inboxOpen: false })
     else if (s.settingsOpen) set({ settingsOpen: false })
     else if (s.focusId) set({ focusId: null })
     else if (s.boardOpen) set({ boardOpen: false })
@@ -146,8 +180,8 @@ export const useCoop = create<CoopState>((set, get) => ({
   },
   /** Phím E: mở màn hình agent / bảng ticket đang đứng gần, hoặc đóng nếu đang xem */
   interact: () => {
-    const { focusId, boardOpen, nearId, nearBoard, agents, openFocus, closeFocus, openBoard, closeBoard, showToast, wardrobeId } = get()
-    if (wardrobeId) return
+    const { focusId, boardOpen, nearId, nearBoard, agents, openFocus, closeFocus, openBoard, closeBoard, showToast, wardrobeId, askId } = get()
+    if (wardrobeId || askId) return
     if (focusId) return closeFocus()
     if (boardOpen) return closeBoard()
     if (nearBoard) return openBoard()
