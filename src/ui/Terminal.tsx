@@ -6,6 +6,7 @@ import { STATUS_COLOR, STATUS_LABEL, type Agent, type AgentStatus } from '../dat
 import { useCoop } from '../store'
 import { AskCard } from './AskCard'
 import { ChatPane } from './Chat'
+import { ExpBadge, KudosDialog } from './Kudos'
 
 type Act = 'wake' | 'pause' | 'resume' | 'comment'
 /** ask = việc chờ bạn duyệt / trả lời (chỉ hiện khi agent có việc chờ) */
@@ -108,6 +109,7 @@ export function Terminal({ agent }: { agent: Agent }) {
   }
   const chatting = useCoop((s) => s.chats.find((c) => c.agentId === agent.id)?.state === 'active')
   const [ask, setAsk] = useState<Act | null>(null)
+  const [kudos, setKudos] = useState(false)
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -207,8 +209,11 @@ export function Terminal({ agent }: { agent: Agent }) {
           <span className="term-dots"><i /><i /><i /></span>
           <span className="term-title">
             <span className="np-dot" style={{ background: STATUS_COLOR[agent.status] }} />
-            {agent.name} <span className="muted">· {agent.title} · {STATUS_LABEL[agent.status]}</span>
+            {agent.name} <ExpBadge agentId={agent.id} /> <span className="muted">· {agent.title} · {STATUS_LABEL[agent.status]}</span>
           </span>
+          <button className="t-btn kudos-btn" onClick={() => setKudos(true)} title="Khen agent này (+EXP, không tốn token)">
+            👏 Khen
+          </button>
           <div className="term-tabs" role="tablist" aria-label="Xem">
             {(mine.length > 0 || tab === 'ask') && (
               <button role="tab" aria-selected={tab === 'ask'} className={`tab-ask${tab === 'ask' ? ' on' : ''}`} onClick={() => setTab('ask')}>
@@ -270,6 +275,8 @@ export function Terminal({ agent }: { agent: Agent }) {
           <span className="t-hint">Lệnh nào cũng hỏi lại trước khi gửi</span>
         </div>
         </>}
+
+        {kudos && <KudosDialog agent={agent} onClose={() => setKudos(false)} />}
 
         {tab === 'log' && c && ask && (
           <div className="t-modal">

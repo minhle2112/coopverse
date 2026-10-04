@@ -169,7 +169,7 @@ function bell(c: AudioContext, t: number, f: number, peak: number, dur = 1.1) {
   tone(c, t, f * 5.4, dur * 0.15, peak * 0.06, 'sine')
 }
 
-export type Ting = 'done' | 'start' | 'warn' | 'error' | 'info' | 'ask'
+export type Ting = 'done' | 'start' | 'warn' | 'error' | 'info' | 'ask' | 'level'
 
 /** Tiếng thông báo, khác nhau theo loại. */
 export function ting(kind: Ting) {
@@ -185,6 +185,10 @@ export function ting(kind: Ting) {
       break
     case 'info':
       bell(c, t, 1174.7, 0.07, 0.8)
+      break
+    case 'level': // kèn nhỏ lên cấp: rải nhanh lên rồi ngân hợp âm trưởng
+      ;[784, 987.8, 1174.7, 1568].forEach((f, i) => bell(c, t + i * 0.07, f, 0.09, 0.6))
+      ;[1568, 1975.5, 2349.3].forEach((f) => bell(c, t + 0.34, f, 0.07, 1.6))
       break
     case 'ask': // "kính coong" đi lên: có người cần bạn
       bell(c, t, 784, 0.09, 0.9)

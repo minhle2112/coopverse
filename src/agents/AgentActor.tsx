@@ -4,6 +4,7 @@ import { Html } from '@react-three/drei'
 import type { Group } from 'three'
 import { Character, type Mood, type Pose, type PoseMode } from '../characters/Character'
 import { useLook } from '../characters/look'
+import { titleOf, useExp, useLevel } from '../data/exp'
 import { STATUS_COLOR, STATUS_LABEL, type Agent } from '../data/types'
 import { damp, lerpAngle, rand } from '../lib/math'
 import { actors, chooseSpot, newActor, release, resetToSeat, type LifeActor, type WP } from '../life/actors'
@@ -344,6 +345,11 @@ function Overhead({ agent, innerRef, asking }: { agent: Agent; innerRef: RefObje
   const em = useLife((s) => s.emotes[agent.id])
   // Dấu "?" chờ bạn thay cho biểu tượng trạng thái (💤, ❗); biểu cảm thoáng qua vẫn hiện trước
   const icon = em?.icon ?? (asking ? null : STATUS_EMOTE[agent.status])
+  const lv = useLevel(agent.id)
+  // +EXP vừa nhận và lên cấp: chỉ hiện khi còn mới (bảng tên dựng lại sau đó thì không chạy lại hiệu ứng)
+  const pop = useExp((s) => s.pops[agent.id])
+  const up = useExp((s) => s.levelUps.find((u) => u.agentId === agent.id))
+  const fresh = pop && Date.now() - pop.at < 2500
   return (
     <Html portal={nameplateLayer} position={[0, 1.95, 0]} center distanceFactor={12} zIndexRange={[10, 0]} pointerEvents="none">
       <div className="overhead" ref={innerRef}>
@@ -358,12 +364,16 @@ function Overhead({ agent, innerRef, asking }: { agent: Agent; innerRef: RefObje
           </div>
         )}
         {!icon && asking && <div className={`ask-mark mark-${asking}`} aria-hidden>?</div>}
-        <div className={`nameplate${near ? ' near' : ''}`}>
+        {up && <div key={up.id} className="lvup">⭐ LÊN CẤP {up.level}</div>}
+        {fresh && <div key={pop.id} className="xp-pop">+{pop.amount} EXP</div>}
+        <div className={`nameplate${near ? ' near' : ''}${lv >= 9 ? ' np-gold' : ''}`}>
           <div className="np-row">
             <span className="np-dot" style={{ background: STATUS_COLOR[agent.status] }} />
+            <span className="np-lv" title={`Cấp ${lv}`}>{lv}</span>
             <span className="np-name">{agent.name}</span>
             {agent.demo && <span className="np-demo">demo</span>}
           </div>
+          <div className="np-rank">{titleOf(lv)}</div>
           <div className={`np-sub${asking ? ' np-ask' : ''}`}>
             {asking === 'approval' ? '🙋 Chờ bạn duyệt' : asking ? '🙋 Chờ bạn trả lời' : agent.status === 'running' && agent.task ? agent.task : STATUS_LABEL[agent.status]}
           </div>

@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import type { AgentStatus } from '../data/types'
 import { Baked } from './Bake'
 import { windowMat } from './DayNight'
-import { B, Desk, FurnitureItem, OfficeChair } from './Furniture'
+import { B, Desk, DeskExtras, FurnitureItem, OfficeChair } from './Furniture'
 import { FURNITURE, LEAD_ROOM, MEET_ROOM, OFFICE, deskCenter, type World } from './layout'
 import { codeTexture, errorTexture, idleTexture, sleepTexture, tickScreens } from './screens'
 
@@ -129,9 +129,15 @@ function screenFor(status: AgentStatus | undefined) {
   }
 }
 
-export function Office({ world, statusOfSlot }: { world: World; statusOfSlot: Map<string, AgentStatus> }) {
+/** Ghế da cho agent cấp 7 trở lên (bậc bàn 3) */
+const LEATHER = '#6b3f2a'
+
+/**
+ * `tierOfSlot`: bậc bàn theo cấp của agent ngồi đó (xem deskTier). Đổi bậc thì gộp lại khối tĩnh.
+ */
+export function Office({ world, statusOfSlot, tierOfSlot }: { world: World; statusOfSlot: Map<string, AgentStatus>; tierOfSlot: Map<string, number> }) {
   useFrame((_, dt) => tickScreens(dt))
-  const bakeKey = world.slots.map((s) => `${s.id}@${s.zone}@${s.seat.x.toFixed(2)},${s.seat.z.toFixed(2)}`).join('|')
+  const bakeKey = world.slots.map((s) => `${s.id}@${s.zone}@${s.seat.x.toFixed(2)},${s.seat.z.toFixed(2)}@${tierOfSlot.get(s.id) ?? 0}`).join('|')
   return (
     <group>
       <Baked bakeKey={bakeKey}>
@@ -144,9 +150,10 @@ export function Office({ world, statusOfSlot }: { world: World; statusOfSlot: Ma
           <group key={s.id}>
             <group position={[c.x, 0, c.z]} rotation={[0, s.yaw, 0]}>
               <Desk screen={screenFor(statusOfSlot.get(s.id))} />
+              <DeskExtras tier={tierOfSlot.get(s.id) ?? 0} />
             </group>
             <group position={[s.seat.x, 0, s.seat.z]} rotation={[0, s.yaw, 0]}>
-              <OfficeChair color={s.zone === 'lead' ? '#2d3a55' : '#3d4451'} />
+              <OfficeChair color={(tierOfSlot.get(s.id) ?? 0) >= 3 ? LEATHER : s.zone === 'lead' ? '#2d3a55' : '#3d4451'} />
             </group>
           </group>
         )

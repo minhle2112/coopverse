@@ -4,6 +4,8 @@ import { switchCompany } from '../data/sync'
 import { STATUS_COLOR, STATUS_LABEL } from '../data/types'
 import { useCoop } from '../store'
 import type { World } from '../world/layout'
+import { useExp } from '../data/exp'
+import { FameView } from './FameView'
 import { AskSheet, Inbox } from './Inbox'
 import { KanbanView } from './KanbanView'
 import { Minimap } from './Minimap'
@@ -125,6 +127,9 @@ export function Hud({ world }: { world: World }) {
   const focusId = useCoop((s) => s.focusId)
   const nearBoard = useCoop((s) => s.nearBoard)
   const boardOpen = useCoop((s) => s.boardOpen)
+  const nearFame = useCoop((s) => s.nearFame)
+  const fameOpen = useCoop((s) => s.fameOpen)
+  const expStats = useExp((s) => s.stats)
   const wardrobeId = useCoop((s) => s.wardrobeId)
   const settingsOpen = useCoop((s) => s.settingsOpen)
   const company = useCoop((s) => s.company)
@@ -132,7 +137,7 @@ export function Hud({ world }: { world: World }) {
   const askId = useCoop((s) => s.askId)
   const near = agents.find((a) => a.id === nearId)
   const focused = agents.find((a) => a.id === focusId)
-  const viewing = !!focusId || boardOpen || !!wardrobeId || !!askId
+  const viewing = !!focusId || boardOpen || fameOpen || !!wardrobeId || !!askId
   const waitingOn = (id: string) => asks.filter((a) => a.agentId === id).length
   const nearAsks = near ? waitingOn(near.id) : 0
 
@@ -174,7 +179,7 @@ export function Hud({ world }: { world: World }) {
             <span className={`np-dot${a.candidate ? ' dot-cand' : ''}`} style={{ background: a.candidate ? undefined : STATUS_COLOR[a.status] }} />
             <span className="roster-main">
               <span className="roster-row">
-                <span className="roster-name">{a.name}{waitingOn(a.id) > 0 && <span className="roster-ask" title="Đang chờ bạn duyệt / trả lời"> 🙋</span>}</span>
+                <span className="roster-name">{!a.candidate && <span className="lv-chip" title="Cấp">Lv {expStats[a.id]?.level ?? 1}</span>}{a.name}{waitingOn(a.id) > 0 && <span className="roster-ask" title="Đang chờ bạn duyệt / trả lời"> 🙋</span>}</span>
                 <span className="roster-status">{a.candidate ? 'Ứng viên' : STATUS_LABEL[a.status]}</span>
               </span>
               {a.status === 'running' && a.task && <span className="roster-task">{a.task}</span>}
@@ -202,6 +207,13 @@ export function Hud({ world }: { world: World }) {
         </div>
       )}
 
+      {nearFame && !viewing && (
+        <div className="prompt">
+          <kbd>E</kbd>
+          <span>Xem bảng vàng · xếp hạng EXP</span>
+        </div>
+      )}
+
       {near && !viewing && (
         <div className="prompt">
           <kbd>E</kbd>
@@ -226,7 +238,7 @@ export function Hud({ world }: { world: World }) {
           <span><kbd>Shift</kbd> chạy</span>
           <span>Chuột: xoay</span>
           <span>Lăn chuột: gần/xa</span>
-          <span><kbd>E</kbd> chat với agent / xem bảng ticket</span>
+          <span><kbd>E</kbd> chat với agent / xem bảng ticket, bảng vàng</span>
           <span><kbd>Q</kbd> việc chờ duyệt</span>
           <span><kbd>C</kbd> tủ đồ</span>
           <span><kbd>M</kbd> nhạc</span>
@@ -238,6 +250,7 @@ export function Hud({ world }: { world: World }) {
       <OfflineCard />
       {focused && <Terminal key={focused.id} agent={focused} />}
       {boardOpen && <KanbanView />}
+      {fameOpen && <FameView />}
       {wardrobeId && <Wardrobe id={wardrobeId} />}
       <AskSheet />
       <Toast />

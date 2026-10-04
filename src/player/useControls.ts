@@ -25,10 +25,10 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
     const isControl = (t: EventTarget | null) => t instanceof HTMLElement && /^(INPUT|BUTTON|A|LABEL)$/.test(t.tagName)
     const CONTROL_KEYS = new Set(['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 
-    /** Đang xem CLI / bảng ticket / tủ đồ: nhân vật đứng yên. Bảng cài đặt nhỏ thì vẫn đi lại được. */
+    /** Đang xem CLI / bảng ticket / bảng vàng / tủ đồ: nhân vật đứng yên. Bảng cài đặt nhỏ thì vẫn đi lại được. */
     const focused = () => {
       const s = useCoop.getState()
-      return s.focusId !== null || s.boardOpen || s.wardrobeId !== null || s.askId !== null
+      return s.focusId !== null || s.boardOpen || s.fameOpen || s.wardrobeId !== null || s.askId !== null
     }
 
     const down = (e: KeyboardEvent) => {

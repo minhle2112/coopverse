@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
+import { EXP, applyLedger, useExp } from '../data/exp'
 import { injectLiveEvent } from '../data/sync'
+import { leveledUp } from '../life/director'
 import type { PcLiveEvent } from '../data/paperclip'
 import { actors } from '../life/actors'
 import { clock, useLife } from '../life/store'
@@ -14,6 +16,7 @@ import { useCoop } from '../store'
  * window.__coop.inject(event, { noRefresh: true }) bơm sự kiện realtime giả của Paperclip.
  * window.__coop.store là store zustand (vd. __coop.store.getState().openFocus(id) để mở CLI).
  * window.__coop.life: trạng thái sống của agent (actors), đồng hồ, bong bóng thoại.
+ * window.__coop.exp: sổ + EXP; __coop.grant(id, 300) cộng EXP giả (chỉ trên trang, không lưu) để xem hiệu ứng.
  */
 export function DevHooks() {
   const advance = useThree((s) => s.advance)
@@ -53,6 +56,17 @@ export function DevHooks() {
         return { calls: r.calls, triangles: r.triangles, meshes, shadowCasters, geometries: st.gl.info.memory.geometries, textures: st.gl.info.memory.textures, programs: st.gl.info.programs?.length, msPerFrame: +ms.toFixed(2), dpr: st.gl.getPixelRatio() }
       },
       inject(e: PcLiveEvent, opts?: { noRefresh?: boolean }) { injectLiveEvent?.(e, opts) },
+      exp: useExp,
+      grant(agentId: string, amount: number) {
+        const L = useExp.getState().ledger
+        const runs = { ...L.runs }
+        for (let i = 0; i < Math.ceil(amount / EXP.run); i++) runs[`dev-${Date.now()}-${i}`] = [agentId, Date.now()]
+        applyLedger({ ...L, runs }, (id, lv) => {
+          useCoop.getState().pushNotes([{ kind: 'level', text: `⭐ (dev) ${id} lên cấp ${lv}` }])
+          leveledUp(id, lv)
+        })
+        return useExp.getState().stats[agentId]
+      },
     }
     ;(window as unknown as { __coop: typeof api }).__coop = api
   }, [advance, get])

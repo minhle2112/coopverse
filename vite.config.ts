@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Connect, type Plugin, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import { paperclipUrl } from './src/config'
+import { coopData } from './server/coopData'
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
@@ -99,7 +100,7 @@ export default defineConfig(({ mode }) => {
 
   // Chỉ mở trên máy này (127.0.0.1)
   return {
-    plugins: [react(), paperclipGuard()],
+    plugins: [react(), paperclipGuard(), coopData({ target, isOwnOrigin })],
     server: { host: '127.0.0.1', port: 5177, strictPort: true, proxy },
     preview: { host: '127.0.0.1', port: 5178, strictPort: true, proxy },
     build: {

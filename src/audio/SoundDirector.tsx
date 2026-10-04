@@ -42,12 +42,12 @@ export function SoundDirector() {
         const known = new Set(p.notes.map((n) => n.id))
         const fresh = s.notes.filter((n) => !known.has(n.id))
         // Nhiều thông báo cùng lúc: chỉ kêu một tiếng, ưu tiên loại quan trọng nhất
-        const order = ['error', 'ask', 'warn', 'done', 'start', 'info'] as const
+        const order = ['error', 'ask', 'level', 'warn', 'done', 'start', 'info'] as const
         const top = order.find((k) => fresh.some((n) => n.kind === k))
         if (top) ting(top)
       }
-      const open = !!s.focusId || s.boardOpen || !!s.wardrobeId
-      const was = !!p.focusId || p.boardOpen || !!p.wardrobeId
+      const open = !!s.focusId || s.boardOpen || s.fameOpen || !!s.wardrobeId
+      const was = !!p.focusId || p.boardOpen || p.fameOpen || !!p.wardrobeId
       if (open !== was) whoosh(open)
     })
     // Bong bóng chat mới → pop ở chỗ agent đang đứng

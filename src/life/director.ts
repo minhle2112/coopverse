@@ -1,9 +1,10 @@
+import { titleOf } from '../data/exp'
 import type { Agent, AskKind } from '../data/types'
 import { player } from '../runtime'
 import { useCoop } from '../store'
 import { GRAPH } from '../world/layout'
 import { actors, type LifeActor } from './actors'
-import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, EXCUSE, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
+import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, EXCUSE, LEVEL_UP, PRAISED, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
 import { clock, emote, expireLife, isSpeaking, readTime, say, useLife } from './store'
 
 /**
@@ -235,6 +236,33 @@ export function askAnswered(agentId: string, good: boolean) {
   }
   say(a.id, pick(good ? ASK_THANKS : ASK_DENIED))
   a.nextMuse = Math.max(a.nextMuse, t + 15)
+}
+
+/** Ăn mừng: giơ tay, mặt vui */
+function celebrate(a: LifeActor, icon: string, sec: number) {
+  const t = clock.t
+  emote(a.id, icon, sec)
+  a.gesture = 'cheer'
+  a.gestureUntil = t + sec - 0.4
+  a.mood = 'happy'
+  a.moodUntil = t + sec + 1
+  a.nextMuse = Math.max(a.nextMuse, t + 15)
+}
+
+/** Agent vừa lên cấp */
+export function leveledUp(agentId: string, level: number) {
+  const a = actors.get(agentId)
+  if (!a) return
+  celebrate(a, '⭐', 3.2)
+  say(a.id, pick(LEVEL_UP(level, titleOf(level))))
+}
+
+/** Bạn vừa khen agent (nút Khen): cảm ơn, đọc lại lời khen nếu có */
+export function praised(agentId: string, note: string) {
+  const a = actors.get(agentId)
+  if (!a) return
+  celebrate(a, '🥰', 2.8)
+  say(a.id, note ? `“${note.length > 60 ? `${note.slice(0, 59)}…` : note}” Cảm ơn sếp! 🥰` : pick(PRAISED), { sec: 5 })
 }
 
 /** Agent vừa tới một chỗ: thỉnh thoảng hiện biểu tượng việc đang làm (☕, ⚽...). */

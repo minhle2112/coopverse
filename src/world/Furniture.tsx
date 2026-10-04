@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Texture } from 'three'
+import { DoubleSide, type Texture } from 'three'
 import type { Furniture } from './layout'
 
 type V3 = [number, number, number]
@@ -65,6 +65,85 @@ export function OfficeChair({ color = '#3d4451' }: { color?: string }) {
       <B s={[0.48, 0.5, 0.07]} p={[0, 0.74, -0.25]} c={color} r={[-0.08, 0, 0]} />
       <Cyl rt={0.03} rb={0.03} h={0.35} p={[0, 0.22, 0]} c="#22262e" />
       <Cyl rt={0.28} rb={0.28} h={0.04} p={[0, 0.04, 0]} c="#22262e" seg={5} />
+    </group>
+  )
+}
+
+const GOLD = '#e0b34a'
+
+function Gold({ s, p }: { s: V3; p: V3 }) {
+  return (
+    <mesh position={p} castShadow>
+      <boxGeometry args={s} />
+      <meshStandardMaterial color={GOLD} metalness={0.55} roughness={0.35} flatShading />
+    </mesh>
+  )
+}
+
+/**
+ * Đồ thêm trên bàn theo bậc (cấp của agent ngồi bàn, xem deskTier trong data/exp.ts):
+ * 1 chậu cây · 2 màn hình thứ hai · 3 đèn bàn (ghế da do Office lo) · 4 cúp vàng + viền bàn vàng.
+ * Cùng hệ toạ độ với Desk: người ngồi ở phía -z.
+ */
+export function DeskExtras({ tier }: { tier: number }) {
+  if (tier <= 0) return null
+  return (
+    <group>
+      {/* Chậu cây nhỏ, góc trước bên phải (cạnh chuột) */}
+      <group position={[0.6, 0.745, -0.25]} scale={0.85}>
+        <Cyl rt={0.055} rb={0.045} h={0.09} p={[0, 0.045, 0]} c="#c4704f" seg={7} />
+        <mesh position={[0, 0.15, 0]} castShadow>
+          <icosahedronGeometry args={[0.085, 0]} />
+          <meshStandardMaterial color="#3f8a4a" roughness={0.9} flatShading />
+        </mesh>
+        <mesh position={[0.04, 0.22, 0.02]} castShadow>
+          <icosahedronGeometry args={[0.055, 0]} />
+          <meshStandardMaterial color="#4d9a52" roughness={0.9} flatShading />
+        </mesh>
+      </group>
+      {/* Màn hình thứ hai bên phải, hơi xoay về phía người ngồi */}
+      {tier >= 2 && (
+        <group position={[0.56, 0.745, 0.13]} rotation={[0, 0.45, 0]}>
+          <B s={[0.16, 0.02, 0.12]} p={[0, 0.01, 0]} c="#2a2f3a" />
+          <B s={[0.04, 0.18, 0.03]} p={[0, 0.1, 0.02]} c="#2a2f3a" />
+          <B s={[0.44, 0.3, 0.035]} p={[0, 0.33, 0]} c="#2a2f3a" />
+          <mesh position={[0, 0.33, -0.019]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[0.4, 0.26]} />
+            <meshBasicMaterial color="#2c4d72" toneMapped={false} />
+          </mesh>
+        </group>
+      )}
+      {/* Đèn bàn góc trước bên trái, bóng đèn sáng */}
+      {tier >= 3 && (
+        <group position={[-0.6, 0.745, -0.2]} rotation={[0, 0.6, 0]} scale={1.35}>
+          <Cyl rt={0.06} rb={0.07} h={0.02} p={[0, 0.01, 0]} c="#2a2f3a" seg={10} />
+          <B s={[0.025, 0.3, 0.025]} p={[0, 0.16, 0.03]} c="#2a2f3a" r={[0.25, 0, 0]} />
+          <B s={[0.025, 0.2, 0.025]} p={[0, 0.33, 0.0]} c="#2a2f3a" r={[-0.9, 0, 0]} />
+          <mesh position={[0, 0.36, -0.1]} rotation={[-0.5, 0, 0]} castShadow>
+            <coneGeometry args={[0.065, 0.09, 10, 1, true]} />
+            <meshStandardMaterial color="#e0784f" roughness={0.6} side={DoubleSide} />
+          </mesh>
+          <mesh position={[0, 0.335, -0.115]}>
+            <sphereGeometry args={[0.03, 8, 6]} />
+            <meshStandardMaterial color="#fff2c4" emissive="#ffd780" emissiveIntensity={2.5} />
+          </mesh>
+        </group>
+      )}
+      {/* Cúp vàng góc sau bên trái (nhìn thấy từ lối đi) + viền bàn vàng */}
+      {tier >= 4 && (
+        <group>
+          <group position={[-0.56, 0.745, 0.24]} scale={1.3}>
+            <Gold s={[0.1, 0.03, 0.1]} p={[0, 0.015, 0]} />
+            <Gold s={[0.025, 0.08, 0.025]} p={[0, 0.07, 0]} />
+            <mesh position={[0, 0.15, 0]} castShadow>
+              <cylinderGeometry args={[0.065, 0.03, 0.1, 10]} />
+              <meshStandardMaterial color={GOLD} metalness={0.55} roughness={0.35} flatShading />
+            </mesh>
+          </group>
+          <Gold s={[1.42, 0.02, 0.025]} p={[0, 0.735, -0.38]} />
+          <Gold s={[1.42, 0.02, 0.025]} p={[0, 0.735, 0.38]} />
+        </group>
+      )}
     </group>
   )
 }

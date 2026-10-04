@@ -31,7 +31,7 @@ export interface DeskSlot {
 
 /** Việc agent làm khi dừng ở một điểm (quyết định dáng, đồ cầm tay, câu nói) */
 export type Activity =
-  | 'coffee' | 'fridge' | 'water' | 'window' | 'tv' | 'foos' | 'books' | 'sofa' | 'beanbag' | 'stool' | 'meeting' | 'kanban'
+  | 'coffee' | 'fridge' | 'water' | 'window' | 'tv' | 'foos' | 'books' | 'sofa' | 'beanbag' | 'stool' | 'meeting' | 'kanban' | 'fame'
 
 export interface GraphNode extends Vec2 {
   id: string
@@ -50,14 +50,14 @@ export const OFFICE = { minX: -16, maxX: 16, minZ: -11, maxZ: 11, wallH: 3.2, wa
 export const SPAWN: Vec2 = { x: 0, z: 5.5 }
 
 /**
- * Sảnh chờ bên phải cửa vào: ứng viên xếp hàng chờ bạn duyệt hồ sơ, mặt nhìn vào văn phòng.
+ * Sảnh chờ bên phải cửa vào: ứng viên xếp hàng hai bên bảng vàng chờ bạn duyệt hồ sơ, mặt nhìn vào văn phòng.
  * Nằm sau lưng camera lúc mới vào, để bảng tên không che màn hình; quay lại phía cửa là thấy.
  */
 export const LOBBY: (Vec2 & { yaw: number })[] = [
-  { x: 3.4, z: 9.8, yaw: Math.PI - 0.25 },
-  { x: 5.1, z: 9.3, yaw: Math.PI - 0.25 },
-  { x: 6.8, z: 9.8, yaw: Math.PI - 0.25 },
-  { x: 8.3, z: 9.3, yaw: Math.PI - 0.25 },
+  { x: 2.8, z: 9.7, yaw: Math.PI - 0.2 },
+  { x: 8.2, z: 9.7, yaw: Math.PI + 0.25 },
+  { x: 3.0, z: 8.4, yaw: Math.PI - 0.2 },
+  { x: 8.0, z: 8.4, yaw: Math.PI + 0.25 },
 ]
 
 export const LEAD_ROOM = { minX: -16, maxX: -9, minZ: -11, maxZ: -4, door: [-11.5, -10.3] as const }
@@ -65,6 +65,9 @@ export const MEET_ROOM = { minX: 9, maxX: 16, minZ: -11, maxZ: -4, door: [10.3, 
 
 /** Bảng kanban treo ở tường nam (mặt bảng nhìn về hướng bắc, -z) */
 export const BOARD = { x: -5.2, y: 1.55, z: OFFICE.maxZ - OFFICE.wallT / 2 - 0.04, w: 3.6, h: 1.8 }
+
+/** Bảng vàng (xếp hạng EXP) treo tường nam, bên phải cửa vào, đối xứng với bảng ticket */
+export const FAME = { x: 5.5, y: 1.6, z: OFFICE.maxZ - OFFICE.wallT / 2 - 0.04, w: 3.0, h: 1.6 }
 
 /** Khoảng cách từ ghế tới tâm bàn */
 export const SEAT_TO_DESK = 0.83
@@ -218,6 +221,9 @@ function buildGraph(): Graph {
   // Bảng kanban trên tường nam
   poi('kanbanL', BOARD.x - 0.8, BOARD.z - 1.25, 0, 'kanban', 'kanban', 'xem bảng ticket'); link('kanbanL', gid(0, 3)); link('kanbanL', gid(1, 3))
   poi('kanbanR', BOARD.x + 0.8, BOARD.z - 1.25, 0, 'kanban', 'kanban', 'xem bảng ticket'); link('kanbanR', gid(0, 3)); link('kanbanR', gid(1, 3))
+  // Bảng vàng
+  poi('fameL', FAME.x - 0.7, FAME.z - 1.3, 0, 'fame', 'fame', 'xem bảng vàng'); link('fameL', gid(1, 3)); link('fameL', gid(2, 3))
+  poi('fameR', FAME.x + 0.7, FAME.z - 1.3, 0, 'fame', 'fame', 'xem bảng vàng'); link('fameR', gid(1, 3)); link('fameR', gid(2, 3))
 
   return { nodes, adj }
 }

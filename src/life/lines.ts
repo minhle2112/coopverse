@@ -1,3 +1,4 @@
+import { expForLevel, levelOf, titleOf, useExp } from '../data/exp'
 import type { Agent, Issue } from '../data/types'
 import type { Activity } from '../world/layout'
 import { sceneHour } from '../world/time'
@@ -35,6 +36,7 @@ const AT: Record<Activity, string[]> = {
   stool: ['Ăn vặt chút đã', 'Bánh mì hôm nay giòn ghê', 'Chiều nay ai đặt trà sữa không?'],
   meeting: ['Phòng họp trống, mượn ngồi chút', 'Tập thuyết trình tí', 'Ghế phòng họp êm hơn ghế mình'],
   kanban: ['Để xem bảng còn gì nào', 'Cột Xong dài ra rồi 😎', 'Chưa có ticket mới à?', 'Ai kéo thẻ này qua vậy?'],
+  fame: ['Tuần này ai dẫn đầu nhỉ?', 'Phải cày thêm mới lên top được 💪', 'Ủa ai cày dữ vậy?', 'Tên mình phải lên bảng vàng mới được', 'Lên cấp là được bàn xịn hơn đó'],
 }
 
 const SEAT_IDLE = ['Rảnh quá, ai giao việc đi', 'Dọn bàn chút', 'Đọc lại checklist cái', 'Hôm nay ăn trưa ở đâu ta?']
@@ -85,9 +87,13 @@ const WINDOW_NIGHT = ['Trăng sáng ghê 🌙', 'Ngoài kia tối om', 'Đêm na
 const isDark = () => { const p = periodNow(); return p === 'night' || p === 'evening' }
 export const EXCUSE = ['Cho em qua với sếp 🙏', 'Xin lỗi sếp, mượn đường!', 'Sếp ơi nhường em tí']
 
+/** Được bạn khen (nút Khen), và lúc lên cấp */
+export const PRAISED = ['Cảm ơn sếp nhiều! 🥰', 'Được sếp khen là vui cả ngày 😄', 'Em sẽ cố hơn nữa!', 'Hihi, cảm ơn sếp 🙏']
+export const LEVEL_UP = (level: number, title: string) => [`Lên cấp ${level} rồi! 🎉`, `Yeah! Giờ em là ${title} 😎`, `Cấp ${level}! Bàn mới đâu sếp ơi 😆`]
+
 export const ACT_EMOTE: Record<Activity, string> = {
   coffee: '☕', fridge: '🧃', water: '💧', window: '🌤️', tv: '📺', foos: '⚽', books: '📖',
-  sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌',
+  sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌', fame: '🏆',
 }
 
 const DIALOGUES: Dialogue[] = [
@@ -162,6 +168,14 @@ function mix(agent: Agent, w: World, pool: string[]): Line {
   return fun(any(pool))
 }
 
+/** Câu nói về cấp hiện tại: còn bao nhiêu EXP nữa lên cấp */
+function levelTalk(agentId: string) {
+  const total = useExp.getState().stats[agentId]?.total ?? 0
+  const lv = levelOf(total)
+  const need = expForLevel(lv + 1) - total
+  return need <= 60 ? `Còn ${need} EXP nữa là lên cấp ${lv + 1} rồi!` : `Mình đang cấp ${lv} · ${titleOf(lv)}`
+}
+
 /** Câu tự nói một mình, theo trạng thái và việc đang làm. */
 export function muse(agent: Agent, w: World, act: Activity | null): Line {
   switch (agent.status) {
@@ -171,6 +185,8 @@ export function muse(agent: Agent, w: World, act: Activity | null): Line {
     default: {
       // Thỉnh thoảng nói chuyện theo giờ (sáng ăn phở, trưa buồn ngủ, khuya...)
       if (Math.random() < 0.22) return fun(any(TIME_MUSE[periodNow()]))
+      // Đứng trước bảng vàng: hay nói về cấp của chính mình (số thật)
+      if (act === 'fame' && Math.random() < 0.5) return real(levelTalk(agent.id))
       const pool = act === 'window' && isDark() ? WINDOW_NIGHT : act ? AT[act] : SEAT_IDLE
       return mix(agent, w, pool)
     }

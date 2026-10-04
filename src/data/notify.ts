@@ -1,7 +1,7 @@
 import { ISSUE_STATUS_LABEL, askLabel, type Agent, type Ask, type Issue } from './types'
 
 /** ask = có việc mới chờ bạn duyệt / trả lời */
-export type NoteKind = 'start' | 'done' | 'warn' | 'error' | 'info' | 'ask'
+export type NoteKind = 'start' | 'done' | 'warn' | 'error' | 'info' | 'ask' | 'level'
 export interface NoteDraft { kind: NoteKind; text: string }
 
 const short = (s: string, n = 48) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s)

@@ -38,6 +38,10 @@ interface CoopState {
   nearBoard: boolean
   /** Đang xem bảng ticket phóng to */
   boardOpen: boolean
+  /** Đứng trước bảng vàng (xếp hạng EXP) */
+  nearFame: boolean
+  /** Đang xem bảng vàng phóng to */
+  fameOpen: boolean
   /** Tủ đồ đang mở cho ai ('player' = bạn, hoặc id agent) */
   wardrobeId: string | null
   settingsOpen: boolean
@@ -61,13 +65,15 @@ interface CoopState {
   pushNotes: (drafts: NoteDraft[]) => void
   dismissNote: (id: number) => void
   pingAgent: (id: string) => void
-  setNear: (id: string | null, board?: boolean) => void
+  setNear: (id: string | null, board?: boolean, fame?: boolean) => void
   setLocked: (v: boolean) => void
   showToast: (text: string) => void
   openFocus: (id: string) => void
   closeFocus: () => void
   openBoard: () => void
   closeBoard: () => void
+  openFame: () => void
+  closeFame: () => void
   openWardrobe: (id?: string) => void
   closeWardrobe: () => void
   toggleSettings: () => void
@@ -97,6 +103,8 @@ export const useCoop = create<CoopState>((set, get) => ({
   focusId: null,
   nearBoard: false,
   boardOpen: false,
+  nearFame: false,
+  fameOpen: false,
   wardrobeId: null,
   settingsOpen: false,
   inboxOpen: false,
@@ -133,7 +141,7 @@ export const useCoop = create<CoopState>((set, get) => ({
   },
   dismissNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
   pingAgent: (id) => set({ ping: { id, at: performance.now() } }),
-  setNear: (id, board = false) => set({ nearId: id, nearBoard: board }),
+  setNear: (id, board = false, fame = false) => set({ nearId: id, nearBoard: board, nearFame: fame }),
   setLocked: (v) => set({ locked: v }),
   showToast: (text) => set({ toast: { id: ++seq, text } }),
   cycleStatus: (id) =>
@@ -155,6 +163,12 @@ export const useCoop = create<CoopState>((set, get) => ({
     set({ boardOpen: true, settingsOpen: false })
   },
   closeBoard: () => set({ boardOpen: false }),
+  openFame: () => {
+    if (document.pointerLockElement) document.exitPointerLock()
+    input.keys.clear()
+    set({ fameOpen: true, settingsOpen: false })
+  },
+  closeFame: () => set({ fameOpen: false }),
   openWardrobe: (id) => {
     if (document.pointerLockElement) document.exitPointerLock()
     input.keys.clear()
@@ -175,6 +189,7 @@ export const useCoop = create<CoopState>((set, get) => ({
     else if (s.settingsOpen) set({ settingsOpen: false })
     else if (s.focusId) set({ focusId: null })
     else if (s.boardOpen) set({ boardOpen: false })
+    else if (s.fameOpen) set({ fameOpen: false })
     else return false
     return true
   },
@@ -184,7 +199,9 @@ export const useCoop = create<CoopState>((set, get) => ({
     if (wardrobeId || askId) return
     if (focusId) return closeFocus()
     if (boardOpen) return closeBoard()
+    if (get().fameOpen) return get().closeFame()
     if (nearBoard) return openBoard()
+    if (get().nearFame) return get().openFame()
     const a = agents.find((x) => x.id === nearId)
     if (!a) return
     // Ứng viên ở sảnh: mở hồ sơ (phiếu thuê) để duyệt

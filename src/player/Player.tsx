@@ -6,7 +6,7 @@ import { PLAYER_ID, useLook } from '../characters/look'
 import { damp, lerpAngle } from '../lib/math'
 import { agentPos, cam, dev, input, player } from '../runtime'
 import { useCoop } from '../store'
-import { BOARD, deskCenter, forward, rayHitCamBoxes, resolveCircle, type DeskSlot, type World } from '../world/layout'
+import { BOARD, FAME, deskCenter, forward, rayHitCamBoxes, resolveCircle, type DeskSlot, type World } from '../world/layout'
 
 const RADIUS = 0.3
 const AGENT_RADIUS = 0.3
@@ -32,8 +32,14 @@ const _focusLook = new Vector3()
 /** Điểm điều khiển đường cong: trên cao, sau lưng ghế, để camera không xuyên qua màn hình bàn đối diện */
 const _ctrl = new Vector3()
 
-/** Thứ camera đang zoom vào: màn hình một bàn, hoặc bảng ticket */
-type Target = { kind: 'desk'; slot: DeskSlot } | { kind: 'board' }
+/** Thứ camera đang zoom vào: màn hình một bàn, bảng ticket, hoặc bảng vàng */
+type Target = { kind: 'desk'; slot: DeskSlot } | { kind: 'board' } | { kind: 'fame' }
+
+/** Khoảng cách từ người chơi tới mặt một bảng treo tường nam (chỉ tính khi đứng trước bảng) */
+function wallDist(b: { x: number; z: number; w: number }) {
+  const bx = Math.max(b.x - b.w / 2, Math.min(player.x, b.x + b.w / 2))
+  return player.z < b.z ? Math.hypot(player.x - bx, b.z - player.z) : Infinity
+}
 
 /**
  * Vị trí camera nhìn thẳng vào một mặt phẳng (tâm c, pháp tuyến hướng về người xem -f, rộng w, cao h)
@@ -50,6 +56,7 @@ function faceView(cx: number, cy: number, cz: number, f: { x: number; z: number 
 
 function targetView(tg: Target, cam: PerspectiveCamera) {
   if (tg.kind === 'board') return faceView(BOARD.x, BOARD.y, BOARD.z - 0.02, { x: 0, z: 1 }, BOARD.w, BOARD.h, cam)
+  if (tg.kind === 'fame') return faceView(FAME.x, FAME.y, FAME.z - 0.02, { x: 0, z: 1 }, FAME.w, FAME.h, cam)
   const f = forward(tg.slot.yaw)
   const c = deskCenter(tg.slot)
   faceView(c.x + f.x * SCREEN_FWD, SCREEN_Y, c.z + f.z * SCREEN_FWD, f, SCREEN_W, SCREEN_H, cam)
@@ -126,9 +133,9 @@ export function Player({ world }: { world: World }) {
     _freeLook.set(player.x, EYE, player.z)
 
     // ── Zoom vào màn hình khi đang xem CLI, hoặc vào bảng ticket ──
-    const { focusId, boardOpen } = useCoop.getState()
+    const { focusId, boardOpen, fameOpen } = useCoop.getState()
     const slot = focusId ? world.seatOf.get(focusId) ?? null : null
-    const target: Target | null = slot ? { kind: 'desk', slot } : boardOpen ? { kind: 'board' } : null
+    const target: Target | null = slot ? { kind: 'desk', slot } : boardOpen ? { kind: 'board' } : fameOpen ? { kind: 'fame' } : null
     if (target) focusTarget.current = target
     const want01 = target ? 1 : 0
     zoom.current += (want01 - zoom.current) * damp(target ? 3.2 : 5, dt)
@@ -156,15 +163,16 @@ export function Player({ world }: { world: World }) {
       const dd = Math.hypot(a.x - player.x, a.z - player.z)
       if (dd < bd) { bd = dd; best = id }
     }
-    // Khoảng cách tới mặt bảng (chỉ tính khi đứng trước bảng)
-    const bx = Math.max(BOARD.x - BOARD.w / 2, Math.min(player.x, BOARD.x + BOARD.w / 2))
-    const boardD = player.z < BOARD.z ? Math.hypot(player.x - bx, BOARD.z - player.z) : Infinity
+    // Bảng ticket / bảng vàng: đứng trước bảng thì ưu tiên bảng, trừ khi có agent sát hơn hẳn
+    const boardD = wallDist(BOARD)
+    const fameD = wallDist(FAME)
     const board = boardD < BOARD_DIST && (!best || boardD - 0.8 < bd)
-    if (board) best = null
-    const key = board ? '#board' : best
+    const fame = !board && fameD < BOARD_DIST && (!best || fameD - 0.8 < bd)
+    if (board || fame) best = null
+    const key = board ? '#board' : fame ? '#fame' : best
     if (key !== lastNear.current) {
       lastNear.current = key
-      setNear(best, board)
+      setNear(best, board, fame)
     }
   })
 

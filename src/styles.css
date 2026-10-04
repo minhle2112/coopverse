@@ -693,3 +693,103 @@ a.card:hover { box-shadow: 0 0 0 2px #2c7fc0, 0 4px 12px rgba(0, 0, 0, 0.15); }
 .hire-warns li { padding: 6px 10px; border-radius: 8px; }
 .hire-warns .lvl-red { background: rgba(239, 90, 76, 0.16); color: #ff8a7d; font-weight: 600; }
 .hire-warns .lvl-warn { background: rgba(242, 181, 68, 0.12); color: #f2c46d; }
+
+/* ───────── Giai đoạn C: EXP, cấp, bảng vàng ───────── */
+
+/* Cấp trên bảng tên */
+.np-lv {
+  min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(#ffd56b, #e0a52f); color: #2a1f05; font-size: 10.5px; font-weight: 800; line-height: 1;
+}
+.np-rank { font-size: 10px; color: #f2c46d; letter-spacing: 0.02em; margin-top: 1px; }
+/* Cấp 9 trở lên: viền vàng */
+.nameplate.np-gold { box-shadow: 0 0 0 1.5px #e0b34a, 0 0 12px rgba(242, 193, 78, 0.45); }
+.nameplate.np-gold.near { outline-color: #ffd56b; }
+
+/* "+EXP" bay lên, "LÊN CẤP" bung ra phía trên bảng tên */
+.xp-pop {
+  position: absolute; left: calc(100% + 6px); bottom: 20%; white-space: nowrap;
+  color: #ffd56b; font-weight: 900; font-size: 15px; text-shadow: 0 1px 0 #3a2a00, 0 0 6px rgba(0, 0, 0, 0.5);
+  animation: xp-pop 2.4s ease-out forwards;
+}
+@keyframes xp-pop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.7); }
+  12% { opacity: 1; transform: translateY(0) scale(1.15); }
+  25% { transform: translateY(-4px) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-34px) scale(1); }
+}
+.lvup {
+  position: absolute; left: 50%; bottom: calc(100% + 58px); white-space: nowrap;
+  padding: 4px 12px; border-radius: 999px;
+  background: linear-gradient(#ffe08a, #e0a52f); color: #2a1f05; border: 2px solid #fff6d0;
+  font-weight: 900; font-size: 14px; letter-spacing: 0.04em; box-shadow: 0 0 18px rgba(255, 210, 90, 0.8);
+  animation: lvup 3.2s ease-out forwards;
+}
+@keyframes lvup {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.3); }
+  10% { opacity: 1; transform: translateX(-50%) scale(1.25); }
+  18% { transform: translateX(-50%) scale(1); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+}
+
+/* Chip cấp dùng chung (danh sách nhân sự, CLI, bảng vàng) */
+.lv-chip {
+  display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px;
+  background: rgba(242, 193, 78, 0.18); color: #f2c46d; font-size: 10.5px; font-weight: 800; line-height: 16px; vertical-align: 1px;
+}
+.note-level { border-left-color: #f2c14e; background: linear-gradient(90deg, rgba(242, 193, 78, 0.22), var(--panel) 60%); font-weight: 600; }
+
+/* Thanh tiêu đề CLI: cấp + danh hiệu + thanh tiến độ */
+.exp-badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.exp-badge .lv-chip { margin: 0; }
+.exp-title { color: #f2c46d; font-size: 12px; }
+.exp-mini { display: inline-block; width: 54px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.exp-mini i { display: block; height: 100%; background: linear-gradient(90deg, #e0a52f, #ffd56b); border-radius: 3px; }
+.kudos-btn { padding: 3px 10px; font-size: 12px; border-color: rgba(242, 193, 78, 0.45); color: #f2c46d; }
+.t-primary.t-btn-kudos { background: #e0a52f; color: #2a1f05; border-color: transparent; }
+
+/* Bảng vàng phóng to: cùng tỉ lệ với bảng 3D (3 : 1.6) */
+.fame {
+  position: relative; pointer-events: auto;
+  width: min(80vw, 150vh); aspect-ratio: 15 / 8; min-height: 360px;
+  display: flex; flex-direction: column;
+  background: linear-gradient(#23304a, #161c2b); color: var(--text);
+  border: 10px solid #b8892f; border-radius: 8px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  animation: term-in 0.35s ease-out 0.55s both;
+}
+.fame-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 14px; display: flex; flex-direction: column; gap: 5px; }
+.fame-empty { margin: auto; color: var(--muted); }
+.fame-row {
+  display: grid; grid-template-columns: 34px 34px minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px;
+  padding: 5px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.04);
+}
+.fame-row.top { background: rgba(242, 193, 78, 0.09); }
+.fame-rank {
+  width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.14); font-weight: 800;
+}
+.top1 .fame-rank { background: #f2c14e; color: #2a2f3a; }
+.top2 .fame-rank { background: #c9d1db; color: #2a2f3a; }
+.top3 .fame-rank { background: #d68a4c; color: #2a2f3a; }
+.fame-av {
+  width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 13px;
+}
+.fame-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fame-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+.fame-title { font-size: 12px; color: #f2c46d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fame-title .muted, .fame-progress .muted { color: var(--muted); }
+.fame-progress { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+.fame-progress .exp-mini { width: 120px; }
+.fame-quote { font-size: 12px; font-style: italic; color: #c4cad6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fame-counts { display: flex; gap: 10px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.fame-exp { font-size: 22px; font-weight: 800; text-align: right; min-width: 80px; }
+.fame-exp small { font-size: 11px; font-weight: 700; color: var(--muted); margin-left: 4px; }
+.fame-foot {
+  padding: 8px 14px; font-size: 11.5px; line-height: 1.45; color: var(--muted);
+  background: rgba(0, 0, 0, 0.2); border-top: 1px solid rgba(255, 255, 255, 0.07);
+}

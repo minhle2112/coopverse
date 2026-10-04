@@ -1,4 +1,5 @@
 import type { AskDetail } from './paperclip'
+import type { Ledger } from './ledger'
 import type { Agent, Ask, Comment, Issue } from './types'
 
 /**
@@ -164,4 +165,40 @@ export const MOCK_COMMENTS: Record<string, Comment[]> = {
   i13: [
     { id: 'c2', body: 'Alt text r2 xong, còn 3 ảnh cần bạn xác nhận nội dung.', createdAt: ago(42), authorAgentId: 'seo-lead', authorType: 'agent' },
   ],
+}
+
+/**
+ * Sổ EXP giả cho bản demo: đủ các cấp để thấy bàn nâng cấp (Lead cấp 9 có cúp, Tạo Ảnh cấp 7 có đèn bàn…).
+ * Viết Bài đang 290 EXP, khen một lần (+25) là lên cấp 3 để xem hiệu ứng lên cấp.
+ */
+export function mockLedger(): Ledger {
+  const now = Date.now()
+  const L: Ledger = { v: 1, runs: {}, tickets: {}, approvals: {}, kudos: [] }
+  // [agent, số lượt chạy, rải trong bao nhiêu ngày gần đây]
+  const plan: [string, number, number][] = [
+    ['seo-lead', 328, 60], ['content-seo', 92, 20], ['demo-image', 220, 30], ['demo-translate', 65, 25],
+    ['demo-research', 42, 6], ['demo-writer', 29, 5], ['demo-editor', 6, 10], ['demo-meta', 3, 3],
+  ]
+  for (const [agentId, n, days] of plan) {
+    for (let i = 0; i < n; i++) {
+      // Rải đều nhưng lệch nhau một chút, không cần ngẫu nhiên thật
+      const ago = ((i + 0.5) / n) * days * 86_400_000 * (0.9 + 0.2 * (((i * 7919) % 97) / 97))
+      L.runs[`${agentId}-r${i}`] = [agentId, now - ago]
+    }
+  }
+  for (const i of MOCK_ISSUES) {
+    if (i.status === 'done' && i.assigneeId) L.tickets[i.id] = [i.assigneeId, Date.parse(i.completedAt ?? i.updatedAt), i.priority ?? 'medium', i.key]
+  }
+  L.approvals['appr-1'] = ['seo-lead', now - 3 * 86_400_000, 'request_board_approval']
+  L.approvals['appr-2'] = ['seo-lead', now - 12 * 86_400_000, 'request_board_approval']
+  const kudos: [string, number, string][] = [
+    ['seo-lead', 1, 'Audit cannibalization rất kỹ 👍'],
+    ['seo-lead', 9, 'Kế hoạch gộp LAB-8/9/10 gọn gàng'],
+    ['seo-lead', 20, ''],
+    ['seo-lead', 33, 'Keyword audit đầu tiên, làm tốt'],
+    ['content-seo', 2, 'Batch A sạch, không phải sửa gì'],
+    ['content-seo', 15, ''],
+  ]
+  kudos.forEach(([agentId, d, note], i) => L.kudos.push({ id: `k${i}`, agentId, at: now - d * 86_400_000, note }))
+  return L
 }
