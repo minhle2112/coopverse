@@ -16,8 +16,8 @@ import { dirOf, px, py, type Dir } from './geom'
 import { useParts } from './look'
 import { PixelLevelFx, hushedBy } from './LevelFx'
 import { PixelSound } from './Sound'
-import { view } from './view'
 import { stage, ticks, toScreen, type Tick } from './stage'
+import { hits, makeOutline, personHit, setOutline } from './pick'
 
 /**
  * Ngồi ghế quay mặt xuống (về phía camera): dùng khung đứng, hạ người xuống để mép bàn che phần chân.
@@ -106,7 +106,9 @@ function makeBody() {
     rim.addChild(r)
   }
   rim.visible = false
-  body.addChild(shadow, rim, man)
+  // Viền sáng khi rê chuột lên (bấm để mở CLI / hồ sơ)
+  const hl = makeOutline()
+  body.addChild(shadow, rim, hl, man)
   const bubble = new Sprite(Texture.EMPTY)
   bubble.anchor.set(0.5, 1)
   const arrow = new Sprite(sprite('arrowDown'))
@@ -115,7 +117,7 @@ function makeBody() {
   stage.sorted!.addChild(body)
   stage.fx!.addChild(bubble, arrow)
   return {
-    body, shadow, man, rim, bubble, arrow,
+    body, shadow, man, rim, hl, bubble, arrow,
     destroy() {
       body.destroy({ children: true })
       bubble.destroy()
@@ -186,11 +188,49 @@ function placeDom(id: string, head: HTMLDivElement | null, feet: HTMLDivElement 
     else heads.set(id, { el: head, x: p.x, y: p.y, w: 0, h: 0 })
   }
   if (feet) {
-    // Thu nhỏ hơn mức mặc định (lăn chuột ra xa): ẩn bảng tên cho đỡ rối, trừ người bạn đang đứng gần
-    const small = view.zoomBias < 0
-    if (feet.classList.contains('far') !== small) feet.classList.toggle('far', small)
     const p = toScreen(x, foot)
-    feet.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`
+    const f = plates.get(id)
+    if (f && f.el === feet) { f.x = p.x; f.y = p.y }
+    else plates.set(id, { el: feet, x: p.x, y: p.y, w: 0, h: 0, big: false })
+  }
+}
+
+/** Bảng tên dưới chân của từng người; layoutPlates() xếp lại cho các bảng bé không đè lên nhau */
+const plates = new Map<string, { el: HTMLDivElement; x: number; y: number; w: number; h: number; big: boolean }>()
+let plateMeasureAt = 0
+
+function layoutPlates(t: number) {
+  const measure = t > plateMeasureAt
+  if (measure) plateMeasureAt = t + 0.25
+  const list = [...plates.values()]
+  if (measure) {
+    for (const it of list) {
+      const pl = it.el.querySelector<HTMLElement>('.px-plate')
+      it.w = pl?.offsetWidth ?? 0
+      it.h = pl?.offsetHeight ?? 0
+      // Thẻ đầy đủ (đứng gần / rê chuột) nằm đè lên trên, không xếp cùng
+      it.big = !!pl?.classList.contains('near')
+    }
+  }
+  // Trên trước, trái trước: người sau bị lệch sang phải một chút (chồng ít) hoặc xuống dưới (chồng nhiều)
+  list.sort((a, b) => a.y - b.y || a.x - b.x)
+  const placed: { l: number; r: number; t: number; b: number }[] = []
+  for (const it of list) {
+    let x = it.x, y = it.y
+    if (!it.big && it.w > 0) {
+      const beside = it.el.classList.contains('beside')
+      const left = () => (beside ? x : x - it.w / 2)
+      for (let pass = 0; pass < 6; pass++) {
+        const l = left()
+        const hit = placed.find((p) => l < p.r + 2 && l + it.w + 2 > p.l && y < p.b + 1 && y + it.h + 1 > p.t)
+        if (!hit) break
+        const ov = hit.r + 2 - l
+        if (ov <= 14) x += ov
+        else y = hit.b + 1
+      }
+      placed.push({ l: left(), r: left() + it.w, t: y, b: y + it.h })
+    }
+    it.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`
   }
 }
 
@@ -248,6 +288,8 @@ function PixelAgent({ agent, slot, isLead }: { agent: Agent; slot: DeskSlot; isL
       v.body.zIndex = a.where === 'seat' ? Math.round(py(a.slot.seat.z)) : b.seat && !f.back ? Y + 10 : Y
       v.shadow.visible = !b.seat
       v.shadow.position.set(0, -f.dy)
+      personHit(a.id, X, Y + f.dy, HEAD, v.body.zIndex)
+      setOutline(v.hl, stage.hover === a.id && sh ? sh.silhouette(f.anim, f.dir, f.i) : null)
 
       const top = Y + f.dy - HEAD
       const em = bubbleOf(a.id, status.current, askRef.current, t, a.phase)
@@ -268,15 +310,16 @@ function PixelAgent({ agent, slot, isLead }: { agent: Agent; slot: DeskSlot; isL
       placeDom(a.id, anchor.current, feet.current, beside ? X + 10 : X, em && !side ? top - 17 : top, beside ? top + 4 : Y + f.dy + 1)
       const fe0 = feet.current
       if (fe0 && fe0.classList.contains('beside') !== beside) fe0.classList.toggle('beside', beside)
-      // Bảng tên của người đang ngồi bàn chỉ hiện khi rê chuột / đứng gần / vừa đánh dấu (bàn sát nhau, tên sẽ chồng lên màn hình)
-      const showPlate = a.where !== 'seat' || stage.hover === a.id || pinged
       const fe = feet.current
-      if (fe && fe.classList.contains('seated') === showPlate) fe.classList.toggle('seated', !showPlate)
+      const hov = stage.hover === a.id
+      if (fe && fe.classList.contains('hover') !== hov) fe.classList.toggle('hover', hov)
     }
     ticks.add(tick)
     return () => {
       ticks.delete(tick)
       heads.delete(agent.id)
+      plates.delete(agent.id)
+      hits.delete(agent.id)
       v.destroy()
       dropActor(agent.id)
     }
@@ -319,14 +362,16 @@ function Overhead({ agent }: { agent: Agent }) {
 /** Bảng tên dưới chân. Dòng phụ (danh hiệu, việc đang làm) chỉ hiện khi bạn đứng gần: chờ bạn thì đã có bong bóng "?". */
 function Plate({ agent, asking, isLead }: { agent: Agent; asking: Asking; isLead: boolean }) {
   const near = useCoop((s) => s.nearId === agent.id)
+  const hover = useCoop((s) => s.hoverId === agent.id)
   const lv = useLevel(agent.id)
-  const sub = near
+  const sub = near || hover
   return (
     <div className="px-under">
-      <div className={`px-plate${near ? ' near' : ''}${lv >= 9 ? ' gold' : ''}`} style={{ borderLeftColor: STATUS_COLOR[agent.status] }}>
+      <div className={`px-plate${sub ? ' near' : ''}${lv >= 9 ? ' gold' : ''}`} style={{ borderLeftColor: STATUS_COLOR[agent.status] }}>
         <div className="px-plate-row">
+          {!sub && <span className="px-dot" style={{ background: STATUS_COLOR[agent.status] }} />}
           {isLead && <span className="px-lead" title="Lead">★</span>}
-          {near && <span className="px-lv">Lv{lv}</span>}
+          {sub && <span className="px-lv">Lv{lv}</span>}
           <span className="px-name">{agent.name}</span>
         </div>
         {sub && (
@@ -335,6 +380,7 @@ function Plate({ agent, asking, isLead }: { agent: Agent; asking: Asking; isLead
             <div className={`px-sub${asking ? ' ask' : ''}`}>
               {asking === 'approval' ? 'Chờ bạn duyệt' : asking ? 'Chờ bạn trả lời' : agent.status === 'running' && agent.task ? agent.task : STATUS_LABEL[agent.status]}
             </div>
+            {hover && <div className="px-hint">{agent.status === 'terminated' ? 'Đã nghỉ việc' : 'Bấm chuột: mở CLI'}</div>}
           </>
         )}
       </div>
@@ -360,14 +406,15 @@ function PixelCandidate({ agent, spot }: { agent: Agent; spot: (typeof LOBBY)[nu
     const tick: Tick = (_dt, t) => {
       const pd = Math.hypot(player.x - spot.x, player.z - spot.z)
       const sh = sheet.current
-      if (sh) {
-        v.man.texture = pd < LOOK_DIST
-          ? sh.frame('idle', dirOf(Math.atan2(player.x - spot.x, player.z - spot.z)), frameAt('idle', t, phase))
-          : sh.frame('read', 'down', frameAt('read', t, phase))
-      }
+      const fr: [Anim, Dir, number] = pd < LOOK_DIST
+        ? ['idle', dirOf(Math.atan2(player.x - spot.x, player.z - spot.z)), frameAt('idle', t, phase)]
+        : ['read', 'down', frameAt('read', t, phase)]
+      if (sh) v.man.texture = sh.frame(...fr)
       const X = Math.round(px(spot.x)), Y = Math.round(py(spot.z))
       v.body.position.set(X, Y)
       v.body.zIndex = Y
+      personHit(agent.id, X, Y, HEAD, Y)
+      setOutline(v.hl, stage.hover === agent.id && sh ? sh.silhouette(...fr) : null)
       v.bubble.visible = askRef.current
       if (askRef.current) {
         // Ứng viên: phong bì hồ sơ (khác dấu "?" của agent đang chờ bạn)
@@ -375,24 +422,31 @@ function PixelCandidate({ agent, spot }: { agent: Agent; spot: (typeof LOBBY)[nu
         v.bubble.position.set(X, Y - HEAD + 1)
       }
       placeDom(agent.id, null, feet.current, X, 0, Y + 1)
+      const fe = feet.current
+      const hov = stage.hover === agent.id
+      if (fe && fe.classList.contains('hover') !== hov) fe.classList.toggle('hover', hov)
     }
     ticks.add(tick)
     return () => {
       ticks.delete(tick)
+      hits.delete(agent.id)
       v.destroy()
       agentPos.delete(agent.id)
+      plates.delete(agent.id)
     }
   }, [agent.id, spot])
 
   const near = useCoop((s) => s.nearId === agent.id)
+  const hover = useCoop((s) => s.hoverId === agent.id)
   const boss = useCoop((s) => s.agents.find((a) => a.id === agent.reportsTo)?.name)
   if (!stage.overlay) return null
   return createPortal(
     <div className="px-anchor" style={OFFSCREEN} ref={feet}>
       <div className="px-under">
-        <div className={`px-plate cand${near ? ' near' : ''}`}>
+        <div className={`px-plate cand${near || hover ? ' near' : ''}`}>
           <div className="px-plate-row"><span className="px-name">{agent.name}</span></div>
-          <div className="px-sub ask">Ứng viên{near && boss ? ` · ${boss}` : ''}</div>
+          {(near || hover) && <div className="px-sub ask">Ứng viên{boss ? ` · ${boss}` : ''}</div>}
+          {hover && <div className="px-hint">Bấm chuột: xem hồ sơ</div>}
         </div>
       </div>
     </div>,
@@ -408,7 +462,7 @@ export function PixelAgents({ world }: { world: World }) {
   useEffect(() => {
     const f: Tick = (dt) => lifeTick(Math.min(dt, 0.1))
     // Chạy sau khi mọi người đã cập nhật vị trí (effect của con chạy trước cha nên tick này nằm sau)
-    const lay: Tick = (_dt, t) => layoutSpeech(t)
+    const lay: Tick = (_dt, t) => { layoutSpeech(t); layoutPlates(t) }
     ticks.add(f)
     ticks.add(lay)
     // Lớp phủ DOM có sau lượt render đầu: vẽ lại một lần để bảng tên gắn vào

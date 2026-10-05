@@ -188,14 +188,15 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 |---|---|
 | W A S D / arrows | Walk |
 | Shift | Run |
-| Mouse wheel | Zoom in / out (zoom all the way out to see the whole office) |
-| Hover an agent | Show its name plate (seated agents normally show only a status bubble) |
+| Settings ⚙️ → Zoom ("Thu phóng") | Two levels: **Near** (default) and **Farthest**. The browser remembers your choice |
+| Hover an agent | Show a full card: name, level, title, current task (no need to walk over) |
+| **Click** | Click an agent: open its screen (CLI). Click a lobby candidate: open the hiring form. Click the ticket board / hall of fame: view it full size. Click yourself: wardrobe. No need to walk over |
+| Click a name in the Staff list | Open that agent's screen (demo: right-click to change its status) |
 | **E** | Near an agent: open its screen (**Chat** and **Log** tabs). In front of the ticket board: view it full size. Press E again to step back |
 | C | Wardrobe: restyle yourself or the nearby agent |
 | Q | Things waiting for your approval / answer |
 | M | Toggle lofi music |
 | Esc | Close whatever screen is open |
-| Click a name in "Nhân sự" (Staff) | Highlight the agent on the minimap |
 | 🔊 🎵 🎨 ⚙️ under the logo | Sound, music, wardrobe, settings (volume, time preview) |
 
 ### Chatting with an agent
@@ -290,7 +291,7 @@ paperclip-plugin/
 - Every Paperclip call lives in `src/data/paperclip.ts`.
 - Type-check and build: `npm run build`.
 - Plugin changes: `cd paperclip-plugin && npm install && npm run build`, then reinstall the plugin.
-- Dev hooks on `window.__coop`: `store.getState().openFocus(agentId)`, `inject(...)` for fake realtime events, `settings.getState().set({ hour: 21 })`. The pixel version adds `step(seconds)` to simulate while the tab is hidden, `resume()`, `go(x, z, zoom)` to jump elsewhere, and `grant(agentId, exp)` to test level-ups.
+- Dev hooks on `window.__coop`: `store.getState().openFocus(agentId)`, `inject(...)` for fake realtime events, `settings.getState().set({ hour: 21 })`. The pixel version adds `step(seconds)` to simulate while the tab is hidden, `resume()`, `go(x, z, 'near' | 'far')` to jump elsewhere, and `grant(agentId, exp)` to test level-ups.
 
 ## License
 

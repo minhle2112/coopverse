@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Application, Container, Sprite } from 'pixi.js'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Application, Container, Graphics, Sprite } from 'pixi.js'
 import { ranking, useExp } from '../data/exp'
 import { COLUMNS, groupIssues } from '../data/kanban'
 import type { AgentStatus } from '../data/types'
@@ -11,12 +11,14 @@ import { assetsReady, loadSheets } from './assets'
 import { PLAYER_ID } from '../characters/look'
 import { charSheet, frameAt, type CharSheet } from './chars'
 import { partsOf, usePixelLooks } from './look'
-import { stage, ticks } from './stage'
-import { MAP_H, MAP_W, dirOf, px, py, wx, wz, type Dir } from './geom'
+import { stage, ticks, toScreen } from './stage'
+import { hits, makeOutline, personHit, pickAt, setOutline } from './pick'
+import { MAP_H, MAP_W, dirOf, px, py, type Dir } from './geom'
 import { buildOffice, drawFame, drawKanban, type OfficeView } from './office'
 import { installDevHooks } from './devhooks'
 import { Lighting } from './light'
 import { view } from './view'
+import { useSettings } from '../settings'
 
 const RADIUS = 0.28
 const AGENT_RADIUS = 0.28
@@ -27,6 +29,31 @@ const INTERACT_DIST = 1.7
 const BOARD_DIST = 2.1
 /** Pixel gốc theo chiều dọc màn hình ở mức phóng to mặc định (~21 ô) */
 const VIEW_PX = 336
+/** Chiều cao hình người (pixel gốc) để tính vùng bấm của bạn */
+const HEAD = 24
+const HL = 0xffe27a
+
+/** Thứ bấm chuột được mà không phải người khác: bạn (tủ đồ) và hai bảng treo tường */
+const TIPS: Record<string, { name: string; hint: string }> = {
+  player: { name: 'Bạn', hint: 'Bấm chuột: tủ đồ' },
+  '#board': { name: 'Bảng ticket', hint: 'Bấm chuột: xem bảng' },
+  '#fame': { name: 'Bảng vàng', hint: 'Bấm chuột: xem xếp hạng' },
+}
+
+/** Bấm chuột vào một thứ trên bản đồ: làm đúng việc phím E làm khi đứng gần, không cần đi tới */
+function activate(id: string) {
+  const s = useCoop.getState()
+  if (id === '#board') s.openBoard()
+  else if (id === '#fame') s.openFame()
+  else if (id === 'player') s.openWardrobe('player')
+  else s.openAgent(id)
+}
+
+/** Đang mở CLI / bảng / tủ đồ / phiếu duyệt: bản đồ phía sau không nhận chuột */
+function busy() {
+  const s = useCoop.getState()
+  return !!(s.focusId || s.boardOpen || s.fameOpen || s.wardrobeId || s.askId)
+}
 
 /** Khoảng cách tới mặt bảng treo tường bắc (chỉ tính khi đứng phía trước, tức phía nam bảng) */
 function wallDist(b: { x: number; z: number; w: number }) {
@@ -50,6 +77,7 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
 }) {
   const host = useRef<HTMLDivElement>(null)
   const overlay = useRef<HTMLDivElement>(null)
+  const tip = useRef<HTMLDivElement>(null)
   /** Sheet nhân vật của bạn, đổi khi chỉnh trong tủ đồ */
   const playerSheet = useRef<CharSheet | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')
@@ -93,24 +121,22 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
       }
       el.appendChild(app.canvas)
       app.canvas.style.imageRendering = 'pixelated'
-      // Rê chuột lên một người: hiện bảng tên (người ngồi bàn mặc định chỉ có bong bóng trạng thái)
-      app.canvas.addEventListener('pointermove', (e) => {
+      // Chuột trên bản đồ: rê lên người / bảng thì hiện thẻ + viền sáng (tính mỗi khung hình, vì người đi lại dưới chuột),
+      // bấm thì mở CLI / hồ sơ / bảng / tủ đồ ngay, không phải đi tới
+      const mouse = { x: 0, y: 0, in: false }
+      const pickClient = (cx: number, cy: number) => {
         const r = stage.root
-        if (!r) return
+        if (!r || busy()) return null
         const rect = app.canvas.getBoundingClientRect()
-        const mx = wx((e.clientX - rect.left - r.position.x) / r.scale.x)
-        const mz = wz((e.clientY - rect.top - r.position.y) / r.scale.y)
-        let best: string | null = null
-        let bd = Infinity
-        for (const [id, a] of agentPos) {
-          // Hình người vẽ từ chân lên ~0,8 m phía trên (theo chiều màn hình)
-          const dx = Math.abs(mx - a.x), up = a.z - mz
-          if (dx < 0.35 && up > -0.15 && up < 0.95 && dx + Math.abs(up - 0.4) < bd) { bd = dx + Math.abs(up - 0.4); best = id }
-        }
-        stage.hover = best
-        app.canvas.style.cursor = best ? 'pointer' : ''
+        return pickAt((cx - rect.left - r.position.x) / r.scale.x, (cy - rect.top - r.position.y) / r.scale.y)
+      }
+      app.canvas.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true })
+      app.canvas.addEventListener('pointerleave', () => { mouse.in = false })
+      app.canvas.addEventListener('click', (e) => {
+        if (e.button !== 0) return
+        const id = pickClient(e.clientX, e.clientY)
+        if (id) activate(id)
       })
-      app.canvas.addEventListener('pointerleave', () => { stage.hover = null })
       await loadSheets()
       playerSheet.current = await charSheet(partsOf(PLAYER_ID, 'Bạn', false))
       if (dead) return
@@ -132,7 +158,11 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
 
       playerSprite = new Sprite(playerSheet.current.frame('idle', 'up', 0))
       playerSprite.anchor.set(0.5, 1)
-      sorted.addChild(playerSprite)
+      const playerHl = makeOutline()
+      sorted.addChild(playerHl, playerSprite)
+      // Viền sáng quanh bảng treo tường khi rê chuột lên (lớp fx: không bị ngày/đêm làm tối)
+      const boardHl = new Graphics()
+      fx.addChild(boardHl)
       view.x = px(player.x)
       view.y = py(player.z)
 
@@ -170,15 +200,23 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
         const sheet = playerSheet.current
         if (playerSprite && sheet) {
           const anim = len > 0 ? 'walk' : 'idle'
-          playerSprite.texture = sheet.frame(anim, facing, frameAt(anim, running ? t * 1.5 : t))
-          playerSprite.position.set(Math.round(px(player.x)), Math.round(py(player.z)) + 2)
-          playerSprite.zIndex = Math.round(py(player.z))
+          const fi = frameAt(anim, running ? t * 1.5 : t)
+          playerSprite.texture = sheet.frame(anim, facing, fi)
+          const X = Math.round(px(player.x)), Y = Math.round(py(player.z))
+          playerSprite.position.set(X, Y + 2)
+          playerSprite.zIndex = Y
+          personHit('player', X, Y + 2, HEAD, Y)
+          playerHl.position.set(X, Y + 2)
+          playerHl.zIndex = Y - 0.5
+          setOutline(playerHl, stage.hover === 'player' ? sheet.silhouette(anim, facing, fi) : null)
         }
 
         // ── Camera: phóng to nguyên lần pixel màn hình thật, bám theo bạn, không ra ngoài bản đồ ──
         const res = app.renderer.resolution
         const sw = app.screen.width, sh = app.screen.height
         const auto = Math.max(2, Math.round((sh * res) / VIEW_PX))
+        // Chỉ hai mức, chọn trong Cài đặt (không lăn chuột): gần = một nấc dưới mức tự động, xa = hai nấc
+        view.zoomBias = useSettings.getState().zoom === 'far' ? -2 : -1
         const zDev = Math.max(1, auto + view.zoomBias)
         const z = zDev / res
         view.zoom = zDev
@@ -196,6 +234,23 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
         // ── Người trong văn phòng (agent, ứng viên), đạo diễn đời sống ──
         for (const f of ticks) f(dt, t)
         lighting.update(t)
+
+        // ── Chuột: thứ đang được rê lên (người, bạn, bảng) ──
+        const hv = mouse.in ? pickClient(mouse.x, mouse.y) : null
+        if (hv !== stage.hover) {
+          stage.hover = hv
+          app.canvas.style.cursor = hv ? 'pointer' : ''
+          useCoop.getState().setHover(hv)
+          boardHl.clear()
+          const b = hv?.startsWith('#') ? hits.get(hv) : undefined
+          if (b) boardHl.rect(b.x0 - 1, b.y0 - 1, b.x1 - b.x0 + 2, b.y1 - b.y0 + 2).stroke({ color: HL, width: 1 })
+        }
+        const tipEl = tip.current
+        const th = hv && TIPS[hv] ? hits.get(hv) : undefined
+        if (tipEl) {
+          const p = th ? toScreen((th.x0 + th.x1) / 2, th.y1 + 1) : { x: -9999, y: -9999 }
+          tipEl.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`
+        }
 
         // ── Màn hình máy tính: vẽ lại ~8 lần mỗi giây ──
         screenAcc += dt
@@ -231,7 +286,9 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
 
     return () => {
       dead = true
-      Object.assign(stage, { app: null, root: null, sorted: null, top: null, fx: null, overlay: null })
+      Object.assign(stage, { app: null, root: null, sorted: null, top: null, fx: null, overlay: null, hover: null })
+      hits.delete('player')
+      useCoop.getState().setHover(null)
       appRef.current = null
       layers.current = null
       office.current = null
@@ -264,6 +321,10 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
     for (const c of v.sorted) L.sorted.addChild(c)
     office.current = v
     light.current?.setOffice(v.lights, v)
+    // Hai bảng treo tường bấm chuột được; người đứng trước bảng thì ưu tiên người
+    for (const [id, r] of [['#board', v.boards.kanban], ['#fame', v.boards.fame]] as const) {
+      hits.set(id, { x0: r.x, y0: r.y, x1: r.x + r.w, y1: r.y + r.h, z: -1e9 })
+    }
     redrawBoards()
   }, [phase, world, tierKey])
 
@@ -294,13 +355,33 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
 
   return (
     <div id="stage" ref={host} className="pixel-stage">
-      <div ref={overlay} className="px-overlay" />
+      <div ref={overlay} className="px-overlay">
+        <HoverTip el={tip} />
+      </div>
       {phase === 'ready' && children}
       {phase === 'missing' && <MissingAssets />}
       {phase === 'error' && (
         <div className="panel center-card">
           <div className="center-title">Không vẽ được văn phòng pixel</div>
           <p className="muted">{err}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Thẻ nhỏ khi rê chuột lên chính bạn hoặc bảng treo tường (người khác có bảng tên riêng) */
+function HoverTip({ el }: { el: RefObject<HTMLDivElement | null> }) {
+  const id = useCoop((s) => s.hoverId)
+  const t = id ? TIPS[id] : undefined
+  return (
+    <div className="px-anchor px-tip" ref={el} style={{ transform: 'translate(-9999px, -9999px)' }}>
+      {t && (
+        <div className="px-under">
+          <div className="px-plate near">
+            <div className="px-plate-row"><span className="px-name">{t.name}</span></div>
+            <div className="px-hint">{t.hint}</div>
+          </div>
         </div>
       )}
     </div>

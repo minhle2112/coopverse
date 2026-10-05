@@ -123,7 +123,7 @@ export function Hud({ world }: { world: World }) {
   const nearId = useCoop((s) => s.nearId)
   const ping = useCoop((s) => s.ping)
   const cycleStatus = useCoop((s) => s.cycleStatus)
-  const pingAgent = useCoop((s) => s.pingAgent)
+  const openAgent = useCoop((s) => s.openAgent)
   const focusId = useCoop((s) => s.focusId)
   const nearBoard = useCoop((s) => s.nearBoard)
   const boardOpen = useCoop((s) => s.boardOpen)
@@ -187,8 +187,9 @@ export function Hud({ world }: { world: World }) {
           <button
             key={a.id}
             className={`roster-item${ping?.id === a.id ? ' pinged' : ''}`}
-            onClick={() => (demo ? cycleStatus(a.id) : pingAgent(a.id))}
-            title={demo ? 'Demo: bấm để đổi trạng thái' : 'Bấm để đánh dấu trên bản đồ'}
+            onClick={() => openAgent(a.id)}
+            onContextMenu={demo ? (e) => { e.preventDefault(); cycleStatus(a.id) } : undefined}
+            title={(a.candidate ? 'Bấm để xem hồ sơ' : 'Bấm để mở CLI') + (demo ? ' · chuột phải: đổi trạng thái (demo)' : '')}
           >
             <span className="roster-av">
               <Avatar parts={partsOf(a.id, a.name, leadIds.has(a.id))} scale={1} />
@@ -212,7 +213,7 @@ export function Hud({ world }: { world: World }) {
         {!hasData && <div className="roster-hint">Đang chờ dữ liệu từ Paperclip…</div>}
         {agents.length > 0 && (
           <div className="roster-hint">
-            {demo ? 'Bấm vào tên để đổi trạng thái (demo)' : 'Bấm vào tên để tìm trên bản đồ'}
+            {demo ? 'Bấm tên để mở CLI · chuột phải: đổi trạng thái (demo)' : 'Bấm tên để mở CLI'}
           </div>
         )}
       </div>
@@ -252,8 +253,7 @@ export function Hud({ world }: { world: World }) {
         <div className="help-keys">
           <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi</span>
           <span><kbd>Shift</kbd> chạy</span>
-          <span>Lăn chuột: phóng to / thu nhỏ</span>
-          <span><kbd>E</kbd> chat với agent / xem bảng ticket, bảng vàng</span>
+          <span><kbd>E</kbd> hoặc bấm chuột: mở CLI agent / bảng ticket, bảng vàng</span>
           <span><kbd>Q</kbd> việc chờ duyệt</span>
           <span><kbd>C</kbd> tủ đồ</span>
           <span><kbd>M</kbd> nhạc</span>

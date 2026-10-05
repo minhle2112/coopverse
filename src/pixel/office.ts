@@ -58,7 +58,11 @@ export interface OfficeView {
   stars: Graphics
   /** Nguồn sáng ban đêm (pixel gốc) */
   lights: Light[]
+  /** Khung bảng ticket / bảng vàng trên tường (pixel gốc), để bấm chuột */
+  boards: { kanban: Rect; fame: Rect }
 }
+
+export interface Rect { x: number; y: number; w: number; h: number }
 
 /** Một nguồn sáng: đèn bàn / đèn cây (ấm), đèn trần (rộng, nhạt), màn hình (xanh, nhỏ) */
 export interface Light {
@@ -256,7 +260,7 @@ function wallBoard(floor: Container, b: { x: number; w: number }, frame: 'corkbo
   const content = new Graphics()
   content.position.set(x + 4, y + 4)
   floor.addChild(content)
-  return { content, w: w - 8, h: h - 9 }
+  return { content, w: w - 8, h: h - 9, rect: { x, y, w, h: h + 2 } }
 }
 
 let kanbanBox = { w: 0, h: 0 }
@@ -631,5 +635,5 @@ export function buildOffice(world: World, tierOfSlot: Map<string, number>): Offi
     if (f.kind === 'door') lights.push({ x: px(f.x), y: py(f.z) - 12, r: 1.5 * PPM, kind: 'lamp' })
   }
 
-  return { floor, sorted, top, screens, kanban: kb.content, fame: fb.content, sun, panes, stars, lights }
+  return { floor, sorted, top, screens, kanban: kb.content, fame: fb.content, sun, panes, stars, lights, boards: { kanban: kb.rect, fame: fb.rect } }
 }

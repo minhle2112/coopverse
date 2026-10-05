@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 
 export type Quality = 'auto' | 'high' | 'low'
+/** Thu phóng bản pixel: 'near' = nhìn gần hơn một nấc, 'far' = xa nhất */
+export type Zoom = 'near' | 'far'
 
 export interface Settings {
   /** Âm thanh văn phòng: gõ phím, "ting", bước chân, bong bóng */
@@ -12,10 +14,11 @@ export interface Settings {
   quality: Quality
   /** null = theo giờ Việt Nam; số = xem thử một giờ cố định (0–24) */
   hour: number | null
+  zoom: Zoom
 }
 
 const KEY = 'coopverse.settings.v1'
-const DEFAULTS: Settings = { sfx: true, sfxVol: 0.7, music: false, musicVol: 0.5, quality: 'auto', hour: null }
+const DEFAULTS: Settings = { sfx: true, sfxVol: 0.7, music: false, musicVol: 0.5, quality: 'auto', hour: null, zoom: 'near' }
 
 const vol = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : d)
 const bool = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d)
@@ -40,6 +43,7 @@ function load(): Settings {
       s.music = bool(o.music, s.music)
       s.musicVol = vol(o.musicVol, s.musicVol)
       if (QUALITIES.includes(o.quality as Quality)) s.quality = o.quality as Quality
+      if (o.zoom === 'near' || o.zoom === 'far') s.zoom = o.zoom
     }
   } catch {
     /* trình duyệt chặn bộ nhớ hoặc JSON hỏng: dùng mặc định */

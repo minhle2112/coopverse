@@ -186,14 +186,15 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 |---|---|
 | W A S D / mũi tên | Đi |
 | Shift | Chạy |
-| Lăn chuột | Phóng to / thu nhỏ (thu nhỏ hết cỡ để xem cả văn phòng) |
-| Rê chuột lên một agent | Hiện bảng tên (agent ngồi bàn bình thường chỉ hiện bong bóng trạng thái) |
+| Cài đặt ⚙️ → Thu phóng | Hai mức: **Gần** (mặc định) và **Xa nhất**. Trình duyệt nhớ mức bạn chọn |
+| Rê chuột lên một agent | Hiện thẻ đầy đủ: tên, cấp, danh hiệu, việc đang làm (không cần đi lại gần) |
+| **Bấm chuột** | Bấm vào agent: mở màn hình của agent (CLI). Bấm ứng viên ở sảnh: xem phiếu thuê. Bấm bảng ticket / bảng vàng: xem bảng to. Bấm vào chính bạn: tủ đồ. Không cần đi lại gần |
+| Bấm tên ở danh sách Nhân sự | Mở màn hình của agent đó (bản demo: chuột phải để đổi trạng thái) |
 | **E** | Đứng gần agent: mở màn hình của agent (tab **Chat** và **Log**). Đứng trước bảng ticket: xem bảng to. Bấm lại E để quay ra |
 | C | Tủ đồ: đổi ngoại hình của bạn, hoặc của agent đang đứng gần |
 | Q | Danh sách việc chờ bạn duyệt / trả lời |
 | M | Bật/tắt nhạc lofi |
 | Esc | Đóng màn hình đang mở |
-| Bấm tên trong bảng "Nhân sự" | Đánh dấu agent trên minimap |
 | Nút 🔊 🎵 🎨 ⚙️ dưới logo | Âm thanh, nhạc, tủ đồ, cài đặt (âm lượng, xem thử giờ) |
 
 ### Chat với agent
@@ -288,7 +289,7 @@ paperclip-plugin/
 - Mọi lời gọi tới Paperclip nằm trong `src/data/paperclip.ts`. Paperclip đổi API thì chỉ sửa ở đó.
 - Kiểm tra kiểu và build: `npm run build`.
 - Sửa plugin: `cd paperclip-plugin && npm install && npm run build`, rồi cài lại plugin.
-- Khi dev có `window.__coop`: `store.getState().openFocus(agentId)` mở màn hình một agent, `inject(...)` bơm sự kiện realtime giả, `settings.getState().set({ hour: 21 })` đổi giờ. Bản pixel có thêm `step(giây)` chạy mô phỏng khi tab bị ẩn, `resume()`, `go(x, z, zoom)` dịch tới chỗ khác, `grant(agentId, exp)` thử lên cấp.
+- Khi dev có `window.__coop`: `store.getState().openFocus(agentId)` mở màn hình một agent, `inject(...)` bơm sự kiện realtime giả, `settings.getState().set({ hour: 21 })` đổi giờ. Bản pixel có thêm `step(giây)` chạy mô phỏng khi tab bị ẩn, `resume()`, `go(x, z, 'near' | 'far')` dịch tới chỗ khác, `grant(agentId, exp)` thử lên cấp.
 
 ## Giấy phép
 

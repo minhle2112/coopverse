@@ -102,6 +102,17 @@ export function SettingsPanel() {
       </div>
       <p className="set-hint">Tiếng gõ phím khi agent làm việc, tiếng "ting" khi có thông báo, tiếng bước chân và bong bóng chat. Nhạc do máy tự sáng tác, không lặp lại.</p>
 
+      <div className="set-sec">Thu phóng</div>
+      <div className="set-row" role="radiogroup" aria-label="Mức thu phóng">
+        {(['near', 'far'] as const).map((z) => (
+          <label key={z} className="set-check">
+            <input type="radio" name="coop-zoom" checked={s.zoom === z} onChange={() => set({ zoom: z })} />
+            <span>{z === 'near' ? 'Gần' : 'Xa nhất'}</span>
+          </label>
+        ))}
+      </div>
+      <p className="set-hint">Gần: nhìn rõ người và đồ vật. Xa nhất: thấy nhiều văn phòng nhất. Trình duyệt nhớ mức bạn chọn.</p>
+
       {/* Bản pixel không có mục Đồ hoạ: chất lượng (bóng đổ, khử răng cưa…) chỉ dùng cho bản 3D */}
       <div className="set-sec">Giờ trong văn phòng</div>
       <label className="set-row set-check">

@@ -32,6 +32,8 @@ interface CoopState {
   /** Agent đang được đánh dấu trên minimap */
   ping: { id: string; at: number } | null
   nearId: string | null
+  /** Người / bảng đang được rê chuột lên trên bản đồ pixel (id agent, 'player', '#board', '#fame') */
+  hoverId: string | null
   /** Agent đang được xem màn hình (camera zoom vào, hiện CLI) */
   focusId: string | null
   /** Đứng trước bảng ticket (bấm E để xem) */
@@ -66,6 +68,9 @@ interface CoopState {
   dismissNote: (id: number) => void
   pingAgent: (id: string) => void
   setNear: (id: string | null, board?: boolean, fame?: boolean) => void
+  setHover: (id: string | null) => void
+  /** Mở thứ của một người: agent → CLI, ứng viên → phiếu thuê, đã nghỉ → báo. Dùng cho phím E, bấm chuột, danh sách nhân sự */
+  openAgent: (id: string) => void
   setLocked: (v: boolean) => void
   showToast: (text: string) => void
   openFocus: (id: string) => void
@@ -100,6 +105,7 @@ export const useCoop = create<CoopState>((set, get) => ({
   notes: [],
   ping: null,
   nearId: null,
+  hoverId: null,
   focusId: null,
   nearBoard: false,
   boardOpen: false,
@@ -142,6 +148,21 @@ export const useCoop = create<CoopState>((set, get) => ({
   dismissNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
   pingAgent: (id) => set({ ping: { id, at: performance.now() } }),
   setNear: (id, board = false, fame = false) => set({ nearId: id, nearBoard: board, nearFame: fame }),
+  setHover: (id) => set({ hoverId: id }),
+  openAgent: (id) => {
+    const { agents, asks, openAsk, openFocus, showToast } = get()
+    const a = agents.find((x) => x.id === id)
+    if (!a) return
+    // Mở từ danh sách nhân sự khi đang xem thứ khác: đóng cái đang xem, không chồng hai bảng lên nhau
+    set({ focusId: null, boardOpen: false, fameOpen: false, wardrobeId: null, askId: null, inboxOpen: false })
+    // Ứng viên ở sảnh: mở hồ sơ (phiếu thuê) để duyệt
+    if (a.candidate) {
+      const hire = asks.find((x) => x.candidateId === a.id)
+      return hire ? openAsk(hire.id) : showToast(`Hồ sơ của ${a.name} chưa tải xong, thử lại sau giây lát.`)
+    }
+    if (a.status === 'terminated') return showToast(`${a.name} đã nghỉ việc, máy đã tắt.`)
+    openFocus(a.id)
+  },
   setLocked: (v) => set({ locked: v }),
   showToast: (text) => set({ toast: { id: ++seq, text } }),
   cycleStatus: (id) =>
@@ -154,26 +175,26 @@ export const useCoop = create<CoopState>((set, get) => ({
     // Nhả chuột để bấm được nút trong CLI
     if (document.pointerLockElement) document.exitPointerLock()
     input.keys.clear()
-    set({ focusId: id, settingsOpen: false })
+    set({ focusId: id, settingsOpen: false, inboxOpen: false })
   },
   closeFocus: () => set({ focusId: null }),
   openBoard: () => {
     if (document.pointerLockElement) document.exitPointerLock()
     input.keys.clear()
-    set({ boardOpen: true, settingsOpen: false })
+    set({ boardOpen: true, settingsOpen: false, inboxOpen: false })
   },
   closeBoard: () => set({ boardOpen: false }),
   openFame: () => {
     if (document.pointerLockElement) document.exitPointerLock()
     input.keys.clear()
-    set({ fameOpen: true, settingsOpen: false })
+    set({ fameOpen: true, settingsOpen: false, inboxOpen: false })
   },
   closeFame: () => set({ fameOpen: false }),
   openWardrobe: (id) => {
     if (document.pointerLockElement) document.exitPointerLock()
     input.keys.clear()
     // Mặc định: người đang đứng gần, không thì chính mình
-    set((s) => ({ wardrobeId: id ?? s.nearId ?? 'player', settingsOpen: false }))
+    set((s) => ({ wardrobeId: id ?? s.nearId ?? 'player', settingsOpen: false, inboxOpen: false }))
   },
   closeWardrobe: () => set({ wardrobeId: null }),
   // Bảng cài đặt nhỏ, không che màn hình: vẫn đi lại được khi đang mở
@@ -195,21 +216,13 @@ export const useCoop = create<CoopState>((set, get) => ({
   },
   /** Phím E: mở màn hình agent / bảng ticket đang đứng gần, hoặc đóng nếu đang xem */
   interact: () => {
-    const { focusId, boardOpen, nearId, nearBoard, agents, openFocus, closeFocus, openBoard, closeBoard, showToast, wardrobeId, askId } = get()
+    const { focusId, boardOpen, nearId, nearBoard, closeFocus, openBoard, closeBoard, wardrobeId, askId } = get()
     if (wardrobeId || askId) return
     if (focusId) return closeFocus()
     if (boardOpen) return closeBoard()
     if (get().fameOpen) return get().closeFame()
     if (nearBoard) return openBoard()
     if (get().nearFame) return get().openFame()
-    const a = agents.find((x) => x.id === nearId)
-    if (!a) return
-    // Ứng viên ở sảnh: mở hồ sơ (phiếu thuê) để duyệt
-    if (a.candidate) {
-      const hire = get().asks.find((x) => x.candidateId === a.id)
-      return hire ? get().openAsk(hire.id) : showToast(`Hồ sơ của ${a.name} chưa tải xong, thử lại sau giây lát.`)
-    }
-    if (a.status === 'terminated') return showToast(`${a.name} đã nghỉ việc, máy đã tắt.`)
-    openFocus(a.id)
+    if (nearId) get().openAgent(nearId)
   },
 }))

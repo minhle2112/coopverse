@@ -1,6 +1,4 @@
 import { useEffect, type RefObject } from 'react'
-import { clamp } from '../lib/math'
-import { view } from '../pixel/view'
 import { input } from '../runtime'
 import { useSettings } from '../settings'
 import { useCoop } from '../store'
@@ -8,7 +6,7 @@ import { useCoop } from '../store'
 const BLOCK_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 
 /**
- * Bàn phím + chuột. Bản pixel: camera nhìn từ trên cố định, không xoay; lăn chuột để phóng to / thu nhỏ.
+ * Bàn phím + chuột. Bản pixel: camera nhìn từ trên cố định, không xoay; mức thu phóng chọn trong Cài đặt (không lăn chuột).
  */
 export function useControls(stage: RefObject<HTMLDivElement | null>) {
   useEffect(() => {
@@ -69,27 +67,16 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
     const mouseDown = () => {
       if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur()
     }
-    let wheelAcc = 0
-    const wheel = (e: WheelEvent) => {
-      if (focused()) return
-      // Mỗi nấc lăn đổi một mức phóng to (nguyên lần, để pixel luôn sắc)
-      wheelAcc += e.deltaY
-      if (Math.abs(wheelAcc) < 80) return
-      view.zoomBias = clamp(view.zoomBias + (wheelAcc > 0 ? -1 : 1), -2, 3)
-      wheelAcc = 0
-    }
 
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', clear)
     el.addEventListener('mousedown', mouseDown)
-    el.addEventListener('wheel', wheel, { passive: true })
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', clear)
       el.removeEventListener('mousedown', mouseDown)
-      el.removeEventListener('wheel', wheel)
     }
   }, [stage])
 }

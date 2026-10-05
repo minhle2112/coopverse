@@ -13,7 +13,7 @@ import { view } from './view'
 /**
  * Chỉ chạy ở chế độ dev (bản pixel). Giống bản 3D:
  * window.__coop.step(2) chạy 2 giây mô phỏng (cả khi tab bị ẩn, requestAnimationFrame dừng);
- * __coop.resume() chạy lại bình thường; __coop.go(x, z, zoomBias) dịch bạn tới chỗ khác để xem;
+ * __coop.resume() chạy lại bình thường; __coop.go(x, z, 'near' | 'far') dịch bạn tới chỗ khác để xem;
  * __coop.inject / store / life / exp / grant như bản 3D.
  */
 export function installDevHooks(app: Application) {
@@ -36,10 +36,10 @@ export function installDevHooks(app: Application) {
       return { player: { ...player }, agents: Object.fromEntries(agentPos) }
     },
     resume() { app.ticker.start() },
-    go(x: number, z: number, zoomBias = view.zoomBias) {
+    go(x: number, z: number, zoom?: 'near' | 'far') {
       player.x = x
       player.z = z
-      view.zoomBias = zoomBias
+      if (zoom) useSettings.getState().set({ zoom })
       // Camera nhảy luôn tới chỗ mới thay vì trượt dần
       view.x = Infinity
     },
