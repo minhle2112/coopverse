@@ -19,6 +19,7 @@ import { installDevHooks } from './devhooks'
 import { Lighting } from './light'
 import { view } from './view'
 import { useSettings } from '../settings'
+import { desktop } from '../desktop'
 
 const RADIUS = 0.28
 const AGENT_RADIUS = 0.28
@@ -390,6 +391,38 @@ function HoverTip({ el }: { el: RefObject<HTMLDivElement | null> }) {
 
 /** Máy này chưa có gói hình LimeZu */
 function MissingAssets() {
+  const [bad, setBad] = useState<string | null>(null)
+  const d = desktop
+  if (d) {
+    const pick = async () => {
+      const r = await d.pickAssets()
+      if (r.ok) location.reload()
+      else if (!r.canceled) setBad(r.picked ?? '')
+    }
+    return (
+      <div className="panel center-card">
+        <div className="center-title">Chưa có gói hình pixel</div>
+        <p>
+          Bản pixel vẽ bằng 2 gói của LimeZu: <b>Modern Interiors</b> (
+          <a href="https://limezu.itch.io/moderninteriors" target="_blank" rel="noreferrer">limezu.itch.io/moderninteriors</a>) và{' '}
+          <b>Modern Office</b> (
+          <a href="https://limezu.itch.io/modernoffice" target="_blank" rel="noreferrer">limezu.itch.io/modernoffice</a>).
+          Gói có bản quyền nên không đi kèm app: giải nén cả hai vào một thư mục (Modern Office vào thư mục con{' '}
+          <code>Modern_Office</code>) rồi chọn thư mục đó.
+        </p>
+        {bad !== null && (
+          <p className="muted">
+            Thư mục <code>{bad}</code> chưa đủ hình: cần có <code>1_Interiors</code>, <code>2_Characters</code> và{' '}
+            <code>Modern_Office\Modern_Office_16x16.png</code>.
+          </p>
+        )}
+        <div className="desk-actions">
+          <button type="button" className="desk-btn primary" onClick={pick}>Chọn thư mục gói hình…</button>
+          {!location.search.includes('demo') && <a href="?demo">Xem bản demo</a>}
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="panel center-card">
       <div className="center-title">Chưa có gói hình pixel</div>

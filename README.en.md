@@ -93,6 +93,27 @@ paperclipai run
 
 ## 4. Install Coopverse
 
+### Quick way: Windows app
+
+Download `Coopverse-Setup-<version>.exe` from [Releases](https://github.com/minhle2112/coopverse/releases) and install it like any other program. It runs in its own window, adds Desktop and Start menu shortcuts, and can be uninstalled from Windows Settings. The app's interface is in Vietnamese.
+
+- **"Windows protected your PC"**: the installer isn't code-signed yet. Click **More info → Run anyway**.
+- **Smart App Control is on** (Windows 11): it may block an unsigned installer outright, with no "Run anyway" button. In that case, download **`Coopverse-<version>-win-x64.zip`** from the same page:
+  1. Right-click → **Extract All** into a permanent folder, e.g. `C:\Coopverse`.
+  2. Open `Coopverse.exe` inside it. For a shortcut, right-click `Coopverse.exe` → **Show more options → Send to → Desktop**.
+  3. The zip build needs no install and has no entry in Settings: delete the folder to remove it. The app's settings live in `%APPDATA%\Coopverse` and are shared with the installed build, so switching between them loses nothing.
+- **On first launch** the app looks for Paperclip on your machine (a running one, or the `paperclipai` command). It then shows a **Kết nối Paperclip** (Connect Paperclip) screen for you to check:
+  - **Paperclip address**: filled in if it was found.
+  - **When Paperclip isn't running**: start `paperclipai` (installed with npm), start it from a **separate install folder** (one that contains `node_modules\paperclipai`), start it inside **WSL**, or don't start it at all.
+  - **Paperclip data folder**: the folder you normally pass with `-d`. Leave it empty for the default `~\.paperclip`. Once you pick it, the app reads Paperclip's port from it.
+- **No Paperclip yet**: click **Cài Paperclip** (Install Paperclip). The app runs `npm install -g paperclipai`, which needs [Node.js](https://nodejs.org) 24.11 or newer.
+- **Pixel art pack**: the LimeZu images are not bundled (see License). On first launch, click **Chọn thư mục gói hình…** (Choose art folder…) and point it at the folder you unpacked as described in the source install below. If it is at `C:\coopverse-assets\limezu`, the app finds it by itself.
+- **Your data is safe**: the app doesn't ship its own Paperclip and never touches Paperclip's data. It only starts the Paperclip you already have, with your own data folder, so two different versions can never migrate the same database.
+- **Closing the app** also stops Paperclip, but only if the app started it. If agents are working, the app asks first. Shutdown is graceful, like pressing Ctrl+C in the Paperclip window: running work stops, then the database is closed. A Paperclip you started yourself keeps running.
+- To change the connection or art folder, import EXP from the browser version (its `.coopverse` folder), or check for updates, go to **Settings ⚙️ → Ứng dụng** (App). The app tells you when a new version exists and opens the download page; it never installs updates by itself. **F11** toggles full screen.
+
+### Install from source (runs in the browser)
+
 On the machine where you use the browser (on Windows: PowerShell or Git Bash, **not** WSL):
 
 ```bash
@@ -280,7 +301,11 @@ src/
   ui/          HUD, minimap, CLI + Chat (Terminal), ticket board, wardrobe, settings
   dev/         dev-only hooks (window.__coop)
 server/
+  guard.ts     allow-list of Paperclip endpoints (shared by Vite and the desktop app)
+  coopData.ts  per-company EXP ledger (/coop/)
   limezu.ts    serves the LimeZu images from COOPVERSE_ASSETS at /limezu/ (127.0.0.1 only)
+desktop/       Windows app (Electron): main.ts, local server (server.ts), starting/stopping Paperclip
+               (paperclip.ts, pc-hook.cjs), connect screen (setup/), hand-drawn icon (icon/make-icon.py)
 paperclip-plugin/
   src/         manifest, worker, UI (sidebar item + top bar button)
   dist/        prebuilt output (committed)
@@ -289,7 +314,9 @@ paperclip-plugin/
 - Stack: Vite, React 19, PixiJS 8, zustand, TypeScript. Pixel font: VT323 (OFL, includes Vietnamese).
 - Sprite coordinates inside the LimeZu packs live in `src/pixel/atlas.json` (coordinates only, no images).
 - Every Paperclip call lives in `src/data/paperclip.ts`.
-- Type-check and build: `npm run build`.
+- Type-check and build: `npm run build` (including the desktop code: `npm run typecheck`).
+- The installer on Releases is built by GitHub Actions (`.github/workflows/desktop-release.yml`). Pushing a tag such as `v0.1.0` creates a draft release; check it, then click Publish yourself. On a machine with Smart App Control on, `npm run dist:win` can fail at the NSIS step with `spawn UNKNOWN`, because Windows blocks running unsigned files.
+- Desktop app: `npm run desktop` runs it from source; `npm run dist:win` builds the installer `release/Coopverse-Setup-<version>.exe`. To try it without touching your real settings, set the environment variable `COOPVERSE_USER_DATA=<temp folder>`.
 - Plugin changes: `cd paperclip-plugin && npm install && npm run build`, then reinstall the plugin.
 - Dev hooks on `window.__coop`: `store.getState().openFocus(agentId)`, `inject(...)` for fake realtime events, `settings.getState().set({ hour: 21 })`. The pixel version adds `step(seconds)` to simulate while the tab is hidden, `resume()`, `go(x, z, 'near' | 'far')` to jump elsewhere, and `grant(agentId, exp)` to test level-ups.
 

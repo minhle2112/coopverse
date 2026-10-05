@@ -101,6 +101,18 @@
 }
 .px-plate.near { background: rgba(16, 14, 24, 0.94); border-color: var(--accent); border-width: 2px 2px 2px 5px; font-size: 18px; }
 .px-lead { color: #ffd95e; }
+/* App desktop: nút trên thẻ giữa màn hình và trong Cài đặt */
+.desk-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 12px; }
+.desk-btn {
+  font: inherit; font-size: 18px; color: var(--text, #f4f1ea); background: #3a3550; cursor: pointer; padding: 2px 10px;
+  border: 2px solid var(--px-dark); box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.3), inset 2px 2px 0 rgba(255, 255, 255, 0.08);
+}
+.desk-btn:hover { background: #48425f; }
+.desk-btn.primary { background: #b77f1f; color: var(--px-paper); }
+.desk-btn.primary:hover { background: #c98d27; }
+.set-btns { flex-wrap: wrap; gap: 6px; }
+.settings .desk-btn { font-size: 15px; padding: 1px 7px; }
+
 /* Bảng tên bé (ai cũng có, kể cả người ngồi bàn): chấm trạng thái + tên, chữ nhỏ, viền mảnh */
 .px-plate:not(.near) { font-size: 15px; line-height: 1; padding: 1px 3px 1px 2px; border-left-width: 1px; background: rgba(16, 14, 24, 0.72); }
 .px-plate:not(.near) .px-plate-row { gap: 2px; }

@@ -5,6 +5,7 @@ import { STATUS_COLOR, STATUS_LABEL } from '../data/types'
 import { useCoop } from '../store'
 import type { World } from '../world/layout'
 import { useExp } from '../data/exp'
+import { desktop } from '../desktop'
 import { FameView } from './FameView'
 import { AskSheet, Inbox } from './Inbox'
 import { KanbanView } from './KanbanView'
@@ -101,6 +102,22 @@ function OfflineCard() {
   const conn = useCoop((s) => s.conn)
   const hasData = useCoop((s) => s.hasData)
   if (hasData || conn !== 'offline') return null
+  if (desktop) {
+    return (
+      <div className="panel center-card">
+        <div className="center-title">Chưa kết nối được Paperclip</div>
+        <p>
+          Coopverse cần Paperclip chạy ở <code>{PAPERCLIP_UI.replace(/^https?:\/\//, '')}</code>. Mở màn hình kết nối để
+          bật Paperclip hoặc đổi địa chỉ.
+        </p>
+        <p className="muted">Coopverse tự kết nối lại khi Paperclip bật xong.</p>
+        <div className="desk-actions">
+          <button type="button" className="desk-btn primary" onClick={() => void desktop?.openSetup()}>Kết nối Paperclip…</button>
+          <a href="?demo">Xem bản demo với dữ liệu giả</a>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="panel center-card">
       <div className="center-title">Chưa kết nối được Paperclip</div>

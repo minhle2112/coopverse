@@ -1,4 +1,5 @@
 import { paperclipUrl } from '../config'
+import { desktop } from '../desktop'
 import type { Agent, AgentStatus, Ask, AskKind, ChatAsk, ChatInfo, ChatMessage, Comment, Company, Issue } from './types'
 
 /**
@@ -170,7 +171,7 @@ export const isRunActive = (status: string) => status === 'queued' || status ===
 export interface LogPage { content: string; nextOffset?: number }
 
 /** Địa chỉ trang Paperclip (mở thẳng, không qua proxy). Tiền tố công ty lấy từ mã ticket, vd LAB-12 → LAB. */
-export const PAPERCLIP_UI = paperclipUrl(import.meta.env.VITE_PAPERCLIP_URL)
+export const PAPERCLIP_UI = desktop ? paperclipUrl(desktop.paperclipUrl) : paperclipUrl(import.meta.env.VITE_PAPERCLIP_URL)
 export const issueUrl = (key: string) => `${PAPERCLIP_UI}/${key.split('-')[0]}/issues/${key}`
 /** Trang chat với agent trong Paperclip (tiền tố công ty, vd LAB). */
 export const chatUrl = (prefix: string, agentId: string) => `${PAPERCLIP_UI}/${prefix}/chats/${agentId}`

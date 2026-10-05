@@ -1,0 +1,38 @@
+# Build Coopverse cho Windows (file cài .exe + bản zip giải nén là chạy) và đưa vào một bản phát hành NHÁP (draft) trên GitHub.
+# Chạy khi đẩy tag dạng v0.1.0, hoặc bấm tay trong tab Actions. Bản nháp chỉ công khai khi bạn tự bấm Publish.
+# Build trên máy chủ của GitHub: máy cá nhân bật Smart App Control sẽ chặn bước NSIS chạy file chưa ký số.
+name: Desktop release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Coopverse-windows
+          path: |
+            release/Coopverse-Setup-*.exe
+            release/Coopverse-*-win-x64.zip
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            release/Coopverse-Setup-*.exe
+            release/Coopverse-*-win-x64.zip

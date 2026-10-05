@@ -6,3 +6,8 @@ dist
 !.env.example
 *.tsbuildinfo
 .coopverse/
+build/
+release/
+desktop/icon/preview.png
+desktop/icon/icon-16.png
+desktop/icon/icon-32.png

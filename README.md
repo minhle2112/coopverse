@@ -91,6 +91,27 @@ paperclipai run
 
 ## 4. Cài Coopverse
 
+### Cách nhanh: app cho Windows
+
+Tải `Coopverse-Setup-<phiên bản>.exe` ở mục [Releases](https://github.com/minhle2112/coopverse/releases) rồi cài như phần mềm bình thường. App có cửa sổ riêng, lối tắt trên Desktop và Start menu, gỡ được trong Settings của Windows.
+
+- **Windows báo "Windows protected your PC"**: file cài chưa có chữ ký số. Bấm **More info → Run anyway**.
+- **Máy bật Smart App Control** (Windows 11): tính năng này có thể chặn hẳn file cài chưa ký số, và không có nút "Run anyway". Khi đó tải bản **`Coopverse-<phiên bản>-win-x64.zip`** ở cùng trang:
+  1. Chuột phải → **Extract All** (giải nén) vào một thư mục cố định, vd `C:\Coopverse`.
+  2. Mở `Coopverse.exe` trong đó. Muốn có lối tắt thì chuột phải `Coopverse.exe` → **Show more options → Send to → Desktop**.
+  3. Bản zip không cần cài và không có mục gỡ trong Settings: xoá thư mục là gỡ. Cài đặt của app nằm ở `%APPDATA%\Coopverse`, dùng chung với bản cài, nên đổi qua lại không mất gì.
+- **Lần đầu mở**, app tự tìm Paperclip trên máy (đang chạy, hoặc lệnh `paperclipai`) và hiện màn hình **Kết nối Paperclip** để bạn kiểm tra:
+  - **Địa chỉ Paperclip**: điền sẵn nếu tìm thấy.
+  - **Khi Paperclip chưa chạy**: tự bật lệnh `paperclipai` (cài bằng npm), tự bật trong một **thư mục cài riêng** (thư mục có `node_modules\paperclipai`), tự bật trong **WSL**, hoặc không tự bật.
+  - **Thư mục dữ liệu Paperclip**: thư mục bạn vẫn truyền bằng `-d` (để trống nếu dùng mặc định `~\.paperclip`). Chọn xong, app tự đọc cổng của Paperclip trong đó.
+- **Máy chưa có Paperclip**: bấm **Cài Paperclip**, app chạy `npm install -g paperclipai` (cần [Node.js](https://nodejs.org) 24.11 trở lên).
+- **Gói hình pixel**: app không đi kèm hình LimeZu (xem giấy phép bên dưới). Lần đầu mở, bấm **Chọn thư mục gói hình…** và chỉ tới thư mục đã giải nén như hướng dẫn ở phần cài bằng mã nguồn bên dưới. Nếu đặt ở `C:\coopverse-assets\limezu` thì app tự tìm thấy.
+- **Dữ liệu của bạn an toàn**: app không mang theo Paperclip riêng và không đụng vào dữ liệu Paperclip. Nó chỉ bật đúng bản Paperclip đã cài, với đúng thư mục dữ liệu của bạn, nên không có chuyện hai phiên bản nâng cấp database của nhau.
+- **Đóng app**: nếu chính app đã bật Paperclip thì app tắt Paperclip theo. Có agent đang làm việc thì app hỏi trước. App tắt kiểu "tắt gọn", giống nhấn Ctrl+C trong cửa sổ Paperclip: chờ lượt chạy dừng rồi đóng database. Paperclip bạn tự bật từ trước thì app không tắt.
+- Đổi kết nối, đổi thư mục hình, nhập điểm EXP từ bản chạy bằng trình duyệt (thư mục `.coopverse`), kiểm tra bản mới: **Cài đặt ⚙️ → Ứng dụng**. Có bản mới thì app báo và mở trang tải về, không tự cài. **F11**: toàn màn hình.
+
+### Cài bằng mã nguồn (chạy trên trình duyệt)
+
 Chạy trên máy bạn dùng trình duyệt (Windows: chạy trong PowerShell hoặc Git Bash, **không** chạy trong WSL):
 
 ```bash
@@ -278,7 +299,11 @@ src/
   ui/          HUD, minimap, CLI + Chat (Terminal), bảng ticket, tủ đồ, cài đặt
   dev/         hook chỉ dùng khi dev (window.__coop)
 server/
+  guard.ts     danh sách endpoint Paperclip được phép đi qua (dùng chung cho Vite và app desktop)
+  coopData.ts  sổ EXP của từng công ty (/coop/)
   limezu.ts    phục vụ file hình LimeZu từ COOPVERSE_ASSETS ở /limezu/ (chỉ 127.0.0.1)
+desktop/       app Windows (Electron): main.ts, máy chủ nội bộ (server.ts), bật/tắt Paperclip (paperclip.ts,
+               pc-hook.cjs), màn hình kết nối (setup/), icon vẽ tay (icon/make-icon.py)
 paperclip-plugin/
   src/         manifest, worker, UI (nút ở thanh bên + thanh trên cùng)
   dist/        bản đã build (commit sẵn)
@@ -287,7 +312,9 @@ paperclip-plugin/
 - Stack: Vite, React 19, PixiJS 8, zustand, TypeScript. Chữ pixel: VT323 (OFL, có tiếng Việt).
 - Toạ độ từng hình trong gói LimeZu nằm ở `src/pixel/atlas.json` (chỉ toạ độ, không có hình).
 - Mọi lời gọi tới Paperclip nằm trong `src/data/paperclip.ts`. Paperclip đổi API thì chỉ sửa ở đó.
-- Kiểm tra kiểu và build: `npm run build`.
+- Kiểm tra kiểu và build: `npm run build` (cả phần desktop: `npm run typecheck`).
+- File cài trên Releases do GitHub Actions build (`.github/workflows/desktop-release.yml`): đẩy một tag dạng `v0.1.0` là có bản phát hành nháp, bạn kiểm tra rồi tự bấm Publish. Trên máy bật Smart App Control, `npm run dist:win` có thể hỏng ở bước NSIS (lỗi `spawn UNKNOWN`), vì Windows chặn chạy file chưa ký số.
+- App desktop: `npm run desktop` chạy thử app từ mã nguồn; `npm run dist:win` tạo file cài `release/Coopverse-Setup-<phiên bản>.exe`. Muốn thử mà không đụng cấu hình thật thì đặt biến môi trường `COOPVERSE_USER_DATA=<thư mục tạm>`.
 - Sửa plugin: `cd paperclip-plugin && npm install && npm run build`, rồi cài lại plugin.
 - Khi dev có `window.__coop`: `store.getState().openFocus(agentId)` mở màn hình một agent, `inject(...)` bơm sự kiện realtime giả, `settings.getState().set({ hour: 21 })` đổi giờ. Bản pixel có thêm `step(giây)` chạy mô phỏng khi tab bị ẩn, `resume()`, `go(x, z, 'near' | 'far')` dịch tới chỗ khác, `grant(agentId, exp)` thử lên cấp.
 

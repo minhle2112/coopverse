@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { uiTick, unlockAudio } from '../audio/engine'
+import { desktop } from '../desktop'
 import { useSettings } from '../settings'
 import { useCoop } from '../store'
 import { fmtHour, periodOf, sceneHour, sunElevation } from '../world/time'
@@ -60,6 +61,53 @@ export function Toolbar() {
         <span aria-hidden>⚙️</span>
       </button>
     </div>
+  )
+}
+
+/** Mục "Ứng dụng" trong Cài đặt, chỉ có khi chạy bằng app desktop */
+function DesktopSection() {
+  const [note, setNote] = useState('')
+  if (!desktop) return null
+  const d = desktop
+  const run = (fn: () => Promise<string | null>) => async () => {
+    const t = await fn()
+    if (t !== null) setNote(t)
+  }
+  const update = run(async () => {
+    setNote('Đang kiểm tra…')
+    const u = await d.checkUpdate()
+    if (u.status === 'new' && u.url) {
+      void d.openExternal(u.url)
+      return `Có bản ${u.latest}: đã mở trang tải về.`
+    }
+    return u.status === 'latest' ? 'Bạn đang dùng bản mới nhất.' : u.status === 'none' ? 'Chưa có bản phát hành nào trên GitHub.' : 'Không kiểm tra được (mất mạng?).'
+  })
+  const assets = run(async () => {
+    const r = await d.pickAssets()
+    if (r.ok) {
+      location.reload()
+      return null
+    }
+    return r.canceled ? null : 'Thư mục đó chưa đủ hình (cần 1_Interiors, 2_Characters, Modern_Office).'
+  })
+  const exp = run(async () => {
+    const r = await d.importExp()
+    if (r.canceled) return null
+    return r.ok ? `Đã gộp ${r.count} sổ EXP. Mở lại trang để thấy điểm mới.` : `Không nhập được: ${r.error ?? 'lỗi lạ'}`
+  })
+  return (
+    <>
+      <div className="set-sec">Ứng dụng · bản {d.version}</div>
+      <div className="set-row set-btns">
+        <button type="button" className="desk-btn" onClick={() => void d.openSetup()}>Kết nối Paperclip…</button>
+        <button type="button" className="desk-btn" onClick={assets}>Thư mục gói hình…</button>
+        <button type="button" className="desk-btn" onClick={exp}>Nhập EXP cũ…</button>
+        <button type="button" className="desk-btn" onClick={update}>Kiểm tra bản mới</button>
+      </div>
+      <p className="set-hint" aria-live="polite">
+        {note || 'Nhập EXP cũ: chọn thư mục .coopverse của bản chạy bằng trình duyệt để giữ điểm và lời khen. F11: toàn màn hình.'}
+      </p>
+    </>
   )
 }
 
@@ -127,6 +175,8 @@ export function SettingsPanel() {
         <b>{fmtHour(s.hour ?? h)}</b>
       </div>
       <p className="set-hint">Kéo để xem thử văn phòng lúc bình minh, hoàng hôn hay ban đêm. Mở lại trang là về giờ thật.</p>
+
+      <DesktopSection />
     </section>
   )
 }

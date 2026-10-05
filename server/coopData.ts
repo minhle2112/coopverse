@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
-import type { Connect, Plugin } from 'vite'
+import type { Plugin } from 'vite'
+import type { Handler } from './guard'
 import { emptyLedger, KUDOS_NOTE_MAX, type Kudos, type Ledger } from '../src/data/ledger'
 
 /**
- * Dữ liệu riêng của Coopverse (không phải của Paperclip), lưu thành file JSON trong thư mục `.coopverse/`
- * của dự án (không commit): sổ EXP của từng công ty.
+ * Dữ liệu riêng của Coopverse (không phải của Paperclip), lưu thành file JSON: sổ EXP của từng công ty.
+ * Chạy bằng Vite: thư mục `.coopverse/` của dự án (không commit). App desktop: thư mục dữ liệu của app.
  *
  * Vì sao cần sổ: Paperclip chỉ trả tối đa 1000 lượt chạy / ticket gần nhất. Coopverse chép dần những gì đã
  * thấy vào sổ, để EXP không tụt khi dữ liệu cũ trôi khỏi danh sách. Lời khen (nút Khen) cũng nằm trong sổ,
@@ -17,8 +19,7 @@ import { emptyLedger, KUDOS_NOTE_MAX, type Kudos, type Ledger } from '../src/dat
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-const DIR = path.resolve(process.cwd(), '.coopverse')
-const fileOf = (cid: string) => path.join(DIR, `exp-${cid}.json`)
+const fileOf = (dir: string, cid: string) => path.join(dir, `exp-${cid}.json`)
 
 /** Đọc lại Paperclip không dày hơn mức này (nhiều tab cùng hỏi một lúc) */
 const PULL_EVERY_MS = 2500
@@ -37,24 +38,54 @@ function serial<T>(cid: string, fn: () => Promise<T>): Promise<T> {
   return next
 }
 
-async function load(cid: string): Promise<Book> {
+async function readLedger(file: string): Promise<Ledger | null> {
+  try {
+    const raw = JSON.parse(await readFile(file, 'utf8')) as Partial<Ledger>
+    return { ...emptyLedger(), ...raw, v: 1 }
+  } catch {
+    return null
+  }
+}
+
+async function load(dir: string, cid: string): Promise<Book> {
   let b = books.get(cid)
   if (b) return b
-  let ledger = emptyLedger()
-  try {
-    const raw = JSON.parse(await readFile(fileOf(cid), 'utf8')) as Partial<Ledger>
-    ledger = { ...ledger, ...raw, v: 1 }
-  } catch { /* chưa có sổ */ }
-  b = { ledger, pulledAt: 0, deep: false }
+  b = { ledger: (await readLedger(fileOf(dir, cid))) ?? emptyLedger(), pulledAt: 0, deep: false }
   books.set(cid, b)
   return b
 }
 
-async function save(cid: string, ledger: Ledger) {
-  await mkdir(DIR, { recursive: true })
-  const tmp = `${fileOf(cid)}.tmp`
+async function save(dir: string, cid: string, ledger: Ledger) {
+  await mkdir(dir, { recursive: true })
+  const tmp = `${fileOf(dir, cid)}.tmp`
   await writeFile(tmp, JSON.stringify(ledger), 'utf8')
-  await rename(tmp, fileOf(cid))
+  await rename(tmp, fileOf(dir, cid))
+}
+
+/**
+ * Gộp các sổ EXP ở thư mục khác (vd `.coopverse/` của bản chạy bằng Vite) vào thư mục `dir`.
+ * Gộp chứ không ghi đè: việc đã có giữ nguyên, lời khen gộp theo id. Trả về số sổ đã gộp.
+ */
+export async function importLedgers(from: string, dir: string): Promise<number> {
+  const names = (await readdir(from)).filter((n) => /^exp-[0-9a-f-]{36}\.json$/.test(n))
+  let n = 0
+  for (const name of names) {
+    const cid = name.slice(4, -5)
+    const src = await readLedger(path.join(from, name))
+    if (!src) continue
+    await serial(cid, async () => {
+      const b = await load(dir, cid)
+      const L = b.ledger
+      L.runs = { ...src.runs, ...L.runs }
+      L.tickets = { ...src.tickets, ...L.tickets }
+      L.approvals = { ...src.approvals, ...L.approvals }
+      const ids = new Set(L.kudos.map((k) => k.id))
+      L.kudos = [...L.kudos, ...src.kudos.filter((k) => !ids.has(k.id))].sort((a, b) => a.at - b.at)
+      await save(dir, cid, L)
+    })
+    n++
+  }
+  return n
 }
 
 const ms = (iso: unknown) => (typeof iso === 'string' ? Date.parse(iso) || 0 : 0)
@@ -97,14 +128,14 @@ async function pull(target: string, cid: string, b: Book): Promise<boolean> {
   return changed
 }
 
-function send(res: Parameters<Connect.NextHandleFunction>[1], status: number, body: unknown) {
+function send(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
   res.setHeader('content-type', 'application/json; charset=utf-8')
   res.setHeader('cache-control', 'no-store')
   res.end(JSON.stringify(body))
 }
 
-function readBody(req: Connect.IncomingMessage): Promise<unknown> {
+function readBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let s = ''
     req.on('data', (c: Buffer) => {
@@ -118,8 +149,10 @@ function readBody(req: Connect.IncomingMessage): Promise<unknown> {
   })
 }
 
-export function coopData(opts: { target: string; isOwnOrigin: (o: unknown) => boolean }): Plugin {
-  const handler: Connect.NextHandleFunction = (req, res, next) => {
+/** `target`: địa chỉ Paperclip (hàm, vì app desktop đổi được trong lúc chạy). `dir`: nơi lưu sổ. */
+export function coopDataHandler(opts: { target: () => string; isOwnOrigin: (o: unknown) => boolean; dir: string }): Handler {
+  const { dir } = opts
+  return (req, res, next) => {
     const url = req.url ?? ''
     if (!url.startsWith('/coop/')) return next()
     const [, , kind, cid] = url.split('?')[0].split('/')
@@ -128,11 +161,11 @@ export function coopData(opts: { target: string; isOwnOrigin: (o: unknown) => bo
 
     if (kind === 'exp' && method === 'GET') {
       serial(cid, async () => {
-        const b = await load(cid)
+        const b = await load(dir, cid)
         let stale = false
         if (Date.now() - b.pulledAt > PULL_EVERY_MS) {
           try {
-            if (await pull(opts.target, cid, b)) await save(cid, b.ledger)
+            if (await pull(opts.target(), cid, b)) await save(dir, cid, b.ledger)
             b.pulledAt = Date.now()
           } catch {
             // Paperclip tắt: trả sổ đang có
@@ -152,10 +185,10 @@ export function coopData(opts: { target: string; isOwnOrigin: (o: unknown) => bo
         const body = (await readBody(req)) as { agentId?: unknown; note?: unknown }
         if (typeof body.agentId !== 'string' || !UUID.test(body.agentId)) return send(res, 400, { error: 'coopverse: thiếu agentId' })
         const note = typeof body.note === 'string' ? body.note.trim().slice(0, KUDOS_NOTE_MAX) : ''
-        const b = await load(cid)
+        const b = await load(dir, cid)
         const k: Kudos = { id: randomUUID(), agentId: body.agentId, at: Date.now(), note }
         b.ledger.kudos.push(k)
-        await save(cid, b.ledger)
+        await save(dir, cid, b.ledger)
         send(res, 200, { ledger: b.ledger, kudos: k })
       }).catch((e: Error) => send(res, 400, { error: `coopverse: ${e.message}` }))
       return
@@ -163,6 +196,10 @@ export function coopData(opts: { target: string; isOwnOrigin: (o: unknown) => bo
 
     send(res, 403, { error: 'coopverse: endpoint không nằm trong danh sách cho phép' })
   }
+}
+
+export function coopData(opts: { target: string; isOwnOrigin: (o: unknown) => boolean }): Plugin {
+  const handler = coopDataHandler({ ...opts, target: () => opts.target, dir: path.resolve(process.cwd(), '.coopverse') })
   return {
     name: 'coopverse-data',
     configureServer(server) { server.middlewares.use(handler) },

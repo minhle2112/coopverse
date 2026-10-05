@@ -1,0 +1,58 @@
+{
+  "appId": "io.github.minhle2112.coopverse",
+  "productName": "Coopverse",
+  "copyright": "Coopverse contributors",
+  "electronVersion": "44.5.1",
+  "electronDist": "node_modules/electron/dist",
+  "electronLanguages": [
+    "vi",
+    "en-US"
+  ],
+  "directories": {
+    "app": "build/app",
+    "output": "release"
+  },
+  "files": [
+    "**/*",
+    "!pc-hook.cjs",
+    "!node_modules{,/**/*}"
+  ],
+  "extraResources": [
+    {
+      "from": "build/app/pc-hook.cjs",
+      "to": "pc-hook.cjs"
+    }
+  ],
+  "asar": true,
+  "npmRebuild": false,
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "zip",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "desktop/icon/icon.ico",
+    "artifactName": "Coopverse-${version}-win-x64.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Coopverse",
+    "deleteAppDataOnUninstall": false,
+    "installerIcon": "desktop/icon/icon.ico",
+    "uninstallerIcon": "desktop/icon/icon.ico",
+    "artifactName": "Coopverse-Setup-${version}.${ext}"
+  }
+}
