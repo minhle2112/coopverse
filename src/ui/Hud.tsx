@@ -120,7 +120,6 @@ export function Hud({ world }: { world: World }) {
   const conn = useCoop((s) => s.conn)
   const hasData = useCoop((s) => s.hasData)
   const nearId = useCoop((s) => s.nearId)
-  const locked = useCoop((s) => s.locked)
   const ping = useCoop((s) => s.ping)
   const cycleStatus = useCoop((s) => s.cycleStatus)
   const pingAgent = useCoop((s) => s.pingAgent)
@@ -195,7 +194,7 @@ export function Hud({ world }: { world: World }) {
         {!hasData && <div className="roster-hint">Đang chờ dữ liệu từ Paperclip…</div>}
         {agents.length > 0 && (
           <div className="roster-hint">
-            {locked ? 'Esc để nhả chuột rồi bấm vào tên' : demo ? 'Bấm vào tên để đổi trạng thái (demo)' : 'Bấm vào tên để tìm trên bản đồ'}
+            {demo ? 'Bấm vào tên để đổi trạng thái (demo)' : 'Bấm vào tên để tìm trên bản đồ'}
           </div>
         )}
       </div>
@@ -232,17 +231,15 @@ export function Hud({ world }: { world: World }) {
       )}
 
       <div className="help">
-        {!locked && <div className="help-start">Bấm vào màn hình để điều khiển bằng chuột</div>}
         <div className="help-keys">
           <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi</span>
           <span><kbd>Shift</kbd> chạy</span>
-          <span>Chuột: xoay</span>
-          <span>Lăn chuột: gần/xa</span>
+          <span>Lăn chuột: phóng to / thu nhỏ</span>
           <span><kbd>E</kbd> chat với agent / xem bảng ticket, bảng vàng</span>
           <span><kbd>Q</kbd> việc chờ duyệt</span>
           <span><kbd>C</kbd> tủ đồ</span>
           <span><kbd>M</kbd> nhạc</span>
-          <span><kbd>Esc</kbd> nhả chuột / đóng</span>
+          <span><kbd>Esc</kbd> đóng</span>
         </div>
       </div>
 

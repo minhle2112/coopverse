@@ -29,7 +29,7 @@ const LABEL_FULL_DIST = 5
 const PERSONAL = 0.85
 
 /** Nút lối đi gần sảnh nhất (giữa hàng bàn gần cửa vào) */
-const LOBBY_NODE = 'g1_3'
+const LOBBY_NODE = 'g1_2'
 
 const nodeWP = (id: string): WP => ({ x: GRAPH.nodes[id].x, z: GRAPH.nodes[id].z, node: id })
 const seatWP = (s: DeskSlot): WP => ({ x: s.seat.x, z: s.seat.z, seat: true })

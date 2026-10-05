@@ -11,6 +11,8 @@
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #bfe3f5; }
 #stage { position: fixed; inset: 0; cursor: grab; }
+.pixel-stage#stage, .pixel-stage#stage:active { cursor: default; background: #1c1a26; }
+.pixel-stage canvas { display: block; image-rendering: pixelated; }
 #stage:active { cursor: grabbing; }
 #nameplates { position: fixed; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
 

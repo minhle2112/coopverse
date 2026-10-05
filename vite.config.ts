@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Connect, type Plugin, type ProxyOptions } f
 import react from '@vitejs/plugin-react'
 import { paperclipUrl } from './src/config'
 import { coopData } from './server/coopData'
+import { assetDir, limezu } from './server/limezu'
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
@@ -40,8 +41,8 @@ function allowList() {
   }
 }
 
-/** Trang của chính Coopverse (dev 5177, preview 5178). */
-const isOwnOrigin = (o: unknown) => typeof o === 'string' && /^http:\/\/(127\.0\.0\.1|localhost):517[78]$/.test(o)
+/** Trang của chính Coopverse bản pixel (dev 5179, preview 5180; bản 3D dùng 5177/5178 nên chạy song song được). */
+const isOwnOrigin = (o: unknown) => typeof o === 'string' && /^http:\/\/(127\.0\.0\.1|localhost):(5179|5180)$/.test(o)
 
 function deny(res: Parameters<Connect.NextHandleFunction>[1], why: string) {
   res.statusCode = 403
@@ -76,7 +77,7 @@ function paperclipGuard(): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const env = loadEnv(mode, process.cwd(), ['VITE_', 'COOPVERSE_'])
   const target = paperclipUrl(env.VITE_PAPERCLIP_URL)
   const wsPath = allowList().WS
 
@@ -100,9 +101,9 @@ export default defineConfig(({ mode }) => {
 
   // Chỉ mở trên máy này (127.0.0.1)
   return {
-    plugins: [react(), paperclipGuard(), coopData({ target, isOwnOrigin })],
-    server: { host: '127.0.0.1', port: 5177, strictPort: true, proxy },
-    preview: { host: '127.0.0.1', port: 5178, strictPort: true, proxy },
+    plugins: [react(), paperclipGuard(), coopData({ target, isOwnOrigin }), limezu(assetDir(env))],
+    server: { host: '127.0.0.1', port: 5179, strictPort: true, proxy },
+    preview: { host: '127.0.0.1', port: 5180, strictPort: true, proxy },
     build: {
       // three.js tự nó đã ~740 kB và không chia nhỏ được; app chỉ chạy localhost nên chấp nhận
       chunkSizeWarningLimit: 800,

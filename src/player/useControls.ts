@@ -1,20 +1,19 @@
 import { useEffect, type RefObject } from 'react'
 import { clamp } from '../lib/math'
-import { cam, input } from '../runtime'
+import { view } from '../pixel/view'
+import { input } from '../runtime'
 import { useSettings } from '../settings'
 import { useCoop } from '../store'
 
 const BLOCK_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 
 /**
- * Bàn phím + chuột. Bấm vào màn hình để khoá chuột (pointer lock); nếu trình duyệt không cho khoá
- * thì kéo chuột trái để xoay camera.
+ * Bàn phím + chuột. Bản pixel: camera nhìn từ trên cố định, không xoay; lăn chuột để phóng to / thu nhỏ.
  */
 export function useControls(stage: RefObject<HTMLDivElement | null>) {
   useEffect(() => {
     const el = stage.current
     if (!el) return
-    let dragging = false
 
     // Ô nhập chữ thật: mọi phím thuộc về ô đó. Ô tick, thanh kéo, ô chọn màu, nút bấm thì không.
     const TEXT_TYPES = new Set(['text', 'search', 'email', 'number', 'password', 'url', 'tel'])
@@ -66,48 +65,31 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
     const up = (e: KeyboardEvent) => input.keys.delete(e.code)
     const clear = () => input.keys.clear()
 
-    const mouseDown = (e: MouseEvent) => {
-      if (e.button !== 0 || focused()) return
-      dragging = true
-      if (!document.pointerLockElement) {
-        try {
-          const p = el.requestPointerLock() as unknown
-          if (p instanceof Promise) p.catch(() => {})
-        } catch {
-          /* không hỗ trợ: dùng kéo chuột */
-        }
-      }
+    // Bấm vào văn phòng: bỏ chọn ô nhập / nút đang giữ phím, để WASD về lại nhân vật
+    const mouseDown = () => {
+      if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur()
     }
-    const mouseUp = () => { dragging = false }
-    const move = (e: MouseEvent) => {
-      const locked = document.pointerLockElement === el
-      if (!locked && !dragging) return
-      cam.yaw -= e.movementX * 0.0026
-      cam.pitch = clamp(cam.pitch + e.movementY * 0.0022, 0.06, 1.25)
-    }
+    let wheelAcc = 0
     const wheel = (e: WheelEvent) => {
       if (focused()) return
-      cam.dist = clamp(cam.dist + e.deltaY * 0.004, 2.2, 10)
+      // Mỗi nấc lăn đổi một mức phóng to (nguyên lần, để pixel luôn sắc)
+      wheelAcc += e.deltaY
+      if (Math.abs(wheelAcc) < 80) return
+      view.zoomBias = clamp(view.zoomBias + (wheelAcc > 0 ? -1 : 1), -2, 3)
+      wheelAcc = 0
     }
-    const lockChange = () => useCoop.getState().setLocked(document.pointerLockElement === el)
 
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', clear)
     el.addEventListener('mousedown', mouseDown)
-    window.addEventListener('mouseup', mouseUp)
-    window.addEventListener('mousemove', move)
     el.addEventListener('wheel', wheel, { passive: true })
-    document.addEventListener('pointerlockchange', lockChange)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', clear)
       el.removeEventListener('mousedown', mouseDown)
-      window.removeEventListener('mouseup', mouseUp)
-      window.removeEventListener('mousemove', move)
       el.removeEventListener('wheel', wheel)
-      document.removeEventListener('pointerlockchange', lockChange)
     }
   }, [stage])
 }
