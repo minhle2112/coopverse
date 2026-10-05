@@ -11,7 +11,7 @@ import { CAP_FILL, CAP_SHADE, OUTLINE, WALL, tiled, type Rect } from './office'
  * Nhìn từ trên nghiêng về bắc: thấy nắp vách, và mặt phía nam ở ô cuối của mỗi đoạn.
  * - Vách thấp: ngang hông, nắp sáng, mặt là chân tường LimeZu
  * - Vách kính: khung kim loại, mặt kính trong
- * - Tường cao: như tường bắc (cao 3 ô), tự mờ đi khi có người đứng phía sau
+ * - Tường cao: như tường bắc (cao 2 ô), tự mờ đi khi có người đứng phía sau
  */
 
 const T = CELL * PPM
@@ -111,9 +111,9 @@ export function buildWalls(o: OfficeState): WallView {
     node.addChild(face)
     if (showFace) {
       if (kind === 'tall') {
-        // Như tường bắc: dải trên lặp phần giữa viên tường, dưới là viên tường nguyên (có chân tường)
+        // Như tường bắc: viên tường nguyên (có chân tường); mặt cao hơn viên tường thì lặp phần giữa ở dải trên
         const [wx, wy, ww, wh] = WALL
-        face.addChild(tiled(cut('walls', wx, wy + 8, ww, F - wh), x0, bottom - F, T, F - wh))
+        if (F > wh) face.addChild(tiled(cut('walls', wx, wy + 8, ww, F - wh), x0, bottom - F, T, F - wh))
         face.addChild(tiled(cut('walls', wx, wy, ww, wh), x0, bottom - wh, T, wh))
       } else if (kind === 'low') {
         face.addChild(tiled(faceTex(F), x0, bottom - F, T, F))

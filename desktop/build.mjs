@@ -37,12 +37,21 @@ for (const sub of ['latin', 'latin-ext', 'vietnamese']) {
 
 if (process.argv.includes('--with-art')) bundleArt()
 
-/** Chép đúng những hình app dùng: các sheet trong atlas.json + bộ phận nhân vật 16x16 (tủ đồ chọn được mọi kiểu) */
+/**
+ * Chép đúng những hình app dùng: các sheet trong atlas.json, ảnh của các tileset bản đồ (maps/tilesets, trỏ tới
+ * maps/art/... = cùng đường dẫn trong gói LimeZu) + bộ phận nhân vật 16x16 (tủ đồ chọn được mọi kiểu)
+ */
 function bundleArt() {
   const src = path.resolve(root, process.env.COOPVERSE_ASSETS?.trim() || '../coopverse-assets/limezu')
   const dst = path.join(out, 'limezu')
   const atlas = JSON.parse(readFileSync(at('src', 'pixel', 'atlas.json'), 'utf8'))
   const files = new Set(Object.values(atlas.sheets))
+  for (const f of readdirSync(at('maps', 'tilesets'))) {
+    if (!f.endsWith('.tsj')) continue
+    const image = path.posix.join('maps/tilesets', JSON.parse(readFileSync(at('maps', 'tilesets', f), 'utf8')).image)
+    if (!image.startsWith('maps/art/')) throw new Error(`Tileset ${f}: ảnh phải nằm trong maps/art/`)
+    files.add(image.slice('maps/art/'.length))
+  }
   const gen = path.join(src, '2_Characters', 'Character_Generator')
   for (const part of ['Bodies', 'Eyes', 'Outfits', 'Hairstyles', 'Accessories']) {
     const dir = path.join(gen, part, '16x16')

@@ -4,7 +4,7 @@ import { CELL, cellX, cellZ } from '../data/officeState'
 import atlas from './atlas.json'
 import { cut, frames, sheet, sprite, stitch, type SpriteName } from './assets'
 import { PPM, px, py } from './geom'
-import { WALL_SHIFT, sortAt, spr, wallTop, type Light, type Rect } from './office'
+import { sortAt, spr, wallTop, type Light, type Rect } from './office'
 
 /**
  * Hình của từng món trong cửa hàng (src/data/catalog.ts), toàn bộ là hình LimeZu:
@@ -80,7 +80,7 @@ export function footRect(i: Item, c: number, r: number, rot: number): Rect {
 /** Khung pixel của đồ treo tường ở cột c */
 export function wallRect(i: Item, c: number): Rect {
   const x = Math.round(px(cellX(c)))
-  return { x, y: wallTop() + WALL_SHIFT, w: i.w * CELL * PPM, h: 30 }
+  return { x, y: wallTop(), w: i.w * CELL * PPM, h: 30 }
 }
 
 /** Khung của hình (toạ độ bản đồ: node nằm ở gốc, chưa gắn vào sân khấu) */

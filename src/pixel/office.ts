@@ -6,8 +6,10 @@ import {
   BOARD, DESK_D, DESK_W, FURNITURE, OFFICE, WINDOWS, deskCenter, forward,
   type DeskSlot, type Furniture, type World,
 } from '../world/layout'
-import { cut, frames, sprite, stitch, type SpriteName } from './assets'
-import { CAP, MAP_H, MAP_W, PPM, WALL_FACE, px, py } from './geom'
+import atlas from './atlas.json'
+import { frames, region, sprite, stitch, type SpriteName } from './assets'
+import { MAP_H, MAP_W, PPM, TILE, WALL_FACE, px, py } from './geom'
+import { MAP_BG, MAP_COLS, mapLayer, marker, tileAt } from './tilemap'
 import { FAME_INNER, itemView } from './catalogArt'
 import { buildWalls, type WallView } from './walls'
 
@@ -16,7 +18,7 @@ import { buildWalls, type WallView } from './walls'
  * bàn của agent. Bụi bẩn vẽ riêng ở dirt.ts (dọn chỗ nào thì gỡ chỗ đó, không dựng lại cả phòng).
  * - `floor`: sàn, tường bắc và mọi thứ treo trên đó (luôn nằm dưới nhân vật)
  * - `sorted`: đồ đạc đứng trên sàn, xếp lớp theo cạnh dưới (zIndex = y pixel của chân) cùng với nhân vật
- * - `top`: tường nam (luôn nằm trên cùng)
+ * - `top`: viền tường nam (luôn nằm trên cùng)
  */
 
 export const OUTLINE = 0x2b2633
@@ -25,11 +27,8 @@ const GOLD = 0xf2c14e
 const CORK = 0xbe7149
 export const CAP_FILL = 0xece8f1
 export const CAP_SHADE = 0xc5bfd2
-const OUTSIDE = 0x1c1a26
 
-/** Gạch sàn: một ô 16×16 không có bóng tường (ô giữa hàng dưới của một khối 3×2 trong Room_Builder_Floors) */
-const FLOOR: [number, number, number, number] = [16, 400, 16, 16]
-/** Mặt tường bắc (vùng 48×32 trong Room_Builder_Walls) */
+/** Viên tường LimeZu (16×32 trong Room_Builder_Walls), cùng viên tường bắc trong bản đồ: vách cao tự xây dùng lại */
 export const WALL: [number, number, number, number] = [16, 352, 16, 32]
 
 /** Bàn cao bao nhiêu pixel (mặt trước bàn) */
@@ -104,74 +103,56 @@ export function box(g: Graphics, x: number, y: number, w: number, h: number, fil
   g.rect(Math.round(x) + 1, Math.round(y) + 1, Math.round(w) - 2, Math.round(h) - 2).fill(fill)
 }
 
-// ───────────────────────── Sàn, tường ─────────────────────────
+// ───────────────────────── Sàn, tường (bản đồ Tiled) ─────────────────────────
 
 /** Mép trên mặt tường bắc (pixel gốc) */
 export const wallTop = () => py(OFFICE.minZ) - WALL_FACE
 
-function buildFloor(c: Container) {
-  const bg = new Graphics().rect(0, 0, MAP_W, MAP_H).fill(OUTSIDE)
-  c.addChild(bg)
-  const [x, y, w, h] = FLOOR
-  c.addChild(tiled(cut('floors', x, y, w, h), px(OFFICE.minX), py(OFFICE.minZ), (OFFICE.maxX - OFFICE.minX) * PPM, (OFFICE.maxZ - OFFICE.minZ) * PPM))
+/** Các layer ô của maps/office.tmj, vẽ theo thứ tự từ dưới lên */
+const MAP_LAYERS = ['Floor', 'FloorDecor', 'Walls', 'WallDecor', 'WallTop'] as const
 
-  // Tường bắc: mặt tường + nắp + bóng đổ xuống sàn
-  const top = wallTop()
-  const [wx0, wy0, ww, wh] = WALL
-  // Tường cao 3 ô: dải trên lặp phần giữa của viên tường LimeZu, 2 ô dưới là viên tường nguyên (có chân tường)
-  const W = (OFFICE.maxX - OFFICE.minX) * PPM
-  c.addChild(tiled(cut('walls', wx0, wy0 + 8, ww, WALL_FACE - wh), px(OFFICE.minX), top, W, WALL_FACE - wh))
-  c.addChild(tiled(cut('walls', wx0, wy0, ww, wh), px(OFFICE.minX), top + WALL_FACE - wh, W, wh))
-  const g = new Graphics()
-  g.rect(px(OFFICE.minX), py(OFFICE.minZ), W, 4).fill({ color: 0x000000, alpha: 0.16 })
-  g.rect(px(OFFICE.minX), py(OFFICE.minZ) + 4, W, 3).fill({ color: 0x000000, alpha: 0.07 })
-  c.addChild(g)
-}
-
-/** Nắp tường nhìn từ trên: dải sáng có viền tối */
-function capBand(g: Graphics, x: number, y: number, w: number, h: number) {
-  box(g, x, y, w, h, CAP_FILL)
-  if (w > h) g.rect(Math.round(x) + 1, Math.round(y + h) - 3, Math.round(w) - 2, 2).fill(CAP_SHADE)
-  else g.rect(Math.round(x + w) - 3, Math.round(y) + 1, 2, Math.round(h) - 2).fill(CAP_SHADE)
-}
-
-function buildOuterWalls(floor: Container, top: Container) {
-  const g = new Graphics()
-  const yTop = wallTop() - CAP
-  const x0 = px(OFFICE.minX) - CAP, x1 = px(OFFICE.maxX)
-  capBand(g, x0, yTop, x1 - x0 + CAP, CAP)
-  // Tường tây, đông: chỉ thấy nắp
-  capBand(g, x0, yTop, CAP, py(OFFICE.maxZ) - yTop + CAP)
-  capBand(g, x1, yTop, CAP, py(OFFICE.maxZ) - yTop + CAP)
-  floor.addChild(g)
-  // Tường nam (mặt quay ra ngoài): chỉ nắp, chừa cửa vào ở giữa
-  const s = new Graphics()
-  const door = [px(-1.1), px(1.1)]
-  capBand(s, x0, py(OFFICE.maxZ), door[0] - x0, CAP)
-  capBand(s, door[1], py(OFFICE.maxZ), x1 + CAP - door[1], CAP)
-  // Ngưỡng cửa
-  s.rect(door[0], py(OFFICE.maxZ), door[1] - door[0], CAP).fill(0x3a3546)
-  s.rect(door[0] + 2, py(OFFICE.maxZ) + 2, door[1] - door[0] - 4, CAP - 4).fill(0x8a7f99)
-  top.addChild(s)
+/**
+ * Vẽ bản đồ: mọi layer nằm dưới nhân vật (`floor`), trừ viền tường nam nằm trên cùng (`top`).
+ * Hình giữ chỗ của bảng ticket trong bản đồ bị bỏ qua: game tự vẽ bảng có ticket thật ở mốc "kanban".
+ */
+function buildMap(floor: Container, top: Container) {
+  floor.addChild(new Graphics().rect(0, 0, MAP_W, MAP_H).fill(MAP_BG))
+  const kb = marker('kanban')
+  const underBoard = (x: number, y: number) => x + TILE > kb.x && x < kb.x + kb.width && y + TILE > kb.y && y < kb.y + kb.height
+  const south = py(OFFICE.maxZ)
+  const tex = new Map<number, Texture>()
+  for (const name of MAP_LAYERS) {
+    const data = mapLayer(name)
+    const below = new Container()
+    const above = new Container()
+    data.forEach((gid, i) => {
+      const t = tileAt(gid)
+      if (!t) return
+      const x = (i % MAP_COLS) * TILE, y = Math.floor(i / MAP_COLS) * TILE
+      if (name === 'WallDecor' && underBoard(x, y)) return
+      let tx = tex.get(gid)
+      if (!tx) tex.set(gid, (tx = region(t.key, t.sx, t.sy, TILE, TILE)))
+      const s = new Sprite(tx)
+      s.position.set(x, y)
+      ;(name === 'WallTop' && y >= south ? above : below).addChild(s)
+    })
+    floor.addChild(below)
+    if (above.children.length) top.addChild(above)
+  }
 }
 
 // ───────────────────────── Đồ treo tường bắc ─────────────────────────
 
-/** Đồ treo tường (cửa sổ, tranh, bảng) hạ xuống giữa mặt tường cao 3 ô */
-export const WALL_SHIFT = 10
-const onWall = (s: Sprite, x: number, fromTop: number) => {
-  s.anchor.set(0.5, 0)
-  s.position.set(Math.round(px(x)), wallTop() + WALL_SHIFT + fromTop)
-  return s
-}
-
 /** Hai ô kính trong hình cửa sổ LimeZu (25×20): x 2–10 và 14–22, y 3–15 */
 export const PANES = [[2, 3, 9, 13], [14, 3, 9, 13]] as const
 
-/** Khung hình cửa sổ ở toạ độ x (mét) trên tường bắc (pixel gốc) */
+/**
+ * Khung hình cửa sổ ở toạ độ x (mét) trên tường bắc (pixel gốc). Bản đồ đặt mỗi cửa sổ thành 2×2 ô, mép trái ở
+ * px(x) − 1 ô, mép trên ở mép trên tường; hình nằm lệch trong ô đúng như trong sheet LimeZu.
+ */
 export function windowBox(x: number): Rect {
-  const t = sprite('window')
-  return { x: Math.round(px(x) - t.width / 2), y: wallTop() + WALL_SHIFT + 6, w: t.width, h: t.height }
+  const [, sx, sy, w, h] = atlas.sprites.window as [string, number, number, number, number]
+  return { x: Math.round(px(x)) - TILE + (sx % TILE), y: wallTop() + (sy % TILE), w, h }
 }
 
 function buildWallDecor(floor: Container) {
@@ -183,11 +164,10 @@ function buildWallDecor(floor: Container) {
     sun.poly([cx - 12, y0, cx + 12, y0, cx + 22, y0 + 44, cx - 2, y0 + 44]).fill({ color: 0xfff1c9, alpha: 0.2 })
   }
   floor.addChild(sun)
-  // Kính phủ màu trời (trong suốt ban ngày) và vài ngôi sao ban đêm, vẽ đè lên ô kính
+  // Hình cửa sổ có sẵn trong bản đồ; ở đây chỉ phủ màu trời (trong suốt ban ngày) và vài ngôi sao ban đêm lên ô kính
   const panes = new Graphics()
   const stars = new Graphics()
   for (const x of WINDOWS) {
-    floor.addChild(onWall(new Sprite(sprite('window')), x, 6))
     const { x: left, y: top } = windowBox(x)
     for (const [dx, dy, pw, ph] of PANES) panes.rect(left + dx, top + dy, pw, ph).fill(0xffffff)
     for (const [dx, dy] of [[4, 5], [8, 11], [16, 7], [20, 13], [18, 4]]) stars.rect(left + dx, top + dy, 1, 1).fill(0xfff6d0)
@@ -199,7 +179,7 @@ function buildWallDecor(floor: Container) {
 /** Khung bảng ticket trên tường bắc (pixel gốc, chưa tính bóng đổ) */
 export function boardBox(): Rect {
   const w = Math.round(BOARD.w * PPM), h = 26
-  return { x: Math.round(px(BOARD.x) - w / 2), y: wallTop() + WALL_SHIFT + 3, w, h }
+  return { x: Math.round(px(BOARD.x) - w / 2), y: wallTop() + 3, w, h }
 }
 
 /** Khung bảng treo tường bắc, trả về Graphics để vẽ nội dung */
@@ -578,11 +558,10 @@ export function buildOffice(world: World, office: OfficeState): OfficeView {
   const sorted: Container[] = []
   const screens: Screen[] = []
 
-  buildFloor(floor)
+  buildMap(floor, top)
   const { sun, panes, stars } = buildWallDecor(floor)
   const kb = wallBoard(floor, 'corkboard', CORK)
   kanbanBox = { w: kb.w, h: kb.h }
-  buildOuterWalls(floor, top)
 
   for (const f of FURNITURE) {
     const o = furniture(f)

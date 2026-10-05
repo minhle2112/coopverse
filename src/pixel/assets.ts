@@ -1,5 +1,6 @@
 import { Assets, Rectangle, Texture, TextureSource } from 'pixi.js'
 import atlas from './atlas.json'
+import { MAP_SHEETS } from './tilemap'
 
 /**
  * Nạp hình LimeZu (phục vụ ở /limezu/... bởi server/limezu.ts, không nằm trong repo).
@@ -27,7 +28,7 @@ export async function assetsReady(): Promise<boolean> {
 
 export async function loadSheets() {
   await Promise.all(
-    Object.entries(atlas.sheets).map(async ([k, rel]) => {
+    [...Object.entries(atlas.sheets), ...Object.entries(MAP_SHEETS)].map(async ([k, rel]) => {
       if (!sheets.has(k)) sheets.set(k, await Assets.load<Texture>(assetUrl(rel)))
     }),
   )
