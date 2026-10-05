@@ -14,9 +14,13 @@ import { OFFICE, WINDOWS } from '../world/room'
 export interface Spend {
   id: string
   at: number
-  /** clean: dọn · buy: mua đồ · sell: bán lại (xu âm) · wall: xây vách · unwall: dỡ vách (xu âm) */
-  kind: 'clean' | 'buy' | 'sell' | 'wall' | 'unwall'
-  /** Việc dọn (id trong JOBS) hoặc món đồ (id trong ITEMS) */
+  /**
+   * clean: dọn · buy: mua đồ · sell: bán lại (xu âm) · wall: xây vách · unwall: dỡ vách (xu âm)
+   * · deskBuy / deskSell: đồ để bàn của một agent (ref = "agentId:món")
+   * · gift: Xu thêm để thử, chỉ có ở bản demo (xu âm; server không bao giờ tạo khoản này)
+   */
+  kind: 'clean' | 'buy' | 'sell' | 'wall' | 'unwall' | 'deskBuy' | 'deskSell' | 'gift'
+  /** Việc dọn (id trong JOBS), món đồ (id trong ITEMS), hoặc "agentId:món" (đồ để bàn) */
   ref: string
   xu: number
 }
@@ -47,9 +51,11 @@ export interface OfficeState {
   walls: Record<string, WallKind>
   /** id chỗ ngồi (DeskSlot.id) → chỗ mới */
   desks: Record<string, DeskPos>
+  /** agentId → đồ để bàn đã mua (id trong DESK_ITEMS): đi theo agent khi đổi chỗ */
+  deskItems: Record<string, string[]>
 }
 
-export const emptyOffice = (): OfficeState => ({ v: 1, cleaned: {}, spent: [], items: [], walls: {}, desks: {} })
+export const emptyOffice = (): OfficeState => ({ v: 1, cleaned: {}, spent: [], items: [], walls: {}, desks: {}, deskItems: {} })
 
 /** Đọc từ file / bộ nhớ trình duyệt: thiếu trường (file của đợt trước) thì lấy mặc định */
 export const normOffice = (raw: Partial<OfficeState> | null | undefined): OfficeState => ({ ...emptyOffice(), ...(raw ?? {}), v: 1 })

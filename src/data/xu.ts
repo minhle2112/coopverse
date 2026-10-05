@@ -2,7 +2,7 @@ import type { Ledger } from './ledger'
 import { EXP, levelOf, ticketExp } from './levels'
 
 /**
- * Xu: tiền của văn phòng, để dọn dẹp và (sau này) mua đồ trang trí.
+ * Xu: tiền của văn phòng, để dọn dẹp, mua đồ trang trí và đồ để bàn.
  * Chỉ ticket xong trên board mới ra Xu, nhiều ít theo độ ưu tiên; agent cấp càng cao (lúc ticket xong) càng được nhiều,
  * mỗi cấp thêm 10%. Xu vào một quỹ chung. Tính lại từ sổ EXP mỗi lần, nên ticket cũ trước khi có tính năng này cũng có Xu.
  * Không phụ thuộc React: server dùng chung để kiểm số dư trước khi cho tiêu.

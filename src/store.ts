@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { standUp, takeSpot } from './life/playerUse'
 import { input } from './runtime'
 import type { NoteDraft, NoteKind } from './data/notify'
 import { useDeco } from './ui/decoStore'
@@ -45,6 +46,10 @@ interface CoopState {
   nearFame: boolean
   /** Đang xem bảng vàng phóng to */
   fameOpen: boolean
+  /** Đứng gần đồ dùng được (sofa, máy game...): id chỗ trong life/spots.ts */
+  nearUse: string | null
+  /** Bạn đang ngồi / dùng chỗ này */
+  using: string | null
   /** Tủ đồ đang mở cho ai ('player' = bạn, hoặc id agent) */
   wardrobeId: string | null
   settingsOpen: boolean
@@ -72,7 +77,9 @@ interface CoopState {
   pushNotes: (drafts: NoteDraft[]) => void
   dismissNote: (id: number) => void
   pingAgent: (id: string) => void
-  setNear: (id: string | null, board?: boolean, fame?: boolean) => void
+  setNear: (id: string | null, board?: boolean, fame?: boolean, use?: string | null) => void
+  /** Đứng dậy khỏi chỗ đang dùng (đi tiếp, mở chế độ khác) */
+  leaveUse: () => void
   setHover: (id: string | null) => void
   /** Mở thứ của một người: agent → CLI, ứng viên → phiếu thuê, đã nghỉ → báo. Dùng cho phím E, bấm chuột, danh sách nhân sự */
   openAgent: (id: string) => void
@@ -120,6 +127,8 @@ export const useCoop = create<CoopState>((set, get) => ({
   boardOpen: false,
   nearFame: false,
   fameOpen: false,
+  nearUse: null,
+  using: null,
   wardrobeId: null,
   settingsOpen: false,
   cleanOpen: false,
@@ -158,7 +167,12 @@ export const useCoop = create<CoopState>((set, get) => ({
   },
   dismissNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
   pingAgent: (id) => set({ ping: { id, at: performance.now() } }),
-  setNear: (id, board = false, fame = false) => set({ nearId: id, nearBoard: board, nearFame: fame }),
+  setNear: (id, board = false, fame = false, use = null) => set({ nearId: id, nearBoard: board, nearFame: fame, nearUse: use }),
+  leaveUse: () => {
+    if (!get().using) return
+    standUp()
+    set({ using: null })
+  },
   setHover: (id) => set({ hoverId: id }),
   openAgent: (id) => {
     const { agents, asks, openAsk, openFocus, showToast } = get()
@@ -249,8 +263,14 @@ export const useCoop = create<CoopState>((set, get) => ({
     if (focusId) return closeFocus()
     if (boardOpen) return closeBoard()
     if (get().fameOpen) return get().closeFame()
+    if (get().using) return get().leaveUse()
     if (nearBoard) return openBoard()
     if (get().nearFame) return get().openFame()
+    const use = get().nearUse
+    if (use && !nearId) {
+      if (takeSpot(use)) set({ using: use, nearUse: null })
+      return
+    }
     if (nearId) get().openAgent(nearId)
   },
 }))

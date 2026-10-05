@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Container, Graphics, Sprite } from 'pixi.js'
-import { footprint, itemById, lowerName, nextRot, resale, wallPrice, type Item } from '../data/catalog'
+import { DESK_ITEMS, WALLS, footprint, itemById, lowerName, nextRot, resale, wallPrice, type DeskItem, type Item } from '../data/catalog'
 import {
-  RESERVED, apply, canDesk, canPlace, canUnwall, canWall, costOf, deskCells, doorRot, reserved, type Action, type Cell, type Check, type PlaceOpts,
+  RESERVED, apply, canDesk, canPlace, canUnwall, canWall, cellsOf, costOf, deskCells, doorRot, reserved, type Action, type Cell, type Check, type PlaceOpts,
 } from '../data/decor'
 import {
   CELL, COLS, ROWS, cellKey, cellX, cellZ, colOf, isClean, patchAt, rowOf, type OfficeState, type Placed,
 } from '../data/officeState'
+import { useExp } from '../data/exp'
 import { act, useBalance, useOffice } from '../data/officeSync'
-import { decorated } from '../life/director'
+import { decorated, deskGift } from '../life/director'
 import { fmtXu } from '../data/xu'
 import { useCoop } from '../store'
 import { useDeco, type Pending } from '../ui/decoStore'
 import { blockedReason, buildWorld, type World } from '../world/layout'
 import { forward } from '../world/room'
-import { footRect, itemView, wallRect } from './catalogArt'
+import { deskThumb, footRect, itemView, wallRect } from './catalogArt'
 import { PPM, px, py, wx, wz } from './geom'
 import type { OfficeView, Rect } from './office'
 import { stage, ticks, toScreen, type Tick } from './stage'
+import { unionRect, wallHit } from './walls'
 
 /**
  * Chế độ trang trí trên bản đồ: lưới ô, bóng mờ của món đang cầm (khung xanh = đặt được, đỏ = không, kèm lý do),
@@ -37,6 +39,53 @@ const BAD = 0xef6f5e
 const SEL = 0xf4d35e
 
 const cellAt = (x: number, y: number): Cell => [colOf(wx(x)), rowOf(wz(y))]
+
+/** Khối vách đang thấy dưới điểm (pixel gốc): vách vẽ cao lên phía trên ô của nó, khối nằm trước nhất thắng */
+function wallAt(x: number, y: number): Cell | null {
+  const o = useOffice.getState().office
+  let best: Cell | null = null, bz = -Infinity
+  for (const [key, kind] of Object.entries(o.walls)) {
+    const [c, r] = key.split(',').map(Number)
+    const h = wallHit(c, r, kind)
+    if (x < h.x || x >= h.x + h.w || y < h.y || y >= h.y + h.h) continue
+    if (h.y + h.h > bz) { bz = h.y + h.h; best = [c, r] }
+  }
+  return best
+}
+
+/** Ô đang trỏ khi dỡ vách: bấm lên mặt vách là trúng vách đó */
+const eraseCellAt = (x: number, y: number): Cell => wallAt(x, y) ?? cellAt(x, y)
+
+/** Các ô có cửa lắp trên vách */
+function doorKeys(o: OfficeState): Set<string> {
+  const s = new Set<string>()
+  for (const p of o.items) {
+    const i = itemById.get(p.item)
+    if (i?.mount === 'door' && !p.stored) for (const [c, r] of cellsOf(i, p.c, p.r, p.rot)) s.add(cellKey(c, r))
+  }
+  return s
+}
+
+/** Đoạn vách cùng loại liền nhau chứa ô (c, r), theo hàng ngang (hoặc dọc nếu hàng ngang chỉ có một ô), dừng ở cửa */
+function wallRun(o: OfficeState, c: number, r: number): Cell[] {
+  const kind = o.walls[cellKey(c, r)]
+  if (!kind) return []
+  const door = doorKeys(o)
+  const same = (cc: number, rr: number) => o.walls[cellKey(cc, rr)] === kind && !door.has(cellKey(cc, rr))
+  const run = (dc: number, dr: number) => {
+    const out: Cell[] = [[c, r]]
+    for (let k = 1; same(c - dc * k, r - dr * k); k++) out.unshift([c - dc * k, r - dr * k])
+    for (let k = 1; same(c + dc * k, r + dr * k); k++) out.push([c + dc * k, r + dr * k])
+    return out
+  }
+  const h = run(1, 0)
+  return h.length > 1 ? h : run(0, 1)
+}
+
+/** Khung trên màn hình của các ô: ô có vách thì lấy cả khối vách đang thấy */
+const shownRect = (o: OfficeState, cells: Cell[]): Rect =>
+  unionRect(cells.map(([c, r]) => { const k = o.walls[cellKey(c, r)]; return k ? wallHit(c, r, k) : cellsRect([[c, r]]) }))
+const levelOf = (id: string) => useExp.getState().stats[id]?.level ?? 1
 
 /** Ô bàn làm việc chiếm (trừ chỗ ngồi `except`) → kiểm đặt đồ */
 function deskBlock(w: World, except?: string): PlaceOpts['blocked'] {
@@ -125,6 +174,12 @@ function selectAt(x: number, y: number): string | null {
     const r = cellsRect(deskCells({ x: sl.seat.x, z: sl.seat.z, yaw: sl.yaw }))
     if (x >= r.x && x < r.x + r.w && y >= r.y - 12 && y < r.y + r.h && r.y + r.h > bz) { bz = r.y + r.h; best = `desk:${sl.id}` }
   }
+  // Vách tự xây: chọn cả đoạn (cửa trên vách là một món riêng, đã xét ở trên)
+  const wc = wallAt(x, y)
+  if (wc && !doorKeys(o).has(cellKey(wc[0], wc[1]))) {
+    const h = wallHit(wc[0], wc[1], o.walls[cellKey(wc[0], wc[1])])
+    if (h.y + h.h > bz) best = `wall:${wc[0]},${wc[1]}`
+  }
   return best
 }
 
@@ -140,7 +195,8 @@ export function decoLeave() { mouse.in = false }
 export function decoDown(x: number, y: number) {
   const d = useDeco.getState()
   if (d.busy || d.pending) return
-  if (d.draft?.kind === 'wall' || d.draft?.kind === 'erase') mouse.drag = cellAt(x, y)
+  if (d.draft?.kind === 'wall') mouse.drag = cellAt(x, y)
+  else if (d.draft?.kind === 'erase') mouse.drag = eraseCellAt(x, y)
 }
 
 export function decoUp(x: number, y: number) {
@@ -148,7 +204,7 @@ export function decoUp(x: number, y: number) {
   const from = mouse.drag
   mouse.drag = null
   if (!from || !d.draft || (d.draft.kind !== 'wall' && d.draft.kind !== 'erase')) return
-  const cells = line(from, cellAt(x, y))
+  const cells = line(from, d.draft.kind === 'erase' ? eraseCellAt(x, y) : cellAt(x, y))
   if (!cells.length) return
   d.setPending(d.draft.kind === 'wall' ? { kind: 'wall', wall: d.draft.wall, cells } : { kind: 'erase', cells })
 }
@@ -232,9 +288,9 @@ async function run(a: Action, done: string, after?: () => void): Promise<boolean
   const o = useOffice.getState().office
   const blocked = deskBlock(w, a.action === 'desk' ? a.slot : undefined)
   // Thử trước trên bản sao để kiểm lối đi (server không biết bàn nằm đâu)
-  const trial = apply(o, a, Infinity, 0, () => '#try', { blocked })
+  const trial = apply(o, a, Infinity, 0, () => '#try', { blocked, levelOf })
   if ('error' in trial) { toast(trial.error); return false }
-  if (a.action !== 'store' && a.action !== 'sell' && a.action !== 'unwall') {
+  if (a.action === 'buy' || a.action === 'place' || a.action === 'wall' || a.action === 'desk') {
     const chk = pathsOk(trial.office)
     if (!chk.ok) { toast(chk.why!); return false }
   }
@@ -402,8 +458,12 @@ export function DecoOverlay() {
       } else if (w && p && (p.kind === 'wall' || p.kind === 'erase')) {
         setGhost('', () => null)
         const chk = checkWall(o, w, p)
-        for (const [c, r] of p.cells) g.rect(Math.round(px(cellX(c))), Math.round(py(cellZ(r))), 16, 16).fill({ color: chk.ok ? (p.kind === 'erase' ? BAD : OK) : BAD, alpha: 0.35 })
-        const rect = cellsRect(p.cells)
+        for (const [c, r] of p.cells) {
+          const k = p.kind === 'erase' ? o.walls[cellKey(c, r)] : undefined
+          const b = k ? wallHit(c, r, k) : cellsRect([[c, r]])
+          g.rect(b.x, b.y, b.w, b.h).fill({ color: chk.ok ? (p.kind === 'erase' ? BAD : OK) : BAD, alpha: 0.35 })
+        }
+        const rect = p.kind === 'erase' ? shownRect(o, p.cells) : cellsRect(p.cells)
         ants(g, rect, chk.ok ? OK : BAD, phase)
         tg = { x: rect.x + rect.w / 2, y: rect.y + rect.h + 4, text: '', ok: chk.ok }
       } else if (w && mouse.in && dr) {
@@ -426,15 +486,19 @@ export function DecoOverlay() {
           if (!chk.ok) tg = { x: rect.x + rect.w / 2, y: rect.y - 8, text: chk.why!, ok: false }
         } else {
           setGhost('', () => null)
-          const cells = mouse.drag ? line(mouse.drag, [c, r]) : [[c, r] as Cell]
+          const erase = dr.kind === 'erase'
+          const at: Cell = erase ? eraseCellAt(mouse.x, mouse.y) : [c, r]
+          const cells = mouse.drag ? line(mouse.drag, at) : [at]
           const pend: Pending = dr.kind === 'wall' ? { kind: 'wall', wall: dr.wall, cells } : { kind: 'erase', cells }
           const chk = mouse.drag ? checkWall(o, w, pend) : { ok: true }
           for (const [cc, rr] of cells) {
-            const x = Math.round(px(cellX(cc))), y = Math.round(py(cellZ(rr)))
-            g.rect(x, y, 16, 16).fill({ color: chk.ok ? (dr.kind === 'erase' ? BAD : OK) : BAD, alpha: 0.3 })
-            g.rect(x, y, 16, 16).stroke({ color: chk.ok ? 0xffffff : BAD, alpha: 0.6, width: 1, alignment: 1 })
+            // Dỡ vách: tô cả khối vách đang thấy, không chỉ ô chân
+            const k = erase ? o.walls[cellKey(cc, rr)] : undefined
+            const b = k ? wallHit(cc, rr, k) : cellsRect([[cc, rr]])
+            g.rect(b.x, b.y, b.w, b.h).fill({ color: chk.ok ? (erase ? BAD : OK) : BAD, alpha: 0.3 })
+            g.rect(b.x, b.y, b.w, b.h).stroke({ color: chk.ok ? 0xffffff : BAD, alpha: 0.6, width: 1, alignment: 1 })
           }
-          const rect = cellsRect(cells)
+          const rect = erase ? shownRect(o, cells) : cellsRect(cells)
           if (mouse.drag) {
             const n = cells.filter(([cc, rr]) => dr.kind === 'erase' ? o.walls[cellKey(cc, rr)] : !o.walls[cellKey(cc, rr)]).length
             const text = !chk.ok ? chk.why! : dr.kind === 'wall' ? `${n} ô · ${fmtXu(n * wallPrice(dr.wall))} Xu` : `Dỡ ${n} ô`
@@ -453,7 +517,7 @@ export function DecoOverlay() {
         if (r) ants(g, r, SEL, phase)
       }
       // Nút của chỗ đặt thử / món đang chọn bám theo vị trí trên màn hình
-      const anchorPt = p ? tg : d.sel && !dr ? (() => { const r = selRect(d.sel!); return r ? { x: r.x + r.w / 2, y: r.y + r.h + 3 } : null })() : null
+      const anchorPt = p ? tg : d.sel && !dr ? (() => { const r = selRect(d.sel!); return r ? { x: r.x + r.w / 2, y: r.y + r.h + (d.sel!.startsWith('desk:') ? 7 : 3) } : null })() : null
       if (bar.current) {
         const s = anchorPt ? toScreen(anchorPt.x, anchorPt.y) : { x: -9999, y: -9999 }
         bar.current.style.transform = `translate(${Math.round(s.x)}px, ${Math.round(s.y)}px)`
@@ -477,7 +541,8 @@ export function DecoOverlay() {
 
   if (!open || !stage.overlay) return null
   const o = office
-  const selItem = sel && !sel.startsWith('desk:') ? o.items.find((p) => p.uid === sel) : undefined
+  const selItem = sel && !sel.startsWith('desk:') && !sel.startsWith('wall:') ? o.items.find((p) => p.uid === sel) : undefined
+  const selWall = sel?.startsWith('wall:') ? wallSel(o, sel) : null
   const selDef = selItem && itemById.get(selItem.item)
   const cost = pending ? costOf(o, pendingAction(pending)) : 0
 
@@ -501,12 +566,21 @@ export function DecoOverlay() {
           </div>
         )}
         {!pending && !draft && sel && (
-          <div className="deco-btns">
+          <div className={`deco-btns${sel.startsWith('desk:') ? ' desk' : ''}`}>
             {sel.startsWith('desk:') ? (
               <>
                 <span className="deco-name">Bàn làm việc</span>
                 <button type="button" className="desk-btn" disabled={busy} onClick={() => void rotateSelected()} title="Xoay (phím R)">↻ Xoay</button>
                 <button type="button" className="desk-btn" disabled={busy} onClick={() => startDesk(sel.slice(5))}>✥ Dời</button>
+                <DeskItems slot={sel.slice(5)} />
+              </>
+            ) : selWall ? (
+              <>
+                <span className="deco-name">{selWall.name} · {selWall.cells.length} ô</span>
+                {!sure
+                  ? <button type="button" className="desk-btn" disabled={busy} onClick={() => setSure(true)}>Dỡ cả đoạn · +{fmtXu(selWall.back)} Xu</button>
+                  : <button type="button" className="desk-btn danger" disabled={busy}
+                    onClick={() => void run({ action: 'unwall', cells: selWall.cells }, `Đã dỡ vách · +${fmtXu(selWall.back)} Xu`, () => useDeco.getState().select(null))}>Chắc chưa? Dỡ</button>}
               </>
             ) : selItem && selDef ? (
               <>
@@ -527,9 +601,81 @@ export function DecoOverlay() {
   )
 }
 
-/** Khung (pixel gốc) của món / bàn đang chọn */
+/**
+ * Đồ để bàn của agent ngồi bàn đang chọn: món đã có (bấm để bán lại nửa giá), món đã mở khoá (bấm để mua),
+ * món còn khoá (hiện cấp cần đạt). Agent nhận đồ mới thì vui ra mặt.
+ */
+function DeskItems({ slot }: { slot: string }) {
+  const agents = useCoop((s) => s.agents)
+  const office = useOffice((s) => s.office)
+  const busy = useDeco((s) => s.busy)
+  const balance = useBalance()
+  const w = decoCtx.world
+  const who = w ? [...w.seatOf].find(([, sl]) => sl.id === slot)?.[0] : undefined
+  const agent = agents.find((a) => a.id === who)
+  const level = useExp((s) => (who ? s.stats[who]?.level ?? 1 : 1))
+  const [selling, setSelling] = useState<string | null>(null)
+  const [hover, setHover] = useState<string | null>(null)
+  useEffect(() => { setSelling(null); setHover(null) }, [slot])
+  if (!who || !agent) return <div className="desk-items"><span className="desk-items-head">Bàn trống: chưa có ai ngồi</span></div>
+  const mine = new Set(office.deskItems[who] ?? [])
+  const buy = (d: DeskItem) => void run({ action: 'deskBuy', agent: who, item: d.id }, `🎁 ${d.name} cho ${agent.name} · −${fmtXu(d.price)} Xu`, () => deskGift(who, lowerName(d.name)))
+  const sell = (d: DeskItem) => void run({ action: 'deskSell', agent: who, item: d.id }, `Đã bán ${lowerName(d.name)} · +${fmtXu(resale(d.price))} Xu`, () => setSelling(null))
+  // Dòng tên: món đang rê chuột (tên + giá / cấp cần), không thì tên agent và cấp
+  const hd = DESK_ITEMS.find((d) => d.id === hover)
+  const head = !hd ? <>Đồ để bàn của <b>{agent.name}</b> · cấp {level}</>
+    : mine.has(hd.id) ? <><b>{hd.name}</b> · bấm để bán +{fmtXu(resale(hd.price))} Xu</>
+      : level < hd.level ? <><b>{hd.name}</b> · mở ở cấp {hd.level}</>
+        : <><b>{hd.name}</b> · {fmtXu(hd.price)} Xu{balance < hd.price ? ', chưa đủ' : ''}</>
+  const icon = (d: DeskItem) => {
+    const t = deskThumb(d.id)
+    // Phóng 2 lần (ghế cao hơn: 1,5 lần cho vừa ô), giữ nét pixel
+    const k = t && t.h > 16 ? 1.5 : 2
+    return t ? <img className="desk-chip-img" src={t.url} alt="" draggable={false} style={{ width: t.w * k, height: t.h * k }} /> : <span>{d.icon}</span>
+  }
+  return (
+    <div className="desk-items" onMouseLeave={() => setHover(null)}>
+      <span className="desk-items-head">{head}</span>
+      <div className="desk-items-row">
+        {DESK_ITEMS.map((d) => {
+          const on = { onMouseEnter: () => setHover(d.id), onFocus: () => setHover(d.id) }
+          if (mine.has(d.id)) {
+            return selling === d.id
+              ? <button key={d.id} type="button" className="desk-btn danger" disabled={busy} onClick={() => sell(d)} {...on}>Bán · +{fmtXu(resale(d.price))}</button>
+              : <button key={d.id} type="button" className="desk-chip own" disabled={busy} onClick={() => setSelling(d.id)} aria-label={`${d.name}: đã có`} {...on}>{icon(d)}<i className="desk-chip-tick">✓</i></button>
+          }
+          if (level < d.level) {
+            return <span key={d.id} className="desk-chip locked" aria-label={`${d.name}: mở khoá ở cấp ${d.level}`} {...on}>{icon(d)}<i>🔒{d.level}</i></span>
+          }
+          const poor = balance < d.price
+          return (
+            <button key={d.id} type="button" className="desk-chip buy" disabled={busy || poor} onClick={() => buy(d)} aria-label={`Mua ${lowerName(d.name)}`} {...on}>
+              {icon(d)}<i>🪙{fmtXu(d.price)}</i>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Đoạn vách đang chọn (`wall:c,r`): tên loại vách, các ô, Xu được trả lại khi dỡ */
+function wallSel(o: OfficeState, sel: string) {
+  const [c, r] = sel.slice(5).split(',').map(Number)
+  const kind = o.walls[cellKey(c, r)]
+  if (!kind) return null
+  const cells = wallRun(o, c, r)
+  return { name: WALLS.find((x) => x.kind === kind)!.name, cells, back: -costOf(o, { action: 'unwall', cells }) }
+}
+
+/** Khung (pixel gốc) của món / bàn / đoạn vách đang chọn */
 function selRect(sel: string): Rect | null {
   const w = decoCtx.world, v = decoCtx.view
+  if (sel.startsWith('wall:')) {
+    const o = useOffice.getState().office
+    const ws = wallSel(o, sel)
+    return ws ? shownRect(o, ws.cells) : null
+  }
   if (sel.startsWith('desk:')) {
     const sl = w?.slots.find((s) => s.id === sel.slice(5))
     if (!sl) return null

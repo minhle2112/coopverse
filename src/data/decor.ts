@@ -1,4 +1,4 @@
-import { footprint, itemById, resale, wallPrice, type Item, type WallKind } from './catalog'
+import { deskItemById, footprint, itemById, resale, wallPrice, type Item, type WallKind } from './catalog'
 import {
   COLS, ROWS, CELL, cellKey, cellX, cellZ, colOf, isClean, jobById, patchAt, rowOf,
   type DeskPos, type OfficeState, type Placed, type Spend,
@@ -95,6 +95,8 @@ export interface PlaceOpts {
   ignore?: string
   /** Ô bị chiếm bởi thứ server không biết (bàn của agent) */
   blocked?: (c: number, r: number) => boolean
+  /** Cấp hiện tại của agent (đồ để bàn mở khoá theo cấp). Không có thì không cho mua đồ để bàn */
+  levelOf?: (agentId: string) => number
 }
 
 /** Cửa lắp theo hướng nào ở ô (c, r): 0 = vách ngang, 1 = vách dọc, null = không có 2 ô vách liền nhau */
@@ -191,6 +193,8 @@ export type Action =
   | { action: 'wall'; kind: WallKind; cells: Cell[] }
   | { action: 'unwall'; cells: Cell[] }
   | { action: 'desk'; slot: string; x: number; z: number; yaw: number }
+  /** Đồ để bàn của một agent: mua (cần đủ cấp) / bán lại nửa giá */
+  | { action: 'deskBuy' | 'deskSell'; agent: string; item: string }
 
 export type Result = { office: OfficeState } | { error: string; status: number }
 
@@ -218,6 +222,9 @@ export function parseAction(v: unknown): Action | null {
       return typeof a.slot === 'string' && a.slot.length < 40 && typeof a.x === 'number' && typeof a.z === 'number' && typeof a.yaw === 'number'
         && Number.isFinite(a.x) && Number.isFinite(a.z) && YAWS.some((y) => Math.abs(y - (a.yaw as number)) < 1e-3)
         ? { action: 'desk', slot: a.slot, x: a.x, z: a.z, yaw: a.yaw } : null
+    case 'deskBuy': case 'deskSell':
+      return typeof a.agent === 'string' && a.agent.length > 0 && a.agent.length < 80 && typeof a.item === 'string'
+        ? { action: a.action, agent: a.agent, item: a.item } : null
     default: return null
   }
 }
@@ -233,9 +240,13 @@ export function costOf(o: OfficeState, a: Action): number {
     }
     case 'wall': return newWallCells(o, a.cells).length * wallPrice(a.kind)
     case 'unwall': return -a.cells.reduce((s, [c, r]) => { const k = o.walls[cellKey(c, r)]; return s + (k ? resale(wallPrice(k)) : 0) }, 0)
+    case 'deskBuy': return hasDeskItem(o, a.agent, a.item) ? 0 : deskItemById.get(a.item)?.price ?? 0
+    case 'deskSell': return hasDeskItem(o, a.agent, a.item) ? -resale(deskItemById.get(a.item)?.price ?? 0) : 0
     default: return 0
   }
 }
+
+export const hasDeskItem = (o: OfficeState, agent: string, item: string) => !!o.deskItems[agent]?.includes(item)
 
 const uniq = (cells: Cell[]) => [...new Map(cells.map((p) => [cellKey(p[0], p[1]), p])).values()]
 const newWallCells = (o: OfficeState, cells: Cell[]) => uniq(cells).filter(([c, r]) => !o.walls[cellKey(c, r)])
@@ -304,6 +315,23 @@ export function apply(o: OfficeState, a: Action, have: number, now: number, uid:
       const chk = canDesk(o, p, opts)
       if (!chk.ok) return err(chk.why!)
       return { office: { ...o, desks: { ...o.desks, [a.slot]: p } } }
+    }
+    case 'deskBuy': {
+      const d = deskItemById.get(a.item)
+      if (!d) return err('Không có món này', 400)
+      if (hasDeskItem(o, a.agent, d.id)) return { office: o }
+      const lv = opts.levelOf?.(a.agent) ?? 0
+      if (lv < d.level) return err(`${d.name} mở khoá ở cấp ${d.level}`)
+      const mine = [...(o.deskItems[a.agent] ?? []), d.id]
+      return { office: { ...o, deskItems: { ...o.deskItems, [a.agent]: mine }, spent: pay('deskBuy', `${a.agent}:${d.id}`, d.price) } }
+    }
+    case 'deskSell': {
+      if (!hasDeskItem(o, a.agent, a.item)) return err('Bàn này không có món đó', 400)
+      const left = o.deskItems[a.agent].filter((x) => x !== a.item)
+      const deskItems = { ...o.deskItems }
+      if (left.length) deskItems[a.agent] = left
+      else delete deskItems[a.agent]
+      return { office: { ...o, deskItems, spent: pay('deskSell', `${a.agent}:${a.item}`, price) } }
     }
   }
 }

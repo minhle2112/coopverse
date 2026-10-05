@@ -3,6 +3,9 @@
  * server dùng chung để kiểm giá. Hình của từng món (LimeZu) nằm ở src/pixel/catalogArt.ts.
  *
  * Lưới đặt đồ: ô 0,5 m (= một ô 16 px của LimeZu). Đồ treo tường chỉ treo trên tường bắc, theo cột ô.
+ *
+ * Giá theo tốc độ kiếm Xu thật: một công ty bình thường được khoảng 150 Xu mỗi ngày có việc.
+ * Đồ nhỏ mua được ngay ngày đầu; món đắt nhất (mèo văn phòng) cần dành dụm khoảng một tuần.
  */
 
 export type Group = 'plant' | 'wall' | 'lounge' | 'fun' | 'build'
@@ -45,64 +48,64 @@ const it = (id: string, name: string, group: Group, price: number, w: number, d:
 
 export const ITEMS: Item[] = [
   // ── Cây & đồ nhỏ ──
-  it('plantSmall', 'Chậu cây nhỏ', 'plant', 40, 1, 1, 'floor', 'flip', 0.8),
-  it('plantBig', 'Chậu cây lá to', 'plant', 80, 1, 1, 'floor', 'flip', 1.4),
-  it('plantTree', 'Cây cảnh cao', 'plant', 110, 1, 1, 'floor', 'flip', 1.8),
-  it('plantPalm', 'Cây cọ', 'plant', 120, 1, 1, 'floor', 'flip', 1.8),
-  it('lampFloor', 'Đèn đứng chụp vải', 'plant', 70, 1, 1, 'floor', 'flip', 1.6, 'lamp'),
-  it('floorLamp', 'Đèn cây hiện đại', 'plant', 90, 1, 1, 'floor', 'flip', 1.6, 'lamp'),
-  it('cabinet', 'Tủ thấp', 'plant', 100, 2, 1, 'floor', 'none', 1.0),
-  it('bookshelf', 'Kệ sách', 'plant', 150, 2, 1, 'floor', 'none', 2.0),
-  it('bookshelfWide', 'Kệ sách lớn', 'plant', 220, 3, 1, 'floor', 'none', 2.0),
-  it('waterCooler', 'Bình nước', 'plant', 120, 1, 1, 'floor', 'none', 1.2),
-  it('vending', 'Máy bán nước', 'plant', 280, 2, 1, 'floor', 'none', 1.9, 'screen'),
-  it('whiteboard', 'Bảng trắng', 'plant', 130, 2, 1, 'floor', 'none', 1.6),
-  it('chalkboard', 'Bảng đen', 'plant', 110, 2, 1, 'floor', 'none', 1.6),
-  it('rugGrey', 'Thảm xám', 'plant', 90, 3, 2, 'rug', 'none', 0),
-  it('rugGreen', 'Thảm xanh lá', 'plant', 100, 3, 2, 'rug', 'none', 0),
-  it('rugBorder', 'Thảm viền', 'plant', 110, 3, 2, 'rug', 'none', 0),
-  it('rugRed', 'Thảm đỏ lớn', 'plant', 140, 5, 3, 'rug', 'none', 0),
-  it('rugBlue', 'Thảm xanh lớn', 'plant', 140, 5, 3, 'rug', 'none', 0),
+  it('plantSmall', 'Chậu cây nhỏ', 'plant', 30, 1, 1, 'floor', 'flip', 0.8),
+  it('plantBig', 'Chậu cây lá to', 'plant', 60, 1, 1, 'floor', 'flip', 1.4),
+  it('plantTree', 'Cây cảnh cao', 'plant', 90, 1, 1, 'floor', 'flip', 1.8),
+  it('plantPalm', 'Cây cọ', 'plant', 100, 1, 1, 'floor', 'flip', 1.8),
+  it('lampFloor', 'Đèn đứng chụp vải', 'plant', 60, 1, 1, 'floor', 'flip', 1.6, 'lamp'),
+  it('floorLamp', 'Đèn cây hiện đại', 'plant', 75, 1, 1, 'floor', 'flip', 1.6, 'lamp'),
+  it('cabinet', 'Tủ thấp', 'plant', 80, 2, 1, 'floor', 'none', 1.0),
+  it('bookshelf', 'Kệ sách', 'plant', 120, 2, 1, 'floor', 'none', 2.0),
+  it('bookshelfWide', 'Kệ sách lớn', 'plant', 180, 3, 1, 'floor', 'none', 2.0),
+  it('waterCooler', 'Bình nước', 'plant', 100, 1, 1, 'floor', 'none', 1.2),
+  it('vending', 'Máy bán nước', 'plant', 220, 2, 1, 'floor', 'none', 1.9, 'screen'),
+  it('whiteboard', 'Bảng trắng', 'plant', 110, 2, 1, 'floor', 'none', 1.6),
+  it('chalkboard', 'Bảng đen', 'plant', 90, 2, 1, 'floor', 'none', 1.6),
+  it('rugGrey', 'Thảm xám', 'plant', 70, 3, 2, 'rug', 'none', 0),
+  it('rugGreen', 'Thảm xanh lá', 'plant', 80, 3, 2, 'rug', 'none', 0),
+  it('rugBorder', 'Thảm viền', 'plant', 90, 3, 2, 'rug', 'none', 0),
+  it('rugRed', 'Thảm đỏ lớn', 'plant', 120, 5, 3, 'rug', 'none', 0),
+  it('rugBlue', 'Thảm xanh lớn', 'plant', 120, 5, 3, 'rug', 'none', 0),
 
   // ── Treo tường (tường bắc) ──
-  it('corkboard', 'Bảng ghim', 'wall', 50, 2, 0, 'wall', 'none', 0),
-  it('painting1', 'Tranh phong cảnh', 'wall', 60, 2, 0, 'wall', 'none', 0),
-  it('painting2', 'Tranh trừu tượng', 'wall', 80, 2, 0, 'wall', 'none', 0),
-  it('painting3', 'Tranh hoa', 'wall', 80, 2, 0, 'wall', 'none', 0),
-  it('moChart', 'Biểu đồ tăng trưởng', 'wall', 70, 2, 0, 'wall', 'none', 0),
-  it('moChart2', 'Biểu đồ cột', 'wall', 70, 2, 0, 'wall', 'none', 0),
-  it('clock', 'Đồng hồ cúc cu', 'wall', 160, 1, 0, 'wall', 'none', 0),
-  it('tvWall', 'TV treo tường', 'wall', 300, 2, 0, 'wall', 'none', 0, 'screen'),
-  it('fame', 'Bảng vinh danh', 'wall', 400, 6, 0, 'wall', 'none', 0),
+  it('corkboard', 'Bảng ghim', 'wall', 40, 2, 0, 'wall', 'none', 0),
+  it('painting1', 'Tranh phong cảnh', 'wall', 50, 2, 0, 'wall', 'none', 0),
+  it('painting2', 'Tranh trừu tượng', 'wall', 60, 2, 0, 'wall', 'none', 0),
+  it('painting3', 'Tranh hoa', 'wall', 60, 2, 0, 'wall', 'none', 0),
+  it('moChart', 'Biểu đồ tăng trưởng', 'wall', 55, 2, 0, 'wall', 'none', 0),
+  it('moChart2', 'Biểu đồ cột', 'wall', 55, 2, 0, 'wall', 'none', 0),
+  it('clock', 'Đồng hồ cúc cu', 'wall', 130, 1, 0, 'wall', 'none', 0),
+  it('tvWall', 'TV treo tường', 'wall', 250, 2, 0, 'wall', 'none', 0, 'screen'),
+  it('fame', 'Bảng vinh danh', 'wall', 300, 6, 0, 'wall', 'none', 0),
 
-  // ── Nghỉ ngơi & bếp (đợt 3: agent dùng được) ──
-  it('sofa', 'Sofa xám', 'lounge', 280, 3, 2, 'floor', 'four', 0.8),
-  it('armRed', 'Ghế bành đỏ', 'lounge', 120, 1, 1, 'floor', 'four', 0.8),
-  it('armBlue', 'Ghế bành xanh', 'lounge', 120, 1, 1, 'floor', 'four', 0.8),
-  it('coffeeTable', 'Bàn trà', 'lounge', 90, 3, 1, 'floor', 'none', 0.4),
-  it('tableHoney', 'Bàn ăn gỗ', 'lounge', 150, 3, 2, 'floor', 'none', 0.75),
-  it('meetingTable', 'Bàn họp', 'lounge', 380, 4, 2, 'floor', 'none', 0.75),
-  it('meetingChair', 'Ghế họp', 'lounge', 40, 1, 1, 'floor', 'two', 0),
-  it('highTable', 'Bàn cao', 'lounge', 100, 2, 1, 'floor', 'none', 1.05),
-  it('stool', 'Ghế đẩu', 'lounge', 30, 1, 1, 'floor', 'none', 0),
-  it('bench', 'Ghế băng', 'lounge', 60, 2, 1, 'floor', 'flip', 0.5),
-  it('kitCounter', 'Tủ bếp', 'lounge', 80, 2, 1, 'floor', 'none', 0.95),
-  it('kitSink', 'Bồn rửa', 'lounge', 120, 1, 1, 'floor', 'none', 0.95),
-  it('kitStove', 'Bếp nấu', 'lounge', 150, 1, 1, 'floor', 'none', 0.95),
-  it('kitFridge', 'Tủ lạnh nhỏ', 'lounge', 180, 1, 1, 'floor', 'none', 1.9),
-  it('fridge', 'Tủ lạnh lớn', 'lounge', 260, 2, 1, 'floor', 'none', 1.9),
-  it('coffeeBar', 'Quầy cà phê', 'lounge', 320, 2, 1, 'floor', 'none', 1.2),
+  // ── Nghỉ ngơi & bếp (agent rảnh và bạn dùng được: ngồi, pha cà phê, mở tủ lạnh...) ──
+  it('sofa', 'Sofa xám', 'lounge', 240, 3, 2, 'floor', 'four', 0.8),
+  it('armRed', 'Ghế bành đỏ', 'lounge', 100, 1, 1, 'floor', 'four', 0.8),
+  it('armBlue', 'Ghế bành xanh', 'lounge', 100, 1, 1, 'floor', 'four', 0.8),
+  it('coffeeTable', 'Bàn trà', 'lounge', 70, 3, 1, 'floor', 'none', 0.4),
+  it('tableHoney', 'Bàn ăn gỗ', 'lounge', 120, 3, 2, 'floor', 'none', 0.75),
+  it('meetingTable', 'Bàn họp', 'lounge', 300, 4, 2, 'floor', 'none', 0.75),
+  it('meetingChair', 'Ghế họp', 'lounge', 35, 1, 1, 'floor', 'two', 0),
+  it('highTable', 'Bàn cao', 'lounge', 80, 2, 1, 'floor', 'none', 1.05),
+  it('stool', 'Ghế đẩu', 'lounge', 25, 1, 1, 'floor', 'none', 0),
+  it('bench', 'Ghế băng', 'lounge', 50, 2, 1, 'floor', 'flip', 0.5),
+  it('kitCounter', 'Tủ bếp', 'lounge', 70, 2, 1, 'floor', 'none', 0.95),
+  it('kitSink', 'Bồn rửa', 'lounge', 100, 1, 1, 'floor', 'none', 0.95),
+  it('kitStove', 'Bếp nấu', 'lounge', 120, 1, 1, 'floor', 'none', 0.95),
+  it('kitFridge', 'Tủ lạnh nhỏ', 'lounge', 150, 1, 1, 'floor', 'none', 1.9),
+  it('fridge', 'Tủ lạnh lớn', 'lounge', 220, 2, 1, 'floor', 'none', 1.9),
+  it('coffeeBar', 'Quầy cà phê', 'lounge', 260, 2, 1, 'floor', 'none', 1.2),
 
   // ── Giải trí ──
-  it('arcade1', 'Máy game thùng', 'fun', 450, 1, 1, 'floor', 'none', 1.6, 'screen'),
-  it('arcade2', 'Máy game đỏ', 'fun', 450, 1, 1, 'floor', 'none', 1.6, 'screen'),
-  it('tvStand', 'Kệ TV', 'fun', 400, 4, 1, 'floor', 'none', 1.0, 'screen'),
-  it('pingpong', 'Bàn bóng bàn', 'fun', 650, 2, 3, 'floor', 'none', 0.9),
-  it('pool', 'Bàn bi-a', 'fun', 900, 3, 2, 'floor', 'none', 0.9),
-  it('cat', 'Mèo văn phòng', 'fun', 1200, 2, 1, 'floor', 'flip', 0.3),
+  it('arcade1', 'Máy game thùng', 'fun', 380, 1, 1, 'floor', 'none', 1.6, 'screen'),
+  it('arcade2', 'Máy game đỏ', 'fun', 380, 1, 1, 'floor', 'none', 1.6, 'screen'),
+  it('tvStand', 'Kệ TV', 'fun', 330, 4, 1, 'floor', 'none', 1.0, 'screen'),
+  it('pingpong', 'Bàn bóng bàn', 'fun', 550, 2, 3, 'floor', 'none', 0.9),
+  it('pool', 'Bàn bi-a', 'fun', 750, 3, 2, 'floor', 'none', 0.9),
+  it('cat', 'Mèo văn phòng', 'fun', 1000, 2, 1, 'floor', 'flip', 0.3),
 
   // ── Xây vách ──
-  it('door', 'Cửa kính', 'build', 120, 2, 1, 'door', 'none', 0),
+  it('door', 'Cửa kính', 'build', 100, 2, 1, 'door', 'none', 0),
 ]
 
 export const itemById = new Map(ITEMS.map((i) => [i.id, i]))
@@ -110,11 +113,26 @@ export const itemById = new Map(ITEMS.map((i) => [i.id, i]))
 /** Vách tự xây: thấp ngang hông, kính, hoặc cao đầy đủ (che người phía sau, tự mờ đi) */
 export type WallKind = 'low' | 'glass' | 'tall'
 export const WALLS: { kind: WallKind; name: string; price: number; hint: string }[] = [
-  { kind: 'low', name: 'Vách thấp', price: 5, hint: 'Ngang hông, luôn thấy người' },
-  { kind: 'glass', name: 'Vách kính', price: 9, hint: 'Kính trong, luôn thấy người' },
-  { kind: 'tall', name: 'Tường cao', price: 12, hint: 'Như tường thật, mờ đi khi có người phía sau' },
+  { kind: 'low', name: 'Vách thấp', price: 4, hint: 'Ngang hông, luôn thấy người' },
+  { kind: 'glass', name: 'Vách kính', price: 7, hint: 'Kính trong, luôn thấy người' },
+  { kind: 'tall', name: 'Tường cao', price: 10, hint: 'Như tường thật, mờ đi khi có người phía sau' },
 ]
 export const wallPrice = (k: WallKind) => WALLS.find((w) => w.kind === k)!.price
+
+/**
+ * Đồ để bàn: của riêng từng agent (đi theo agent khi đổi chỗ), mở khoá khi agent đạt cấp `level`, rồi mới mua bằng Xu.
+ * Mỗi món một chỗ cố định trên bàn. Thứ tự = thứ tự hiện trong bảng chọn.
+ */
+export interface DeskItem { id: string; name: string; icon: string; price: number; level: number }
+export const DESK_ITEMS: DeskItem[] = [
+  { id: 'plant', name: 'Cây để bàn', icon: '🌱', price: 25, level: 2 },
+  { id: 'frame', name: 'Khung ảnh', icon: '🖼️', price: 20, level: 2 },
+  { id: 'monitor', name: 'Màn hình thứ hai', icon: '🖥️', price: 120, level: 3 },
+  { id: 'lamp', name: 'Đèn bàn', icon: '💡', price: 60, level: 3 },
+  { id: 'chair', name: 'Ghế da', icon: '🪑', price: 140, level: 4 },
+  { id: 'trophy', name: 'Cúp vàng', icon: '🏆', price: 200, level: 5 },
+]
+export const deskItemById = new Map(DESK_ITEMS.map((d) => [d.id, d]))
 
 /** Tên món giữa câu ("Đã mua sofa xám"), giữ nguyên chữ viết tắt ("TV treo tường") */
 export const lowerName = (name: string) => (name.length > 1 && name[1] === name[1].toUpperCase() && /\p{L}/u.test(name[1]) ? name : name[0].toLowerCase() + name.slice(1))

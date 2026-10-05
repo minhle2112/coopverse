@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { JOBS, allClean, isClean, jobById } from '../data/officeState'
-import { cleanJob, resetDemoOffice, useBalance, useOffice } from '../data/officeSync'
+import { cleanJob, demoGift, isDemo, resetDemoOffice, useBalance, useOffice } from '../data/officeSync'
 import { XU_TICKET, fmtXu } from '../data/xu'
 import { useCoop } from '../store'
 
@@ -61,7 +61,7 @@ export function CleanupPanel() {
         <b>🧹 Dọn dẹp</b>
         <button className="term-close" onClick={close}><kbd>Esc</kbd> Đóng</button>
       </div>
-      <div className="xu-big" title="Xu trong quỹ văn phòng">🪙 {fmtXu(balance)} <small>Xu</small></div>
+      <div className="xu-big" title="Xu trong quỹ văn phòng">🪙 {fmtXu(balance)} <small>Xu</small> <DemoXu /></div>
       <div className="clean-bar" title={`${done}/${JOBS.length} chỗ đã sạch`}>
         <i style={{ width: `${Math.round((100 * done) / JOBS.length)}%` }} />
       </div>
@@ -115,8 +115,22 @@ export function XuBadge() {
   const toggle = useCoop((s) => s.toggleClean)
   if (!ready) return null
   return (
-    <button type="button" className="xu-badge" onClick={toggle} title="Quỹ văn phòng · bấm để dọn dẹp (phím B)">
-      🪙 {fmtXu(balance)} Xu
+    <div className="xu-row">
+      <button type="button" className="xu-badge" onClick={toggle} title="Quỹ văn phòng · bấm để dọn dẹp (phím B)">
+        🪙 {fmtXu(balance)} Xu
+      </button>
+      <DemoXu />
+    </div>
+  )
+}
+
+/** Bản demo: nút thêm 500 Xu để thử dọn dẹp, mua đồ (bản thật không có) */
+export function DemoXu() {
+  if (!isDemo()) return null
+  return (
+    <button type="button" className="xu-add" title="Bản demo: thêm 500 Xu để thử"
+      onClick={() => { demoGift(500); useCoop.getState().showToast('🪙 +500 Xu (bản demo)') }}>
+      +500
     </button>
   )
 }

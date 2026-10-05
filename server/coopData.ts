@@ -7,6 +7,7 @@ import type { Handler } from './guard'
 import { emptyLedger, type Ledger } from '../src/data/ledger'
 import { apply, parseAction } from '../src/data/decor'
 import { normOffice, spentXu, type OfficeState } from '../src/data/officeState'
+import { agentExp, levelOf } from '../src/data/levels'
 import { earnings } from '../src/data/xu'
 
 /**
@@ -229,9 +230,10 @@ export function coopDataHandler(opts: { target: () => string; isOwnOrigin: (o: u
         const act = parseAction(await readBody(req))
         if (!act) return send(res, 400, { error: 'coopverse: lệnh không hợp lệ' })
         const o = await loadOffice(dir, cid)
-        // Số dư tính lại từ sổ EXP trên máy (không tin con số trang gửi lên)
-        const have = earnings((await load(dir, cid)).ledger).total - spentXu(o)
-        const r = apply(o, act, have, Date.now(), randomUUID)
+        // Số dư và cấp agent tính lại từ sổ EXP trên máy (không tin con số trang gửi lên)
+        const ledger = (await load(dir, cid)).ledger
+        const have = earnings(ledger).total - spentXu(o)
+        const r = apply(o, act, have, Date.now(), randomUUID, { levelOf: (id) => levelOf(agentExp(ledger, id)) })
         if ('error' in r) return send(res, r.status, { error: r.error })
         const next = r.office
         if (next !== o) await writeJson(officeFileOf(dir, cid), next)

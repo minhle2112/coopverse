@@ -4,7 +4,7 @@ import { cellsOf } from '../data/decor'
 import { CELL, cellKey, cellX, cellZ, type OfficeState } from '../data/officeState'
 import { cut, frames } from './assets'
 import { PPM, WALL_FACE, px, py } from './geom'
-import { CAP_FILL, CAP_SHADE, OUTLINE, WALL, tiled } from './office'
+import { CAP_FILL, CAP_SHADE, OUTLINE, WALL, tiled, type Rect } from './office'
 
 /**
  * Vách bạn tự xây (mỗi ô 0,5 m một khối) và cửa kính lắp trên vách.
@@ -30,6 +30,21 @@ export interface WallView {
   /** Mặt tường cao (chỉ mặt, nắp giữ nguyên): làm mờ khi có người đứng phía sau */
   tall: { node: Container; x0: number; x1: number; bottom: number; face: number; a: number }[]
   doors: { anim: AnimatedSprite; x: number; y: number; open: number }[]
+  /** Vùng bấm chọn cửa (uid → khung trên màn hình) */
+  doorHits: Map<string, Rect>
+}
+
+/** Khung một khối vách trên màn hình (pixel gốc): từ nắp tới chân, để bấm chọn đúng chỗ đang thấy */
+export function wallHit(c: number, r: number, kind: WallKind): Rect {
+  const x = Math.round(px(cellX(c))), y = Math.round(py(cellZ(r)))
+  return { x, y: y - FACE[kind], w: T, h: FACE[kind] + T }
+}
+
+/** Khung bao quanh nhiều khung */
+export function unionRect(rs: Rect[]): Rect {
+  const x0 = Math.min(...rs.map((r) => r.x)), y0 = Math.min(...rs.map((r) => r.y))
+  const x1 = Math.max(...rs.map((r) => r.x + r.w)), y1 = Math.max(...rs.map((r) => r.y + r.h))
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 }
 
 /** Chân tường LimeZu (dải dưới của viên tường) cao h pixel */
@@ -47,14 +62,16 @@ const faceTex = (() => {
 })()
 
 export function buildWalls(o: OfficeState): WallView {
-  const out: WallView = { sorted: [], tall: [], doors: [] }
+  const out: WallView = { sorted: [], tall: [], doors: [], doorHits: new Map() }
   const doorCells = new Map<string, { uid: string; first: boolean; vertical: boolean }>()
+  const kindAt = (c: number, r: number) => o.walls[cellKey(c, r)]
   for (const p of o.items) {
     const i = itemById.get(p.item)
     if (!i || p.stored || i.mount !== 'door') continue
-    cellsOf(i, p.c, p.r, p.rot).forEach(([c, r], k) => doorCells.set(cellKey(c, r), { uid: p.uid, first: k === 0, vertical: p.rot === 1 }))
+    const cells = cellsOf(i, p.c, p.r, p.rot)
+    cells.forEach(([c, r], k) => doorCells.set(cellKey(c, r), { uid: p.uid, first: k === 0, vertical: p.rot === 1 }))
+    out.doorHits.set(p.uid, unionRect(cells.map(([c, r]) => wallHit(c, r, kindAt(c, r) ?? 'low'))))
   }
-  const kindAt = (c: number, r: number) => o.walls[cellKey(c, r)]
 
   for (const [key, kind] of Object.entries(o.walls)) {
     const [c, r] = key.split(',').map(Number)

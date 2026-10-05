@@ -29,7 +29,7 @@ export const useOffice = create<OfficeStore>(() => ({ office: emptyOffice(), rea
 export const useBalance = () => useOffice((s) => s.earned.total - spentXu(s.office))
 
 const DEMO_KEY = 'coopverse.demo.office'
-const isDemo = () => new URLSearchParams(location.search).has('demo')
+export const isDemo = () => new URLSearchParams(location.search).has('demo')
 const companyId = () => useCoop.getState().company?.id ?? null
 
 let seq = 0
@@ -94,7 +94,7 @@ export function startOfficeSync(): () => void {
 }
 
 /**
- * Gửi một lệnh văn phòng (dọn, mua, dời, cất, bán, xây vách, dời bàn: src/data/decor.ts). Bản demo làm ngay trong trình duyệt;
+ * Gửi một lệnh văn phòng (dọn, mua, dời, cất, bán, xây vách, dời bàn, đồ để bàn: src/data/decor.ts). Bản demo làm ngay trong trình duyệt;
  * bản thật gửi server Coopverse (server kiểm lại Xu và chỗ đặt). Lỗi (chưa đủ Xu, vướng, mất kết nối) thì ném ra để giao diện báo.
  * `opts.blocked`: ô bàn làm việc (chỉ trang biết) để kiểm trước khi gửi.
  */
@@ -102,7 +102,8 @@ export async function act(a: Action, opts: PlaceOpts = {}): Promise<OfficeState>
   const s = useOffice.getState()
   const have = s.earned.total - spentXu(s.office)
   // Kiểm ở trang trước (cả phần server không biết: bàn làm việc), báo lỗi ngay không cần chờ mạng
-  const local = apply(s.office, a, have, Date.now(), () => `local-${Date.now()}-${++seq}`, opts)
+  const levelOf = (id: string) => useExp.getState().stats[id]?.level ?? 1
+  const local = apply(s.office, a, have, Date.now(), () => `local-${Date.now()}-${++seq}`, { levelOf, ...opts })
   if ('error' in local) throw new Error(local.error)
   let next: OfficeState
   if (isDemo()) {
@@ -122,6 +123,15 @@ export async function act(a: Action, opts: PlaceOpts = {}): Promise<OfficeState>
   }
   useOffice.setState({ office: next })
   return next
+}
+
+/** Bản demo: thêm Xu để thử mua đồ (ghi như một khoản tặng trong trình duyệt, sổ EXP và cấp agent không đổi) */
+export function demoGift(xu: number) {
+  if (!isDemo()) return
+  const o = useOffice.getState().office
+  const next: OfficeState = { ...o, spent: [...o.spent, { id: `gift-${Date.now()}-${++seq}`, at: Date.now(), kind: 'gift', ref: 'demo', xu: -xu }] }
+  try { localStorage.setItem(DEMO_KEY, JSON.stringify(next)) } catch { /* chỉ giữ trong phiên */ }
+  useOffice.setState({ office: next })
 }
 
 /** Trả Xu dọn một chỗ */

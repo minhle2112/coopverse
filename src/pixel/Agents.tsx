@@ -7,6 +7,7 @@ import { STATUS_COLOR, STATUS_LABEL, type Agent, type AgentStatus } from '../dat
 import { actorFor, placeActor, dropActor, stepActor, type Asking, type Body } from '../life/brain'
 import type { LifeActor } from '../life/actors'
 import { lifeTick, reactToStatus } from '../life/director'
+import { spotById } from '../life/spots'
 import { clock, useLife } from '../life/store'
 import { agentPos, lobbyPos, player } from '../runtime'
 import { useCoop } from '../store'
@@ -24,10 +25,10 @@ import { hits, makeOutline, personHit, setOutline } from './pick'
  * Ngồi ghế quay mặt xuống (về phía camera): dùng khung đứng, hạ người xuống để mép bàn che phần chân.
  * Quay lưng lại: nâng người lên một chút để đầu + vai nhô khỏi lưng ghế (hình người chỉ cao ~24 trong khung 32).
  */
-const SIT_DROP = 11
-const SIT_BACK_DROP = -7
+export const SIT_DROP = 11
+export const SIT_BACK_DROP = -7
 /** Ngồi nghiêng (ghế ăn, ghế đẩu): khung ngồi có sẵn của LimeZu */
-const SIT_SIDE_DROP = 1
+export const SIT_SIDE_DROP = 1
 /** Đỉnh đầu cách chân bao nhiêu pixel (khung 32, người cao ~24) */
 const HEAD = 24
 /** Ứng viên quay sang nhìn khi bạn lại gần */
@@ -62,6 +63,9 @@ function framing(a: LifeActor, b: Body, t: number): Framing {
   }
   if (b.mode === 'read' || b.mode === 'cv') return { anim: 'read', dir: 'down', i: frameAt('read', t, ph), dy: 0 }
   if (b.mode === 'play') return { anim: 'idle', dir, i: frameAt('idle', t * 2.2, ph), dy: 0 }
+  // Chờ tới lượt (bi-a, bóng bàn): đứng yên nhìn bàn, không lướt điện thoại
+  const act = a.where === 'spot' ? spotById(a.spot)?.act : undefined
+  if (b.mode === 'stand' && (act === 'pool' || act === 'foos')) return { anim: 'idle', dir, i: 0, dy: 0 }
   // Đứng một chỗ lâu: thỉnh thoảng lướt điện thoại
   if (b.mode === 'stand' && a.where === 'spot' && Math.sin(t * 0.13 + ph) > 0.45) {
     return { anim: 'phone', dir: 'down', i: frameAt('phone', t, ph), dy: 0 }

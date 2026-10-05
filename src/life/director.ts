@@ -4,7 +4,7 @@ import { player } from '../runtime'
 import { useCoop } from '../store'
 import type { CleanJob } from '../data/officeState'
 import { actors, type LifeActor } from './actors'
-import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, BOUGHT, BUILT, CLEANED, EXCUSE, LEVEL_UP, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
+import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, BOUGHT, BUILT, CLEANED, EXCUSE, GIFT, LEVEL_UP, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
 import { spotById } from './spots'
 import { clock, emote, expireLife, isSpeaking, readTime, say, useLife } from './store'
 
@@ -281,6 +281,15 @@ export function decorated(name: string | null, x: number, z: number) {
     emote(a.id, name ? '😍' : '🤔', 2.4)
     if (i === 0) say(a.id, name ? pick(BOUGHT).replace('{x}', name) : pick(BUILT))
   })
+}
+
+/** Bạn vừa mua đồ để bàn cho agent: agent mừng rỡ, cảm ơn */
+export function deskGift(agentId: string, name: string) {
+  const a = actors.get(agentId)
+  if (!a) return
+  if (a.where !== 'seat') celebrate(a, '🎁', 2.8)
+  else emote(a.id, '🥹', 2.8)
+  say(a.id, pick(GIFT).replace('{x}', name))
 }
 
 /** Agent vừa tới một chỗ: thỉnh thoảng hiện biểu tượng việc đang làm (☕, ⚽...). */

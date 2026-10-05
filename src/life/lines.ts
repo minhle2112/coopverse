@@ -37,6 +37,12 @@ const AT: Record<Activity, string[]> = {
   meeting: ['Phòng họp trống, mượn ngồi chút', 'Tập thuyết trình tí', 'Ghế phòng họp êm hơn ghế mình'],
   kanban: ['Để xem bảng còn gì nào', 'Cột Xong dài ra rồi 😎', 'Chưa có ticket mới à?', 'Ai kéo thẻ này qua vậy?'],
   fame: ['Tuần này ai dẫn đầu nhỉ?', 'Phải cày thêm mới lên top được 💪', 'Ủa ai cày dữ vậy?', 'Tên mình phải lên bảng vàng mới được'],
+  game: ['Kỷ lục mới nè! 🕹️', 'Một ván thôi rồi làm tiếp', 'Máy này khó ghê', 'Ai phá kỷ lục của tôi vậy?'],
+  pool: ['Bi số 8 vào lỗ góc!', 'Cú này khó đây…', 'Đánh nhẹ tay thôi', 'Ván này tôi thắng nha 🎱'],
+  pet: ['Mèo ơi lại đây 🐱', 'Bé mèo ngủ suốt ngày ha', 'Ai cho mèo ăn chưa?', 'Meo~'],
+  board: ['Vẽ sơ đồ cho dễ hiểu', 'Để ghi lại ý này kẻo quên', 'Ai vẽ con mèo lên bảng vậy? 😂'],
+  cook: ['Hâm lại hộp cơm chút', 'Mì gói buổi chiều là chân ái 🍜', 'Bếp này sạch ghê', 'Ai rửa giùm cái ly với'],
+  snack: ['Một lon nước ngọt cho tỉnh', 'Máy nuốt tiền rồi! 😤', 'Hết vị đào rồi…', 'Snack rong biển ngon ghê'],
   chat: ['Phòng rộng mà trống trơn ghê', 'Bao giờ mới có sofa ta?', 'Mua cái máy cà phê đi sếp ơi ☕', 'Có chậu cây chắc đẹp hơn 🪴', 'Đứng duỗi chân tí', 'Làm thêm ticket là có Xu sắm đồ đó'],
   dust: ['Chỗ này bụi quá… 🤧', 'Hắt xì! Ai dọn giùm với', 'Sàn này bao lâu rồi chưa lau vậy?', 'Sếp ơi, thuê người dọn đi 😅', 'Xong ticket là có Xu dọn chỗ này', 'Giẫm phải gì dính dính…'],
 }
@@ -102,11 +108,14 @@ export const CLEANED: Record<'floor' | 'wall' | 'window' | 'board', string[]> = 
 
 /** Bạn vừa mua đồ mới: agent đứng gần khen (`{x}` = tên món) */
 export const BOUGHT = ['Ồ, {x} mới kìa! 😍', 'Văn phòng xịn dần lên rồi', '{x} đẹp ghê', 'Ai chọn {x} vậy, có gu ghê', 'Giờ mới ra dáng văn phòng 😄']
+/** Agent được mua đồ để bàn (`{x}` = tên món) */
+export const GIFT = ['Ôi {x} cho em hả? Cảm ơn sếp 🥹', 'Bàn mình xịn hẳn lên rồi 😍', 'Có {x} rồi, làm việc hăng hơn hẳn 💪', 'Sếp chu đáo ghê!']
 export const BUILT = ['Có vách rồi, riêng tư ghê', 'Ô, phòng mới hả?', 'Xây gì đây ta? 🤔']
 
 export const ACT_EMOTE: Record<Activity, string> = {
   coffee: '☕', fridge: '🧃', water: '💧', window: '🌤️', tv: '📺', foos: '🏓', books: '📖',
   sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌', fame: '🏆', chat: '💬', dust: '🤧',
+  game: '🕹️', pool: '🎱', pet: '🐱', board: '✏️', cook: '🍜', snack: '🥤',
 }
 
 const DIALOGUES: Dialogue[] = [

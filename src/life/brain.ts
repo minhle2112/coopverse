@@ -21,7 +21,7 @@ const PERSONAL = 0.85
 const VISIT_BACK = 0.62
 
 /** Dáng khi dừng ở một chỗ */
-const ACT_POSE: Partial<Record<Activity, PoseMode>> = { coffee: 'drink', water: 'drink', foos: 'play', books: 'read' }
+const ACT_POSE: Partial<Record<Activity, PoseMode>> = { coffee: 'drink', water: 'drink', foos: 'play', pool: 'play', game: 'play', books: 'read' }
 
 /** Agent đang chờ bạn: 'approval' = có phiếu duyệt, 'question' = chỉ có câu hỏi */
 export type Asking = 'approval' | 'question' | null
@@ -42,9 +42,14 @@ function behind(s: DeskSlot): Vec2 {
   return { x: s.seat.x - f.x * VISIT_BACK, z: s.seat.z - f.z * VISIT_BACK }
 }
 
-/** Bắt đầu đi tới `to` theo lưới tìm đường */
-function walkTo(a: LifeActor, to: Vec2, dest: LifeActor['dest']) {
-  a.pts = route(navRef.current, a, to)
+/**
+ * Bắt đầu đi tới `to` theo lưới tìm đường. Đang ngồi trên đồ thì bước ra phía trước trước (a.exit);
+ * `via`: chỗ ngồi trên đồ thì đi tới phía trước đồ rồi mới bước vào.
+ */
+function walkTo(a: LifeActor, to: Vec2, dest: LifeActor['dest'], via?: Vec2) {
+  const from: Vec2 = a.exit ?? a
+  a.pts = [...(a.exit ? [{ ...a.exit }] : []), ...route(navRef.current, from, via ?? to), ...(via ? [{ ...to }] : [])]
+  a.exit = null
   a.i = 0
   a.dest = dest
   a.where = 'walk'
@@ -90,7 +95,7 @@ function wander(a: LifeActor) {
   const s = spotById(id)
   if (!s) return walkTo(a, a.slot.seat, 'seat')
   a.spot = s.id
-  walkTo(a, s, 'spot')
+  walkTo(a, s, 'spot', s.via)
 }
 
 /**
@@ -194,7 +199,9 @@ export function stepActor(a: LifeActor, st: AgentStatus, ask: Asking, rawDt: num
           a.timer = 12
         } else {
           a.where = 'spot'
-          a.timer = rand(12, 26)
+          const here = spotById(a.spot)
+          a.exit = here?.via ? { ...here.via } : null
+          a.timer = here?.sit !== undefined ? rand(18, 34) : rand(12, 26)
           onArrive(a)
         }
       }
@@ -225,7 +232,9 @@ export function stepActor(a: LifeActor, st: AgentStatus, ask: Asking, rawDt: num
   } else if (a.where === 'spot') {
     seat = here?.sit !== undefined
     lift = here?.sit ?? 0
-    const base = (here?.act && ACT_POSE[here.act]) || (seat ? 'sit' : 'stand')
+    let base = (here?.act && ACT_POSE[here.act]) || (seat ? 'sit' : 'stand')
+    // Bi-a, bóng bàn: hai đầu bàn thay lượt mỗi 4 giây; người chờ đứng yên
+    if (here && (here.act === 'pool' || here.act === 'foos')) base = Math.floor(t / 4) % 2 === (here.id.endsWith(':a') ? 0 : 1) ? 'play' : 'stand'
     mode = speaking && base !== 'play' ? 'talk' : base
     yawTo = !seat && a.face && a.faceUntil > t ? Math.atan2(a.face.x - a.x, a.face.z - a.z) : here?.yaw ?? null
   } else if (a.where === 'visit') {
@@ -239,7 +248,7 @@ export function stepActor(a: LifeActor, st: AgentStatus, ask: Asking, rawDt: num
   if (yawTo !== null) a.yaw = lerpAngle(a.yaw, yawTo, damp(7, dt))
 
   let mood: Mood = st === 'running' ? 'focus' : st === 'error' ? 'shock' : 'normal'
-  if (here?.act === 'foos') mood = 'happy'
+  if (here?.act === 'foos' || here?.act === 'pool' || here?.act === 'game' || here?.act === 'pet') mood = 'happy'
   if (a.mood && a.moodUntil > t) mood = a.mood
 
   agentPos.set(a.id, { x: a.x, z: a.z })

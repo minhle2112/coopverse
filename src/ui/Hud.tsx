@@ -4,7 +4,12 @@ import { switchCompany } from '../data/sync'
 import { STATUS_COLOR, STATUS_LABEL } from '../data/types'
 import { useCoop } from '../store'
 import type { World } from '../world/layout'
+import { itemById } from '../data/catalog'
 import { useExp } from '../data/exp'
+import type { OfficeState } from '../data/officeState'
+import { useOffice } from '../data/officeSync'
+import { USE_LABEL } from '../life/playerUse'
+import { spotById } from '../life/spots'
 import { desktop } from '../desktop'
 import { CleanupPanel, XuBadge } from './Cleanup'
 import { useDeco } from './decoStore'
@@ -136,6 +141,15 @@ function OfflineCard() {
   )
 }
 
+/** "Ngồi nghỉ · Sofa xám", "Chơi game · Máy game đỏ" */
+function labelOf(spotId: string, o: OfficeState) {
+  const s = spotById(spotId)
+  const p = o.items.find((x) => x.uid === s?.item)
+  const name = itemById.get(p?.item ?? '')?.name
+  const verb = (s?.act && USE_LABEL[s.act]) ?? 'Dùng'
+  return name ? `${verb} · ${name}` : verb
+}
+
 export function Hud({ world }: { world: World }) {
   const agents = useCoop((s) => s.agents)
   const conn = useCoop((s) => s.conn)
@@ -146,6 +160,9 @@ export function Hud({ world }: { world: World }) {
   const openAgent = useCoop((s) => s.openAgent)
   const focusId = useCoop((s) => s.focusId)
   const nearBoard = useCoop((s) => s.nearBoard)
+  const nearUse = useCoop((s) => s.nearUse)
+  const usingSpot = useCoop((s) => s.using)
+  const office = useOffice((s) => s.office)
   const boardOpen = useCoop((s) => s.boardOpen)
   const fameOpen = useCoop((s) => s.fameOpen)
   const cleanOpen = useCoop((s) => s.cleanOpen)
@@ -246,6 +263,13 @@ export function Hud({ world }: { world: World }) {
         <div className="prompt">
           <kbd>E</kbd>
           <span>Xem bảng ticket</span>
+        </div>
+      )}
+
+      {(usingSpot || nearUse) && !viewing && !decoOpen && (
+        <div className="prompt">
+          <kbd>E</kbd>
+          <span>{usingSpot ? 'Đứng dậy (hoặc đi tiếp)' : labelOf(nearUse!, office)}</span>
         </div>
       )}
 

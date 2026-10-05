@@ -211,7 +211,7 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 | Rê chuột lên một agent | Hiện thẻ đầy đủ: tên, cấp, danh hiệu, việc đang làm (không cần đi lại gần) |
 | **Bấm chuột** | Bấm vào agent: mở màn hình của agent (CLI). Bấm ứng viên ở sảnh: xem phiếu thuê. Bấm bảng ticket: xem bảng to. Bấm vào chính bạn: tủ đồ. Không cần đi lại gần |
 | Bấm tên ở danh sách Nhân sự | Mở màn hình của agent đó (bản demo: chuột phải để đổi trạng thái) |
-| **E** | Đứng gần agent: mở màn hình của agent (tab **Chat** và **Log**). Đứng trước bảng ticket: xem bảng to. Bấm lại E để quay ra |
+| **E** | Đứng gần agent: mở màn hình của agent (tab **Chat** và **Log**). Đứng trước bảng ticket: xem bảng to. Đứng gần sofa, ghế, máy game, quầy cà phê…: ngồi / dùng (đi tiếp là đứng dậy). Bấm lại E để quay ra |
 | C | Tủ đồ: đổi ngoại hình của bạn, hoặc của agent đang đứng gần |
 | B | Dọn dẹp: trả Xu dọn chỗ bẩn (xem dưới) |
 | T | Trang trí: cửa hàng, đặt / dời đồ, xây vách, dời bàn (xem dưới). Trong lúc trang trí: **R** xoay, **Enter** mua, **Esc** bỏ |
@@ -234,9 +234,13 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 - Đồ chỉ đặt trên mảng sàn đã dọn; đồ treo tường cần tường bắc đã dọn. Cửa vào và sảnh chờ ứng viên luôn để trống (tô đỏ nhạt). Không cho đặt đồ chặn kín lối tới bàn làm việc hay bảng ticket.
 - Bấm vào món đã đặt: xoay, dời (miễn phí), cất vào kho (miễn phí, lấy ra đặt lại lúc nào cũng được) hoặc bán lại được nửa giá.
 - Bấm vào bàn làm việc: xoay, dời đi chỗ khác. Bàn của mỗi agent miễn phí; agent tự đi tới chỗ mới.
-- Tab 🧱: giữ chuột kéo một đường thẳng để xây vách, thả ra rồi bấm ✓. Vách thấp, vách kính luôn thấy người; tường cao như tường thật, tự mờ đi khi có người đứng phía sau. Mua **cửa kính** rồi lắp vào 2 ô vách liền nhau (cửa tự mở khi có người tới gần). Công cụ **Dỡ vách** trả lại nửa giá.
+- **Đồ để bàn** (bấm vào bàn, hàng dưới): cây để bàn, khung ảnh (cấp 2), màn hình thứ hai, đèn bàn (cấp 3), ghế da (cấp 4), cúp vàng kèm viền vàng (cấp 5). Agent ngồi bàn đó đạt cấp thì món mở khoá, rồi bạn trả Xu mua. Đồ là của riêng agent, đổi chỗ thì đi theo; bán lại được nửa giá.
+- Tab 🧱: giữ chuột kéo một đường thẳng để xây vách, thả ra rồi bấm ✓. Vách thấp, vách kính luôn thấy người; tường cao như tường thật, tự mờ đi khi có người đứng phía sau. Mua **cửa kính** rồi lắp vào 2 ô vách liền nhau (cửa tự mở khi có người tới gần). Dỡ vách: bấm vào một đoạn vách trên bản đồ rồi chọn **Dỡ cả đoạn**, hoặc dùng công cụ **Dỡ vách** kéo qua từng khúc; được trả lại nửa giá. Vách có cửa thì bấm vào cửa để cất trước.
 - Mua bảng vinh danh rồi treo lên tường thì mới xem được bảng xếp hạng EXP (bấm vào bảng, hoặc đứng trước bảng bấm E).
-- Đồ, vách, chỗ bàn lưu cùng chỗ với Xu (server Coopverse kiểm lại số dư và chỗ đặt). Sắp có: agent dùng được đồ (ngồi sofa, pha cà phê…), đồ để trên bàn.
+- Agent rảnh tự dùng đồ đã mua: ngồi sofa, ghế bành, ghế họp; pha cà phê, mở tủ lạnh, nấu mì; chơi máy game; hai người rủ nhau đánh bóng bàn, bi-a; đọc sách, xem TV, vuốt mèo. Chỉ cho văn phòng sinh động, không ảnh hưởng việc. Bạn cũng dùng được: đứng gần rồi bấm **E**.
+- Bản demo (`?demo`) có nút **+500** cạnh số Xu để thử mua đồ (chỉ lưu trong trình duyệt, không đổi EXP hay cấp agent).
+- Giá tính theo tốc độ kiếm Xu thật (khoảng 150 Xu mỗi ngày có việc): đồ nhỏ mua được ngay ngày đầu, món đắt nhất (mèo văn phòng, 1.000 Xu) cần dành khoảng một tuần.
+- Đồ, vách, chỗ bàn, đồ để bàn lưu cùng chỗ với Xu (server Coopverse kiểm lại số dư, chỗ đặt và cấp agent).
 
 ### Chat với agent
 

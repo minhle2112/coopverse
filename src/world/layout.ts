@@ -107,9 +107,9 @@ export interface World {
   deskCells: Set<string>
 }
 
-/** Phần trạng thái văn phòng làm đổi bố cục (đồ đang đặt, vách, bàn đã dời); bụi, Xu thì không */
+/** Phần trạng thái văn phòng làm đổi bố cục hoặc hình (đồ đang đặt, vách, bàn đã dời, đồ để bàn); bụi, Xu thì không */
 export function layoutKey(o: OfficeState) {
-  return JSON.stringify([o.items.filter((p) => !p.stored).map((p) => [p.uid, p.c, p.r, p.rot]), o.walls, o.desks])
+  return JSON.stringify([o.items.filter((p) => !p.stored).map((p) => [p.uid, p.c, p.r, p.rot]), o.walls, o.desks, o.deskItems])
 }
 
 /**

@@ -19,6 +19,8 @@ export interface DeskSlot {
 /** Việc agent làm khi dừng ở một chỗ (quyết định dáng, đồ cầm tay, câu nói) */
 export type Activity =
   | 'coffee' | 'fridge' | 'water' | 'window' | 'tv' | 'foos' | 'books' | 'sofa' | 'beanbag' | 'stool' | 'meeting' | 'kanban' | 'fame'
+  // Đồ mua ở cửa hàng: máy game, bi-a, mèo, bảng trắng, bếp, máy bán nước
+  | 'game' | 'pool' | 'pet' | 'board' | 'cook' | 'snack'
   // Phòng trống: đứng tán gẫu, đứng nhìn chỗ bụi bẩn
   | 'chat' | 'dust'
 

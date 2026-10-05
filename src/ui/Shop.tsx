@@ -5,6 +5,7 @@ import { useBalance, useOffice } from '../data/officeSync'
 import { fmtXu } from '../data/xu'
 import { itemThumb } from '../pixel/catalogArt'
 import { useCoop } from '../store'
+import { DemoXu } from './Cleanup'
 import { useDeco } from './decoStore'
 
 /**
@@ -41,7 +42,7 @@ export function ShopPanel() {
       : draft?.kind === 'desk' ? 'Bấm chỗ mới cho ghế (bàn nằm phía trước) · R xoay · Esc thôi.'
         : draft?.kind === 'wall' ? 'Giữ chuột kéo một đường thẳng trên sàn đã dọn, thả ra rồi bấm ✓.'
           : draft?.kind === 'erase' ? 'Kéo qua đoạn vách muốn dỡ, thả ra rồi bấm ✓ (được trả nửa giá).'
-            : 'Chọn một món để đặt thử, hoặc bấm vào đồ / bàn trên bản đồ để dời, xoay, cất.'
+            : 'Chọn một món để đặt thử, hoặc bấm vào đồ / bàn / vách trên bản đồ để dời, xoay, cất, dỡ, mua đồ để bàn.'
 
   const items = ITEMS.filter((i) => i.group === tab)
   const card = (i: Item) => {
@@ -64,7 +65,7 @@ export function ShopPanel() {
         <b>🛋️ Trang trí</b>
         <button className="term-close" onClick={close}><kbd>Esc</kbd> Đóng</button>
       </div>
-      <div className="xu-big" title="Xu trong quỹ văn phòng">🪙 {fmtXu(balance)} <small>Xu</small></div>
+      <div className="xu-big" title="Xu trong quỹ văn phòng">🪙 {fmtXu(balance)} <small>Xu</small> <DemoXu /></div>
       <p className="set-hint">{!ready ? 'Đang đọc văn phòng…' : hint}</p>
       {ready && !anyFloor && <p className="set-hint clean-err">Sàn còn bẩn hết: dọn ít nhất một mảng sàn (phím B) rồi mới đặt đồ được.</p>}
 
@@ -78,7 +79,7 @@ export function ShopPanel() {
       </div>
       <div className="set-sec">{GROUPS.find((g) => g.id === tab)!.name}</div>
       {tab === 'wall' && !wallClean && <p className="set-hint clean-err">Dọn tường bắc trước (150 Xu ở bảng Dọn dẹp) rồi mới treo được.</p>}
-      {tab === 'lounge' && <p className="set-hint">Đợt này để trang trí; đợt sau agent sẽ ngồi sofa, pha cà phê, mở tủ lạnh.</p>}
+      {(tab === 'lounge' || tab === 'fun') && <p className="set-hint">Agent rảnh sẽ tự tới ngồi, pha cà phê, chơi game. Bạn đứng gần bấm E để dùng.</p>}
 
       {tab === 'build' && (
         <>
@@ -97,7 +98,7 @@ export function ShopPanel() {
               <i className="wall-sw erase" aria-hidden /><span><b>Dỡ vách</b><small>+½ giá</small></span>
             </button>
           </div>
-          <p className="set-hint">Kéo chuột vẽ một đường thẳng. Tường cao mờ đi khi có người phía sau. Cửa lắp vào 2 ô vách liền nhau.</p>
+          <p className="set-hint">Kéo chuột vẽ một đường thẳng. Tường cao mờ đi khi có người phía sau. Cửa lắp vào 2 ô vách liền nhau. Bấm vào một đoạn vách để dỡ cả đoạn.</p>
         </>
       )}
 

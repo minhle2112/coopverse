@@ -25,3 +25,13 @@ export const TITLES = [
   'Chuyên viên chính', 'Chuyên gia', 'Chuyên gia cao cấp', 'Bậc thầy', 'Huyền thoại',
 ]
 export const titleOf = (level: number) => TITLES[Math.min(level, TITLES.length) - 1]
+
+/** EXP tích luỹ của một agent, cộng thẳng từ sổ (server dùng để kiểm cấp trước khi bán đồ để bàn) */
+type Rows = Record<string, readonly [string, number, ...string[]]>
+export function agentExp(L: { runs: Rows; tickets: Rows; approvals: Rows }, agentId: string) {
+  let n = 0
+  for (const [id] of Object.values(L.runs)) if (id === agentId) n += EXP.run
+  for (const [id, , p] of Object.values(L.tickets)) if (id === agentId) n += ticketExp(p ?? '')
+  for (const [id] of Object.values(L.approvals)) if (id === agentId) n += EXP.approval
+  return n
+}

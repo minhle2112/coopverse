@@ -213,7 +213,7 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 | Hover an agent | Show a full card: name, level, title, current task (no need to walk over) |
 | **Click** | Click an agent: open its screen (CLI). Click a lobby candidate: open the hiring form. Click the ticket board: view it full size. Click yourself: wardrobe. No need to walk over |
 | Click a name in the Staff list | Open that agent's screen (demo: right-click to change its status) |
-| **E** | Near an agent: open its screen (**Chat** and **Log** tabs). In front of the ticket board: view it full size. Press E again to step back |
+| **E** | Near an agent: open its screen (**Chat** and **Log** tabs). In front of the ticket board: view it full size. Near a sofa, chair, arcade machine, coffee bar…: sit down / use it (walk away to get up). Press E again to step back |
 | C | Wardrobe: restyle yourself or the nearby agent |
 | B | Cleaning: pay Xu to clean dirty spots (see below) |
 | T | Decorating: shop, place / move items, build walls, move desks (see below). While decorating: **R** rotates, **Enter** buys, **Esc** cancels |
@@ -236,9 +236,13 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 - Items go only on cleaned floor patches; wall items need the north wall cleaned. The entrance and the candidates' lobby always stay free (tinted red). Nothing may wall off the path to a desk or the ticket board.
 - Click a placed item to rotate it, move it (free), put it in storage (free, place it again any time) or sell it back for half price.
 - Click a desk to rotate or move it. Every agent's desk is free; the agent walks to the new spot.
-- 🧱 tab: hold the mouse and drag a straight line to build a wall, release, then ✓. Low and glass walls never hide anyone; tall walls look like real walls and fade when someone stands behind them. Buy a **glass door** and fit it into 2 adjacent wall cells (it opens when someone comes near). **Dỡ vách** (remove walls) refunds half.
+- **Desk items** (click a desk, bottom row): desk plant, photo frame (level 2), second monitor, desk lamp (level 3), leather chair (level 4), gold trophy with a gold trim (level 5). An item unlocks when the agent at that desk reaches the level; then you buy it with Xu. Desk items belong to the agent and move with them; sell back for half price.
+- 🧱 tab: hold the mouse and drag a straight line to build a wall, release, then ✓. Low and glass walls never hide anyone; tall walls look like real walls and fade when someone stands behind them. Buy a **glass door** and fit it into 2 adjacent wall cells (it opens when someone comes near). To remove walls, click a wall segment on the map and pick **Dỡ cả đoạn** (remove segment), or drag across part of it with the **Dỡ vách** tool; you get half back. If a door sits in it, click the door and store it first.
 - The EXP ranking is shown on the fame board: buy it, hang it on the wall, then click it (or stand in front and press E).
-- Items, walls and desk spots are stored with the Xu (the Coopverse server re-checks the balance and placement). Coming next: agents using items (sitting on the sofa, making coffee…) and items on desks.
+- Idle agents use what you bought: they sit on sofas, armchairs and meeting chairs; make coffee, open the fridge, cook noodles; play the arcade; pair up for ping-pong or pool; read, watch TV, pet the cat. It only makes the office lively and does not affect work. You can use them too: stand close and press **E**.
+- The demo (`?demo`) has a **+500** button next to the Xu balance for trying things out (kept in the browser only; EXP and agent levels are unchanged).
+- Prices follow the real Xu earning rate (about 150 Xu on a working day): small items are affordable on day one, the most expensive (the office cat, 1,000 Xu) takes about a week of saving.
+- Items, walls, desk spots and desk items are stored with the Xu (the Coopverse server re-checks the balance, placement and agent levels).
 
 ### Chatting with an agent
 

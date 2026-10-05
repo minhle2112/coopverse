@@ -2,7 +2,7 @@ import { AnimatedSprite, Container, Graphics, NineSliceSprite, Sprite } from 'pi
 import { footprint, type Item } from '../data/catalog'
 import { CELL, cellX, cellZ } from '../data/officeState'
 import atlas from './atlas.json'
-import { frames, sheet, sprite, stitch, type SpriteName } from './assets'
+import { cut, frames, sheet, sprite, stitch, type SpriteName } from './assets'
 import { PPM, px, py } from './geom'
 import { WALL_SHIFT, sortAt, spr, wallTop, type Light, type Rect } from './office'
 
@@ -67,6 +67,8 @@ export interface ItemView {
   /** Khung bấm chuột (pixel gốc) */
   hit: Rect
   light?: Light
+  /** Phần trước của ghế (tay ghế phía camera): vẽ đè lên người đang ngồi, xếp lớp riêng */
+  front?: Container
 }
 
 /** Khung pixel của các ô một món chiếm trên sàn */
@@ -136,6 +138,8 @@ export function itemView(i: Item, c: number, r: number, rot: number, fame?: Grap
   } else {
     const v = viewOf(i, rot)
     node = strip(v.names, cx, bottom, v.flip)
+    // Bàn bi-a: bộ bóng xếp sẵn trên mặt nỉ (ván đang chơi dở)
+    if (i.id === 'pool') node.addChild(spr('poolBalls', 9, -17))
   }
   if (i.light === 'lamp') light = { x: Math.round(cx), y: bottom - 26, r: 40, kind: 'lamp' }
   else if (i.light === 'screen') light = { x: Math.round(cx), y: bottom - 18, r: 18, kind: 'screen' }
@@ -149,7 +153,19 @@ export function itemView(i: Item, c: number, r: number, rot: number, fame?: Grap
   }
   wrap.addChild(node)
   wrap.zIndex = node.zIndex
-  return { node: wrap, layer: 'sorted', hit: bounds(wrap), light }
+  return { node: wrap, layer: 'sorted', hit: bounds(wrap), light, front: armFront(i, rot, cx, bottom) }
+}
+
+/** Ghế bành quay ngang: 7 px dưới cùng của hình (tay ghế + mép đệm phía camera) vẽ đè lên người ngồi */
+function armFront(i: Item, rot: number, cx: number, bottom: number): Container | undefined {
+  if ((i.id !== 'armRed' && i.id !== 'armBlue') || (rot !== 1 && rot !== 3)) return undefined
+  const [k, sx, sy, w, h] = atlas.sprites[VIEWS[i.id][rot][0]] as Frame
+  const H = 7
+  const s = new Sprite(cut(k, sx, sy + h - H, w, H))
+  s.position.set(Math.round(cx - w / 2), Math.round(bottom) - H)
+  // Người ngồi ghế xếp lớp ở chân + 10 (Agents.tsx), mép ghế nằm ngay trên
+  s.zIndex = Math.round(bottom) + 3
+  return s
 }
 
 function wallItem(i: Item, c: number, fame?: Graphics): ItemView {
@@ -192,6 +208,30 @@ export const FAME_INNER = { w: 6 * CELL * PPM - 10, h: 16 }
 
 type Frame = [string, number, number, number, number]
 const thumbs = new Map<string, string>()
+
+/** Hình đồ để bàn (src/data/catalog.ts DESK_ITEMS) đúng như trên bàn, dùng cho nút chọn */
+const DESK_SPRITE: Record<string, SpriteName> = {
+  plant: 'plantDesk', frame: 'deskFrame', monitor: 'moMonFront', lamp: 'deskLamp', chair: 'moChairFrontL', trophy: 'trophy',
+}
+
+/** Ảnh nhỏ (data URL) của một đồ để bàn, kèm cỡ gốc (pixel) để phóng đúng bội số nguyên */
+export function deskThumb(id: string): { url: string; w: number; h: number } | null {
+  const name = DESK_SPRITE[id]
+  if (!name) return null
+  const [k, sx, sy, w, h] = atlas.sprites[name] as Frame
+  const key = `desk:${id}`
+  const hit = thumbs.get(key)
+  if (hit) return { url: hit, w, h }
+  const cv = document.createElement('canvas')
+  cv.width = w
+  cv.height = h
+  const g = cv.getContext('2d')!
+  g.imageSmoothingEnabled = false
+  g.drawImage(sheet(k).source.resource as CanvasImageSource, sx, sy, w, h, 0, 0, w, h)
+  const url = cv.toDataURL()
+  thumbs.set(key, url)
+  return { url, w, h }
+}
 
 /** Ảnh nhỏ (data URL) của một món ở hướng mặc định, vẽ thẳng từ sheet LimeZu */
 export function itemThumb(i: Item): string {

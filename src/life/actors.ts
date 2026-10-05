@@ -20,6 +20,8 @@ export interface LifeActor {
   where: 'seat' | 'spot' | 'visit' | 'walk'
   /** Chỗ đang đứng, hoặc đang đi tới (id trong spots.ts) */
   spot: string | null
+  /** Đang ngồi trên đồ (sofa, ghế bành...): bước ra điểm này trước rồi mới đi tiếp, khỏi đi xuyên lưng ghế */
+  exit: Vec2 | null
   /** Chỗ nhìn vào khi ghé bàn */
   lookAt: Vec2 | null
   pts: WP[]
@@ -60,13 +62,25 @@ export function release(id: string) {
   for (const [spot, who] of claims) if (who === id) claims.delete(spot)
 }
 
+/** Giữ một chỗ cho `who` (bạn ngồi sofa: agent không tới ngồi đè). false = có người khác giữ rồi */
+export function claim(spot: string, who: string) {
+  const cur = claims.get(spot)
+  if (cur && cur !== who) return false
+  release(who)
+  claims.set(spot, who)
+  return true
+}
+
+/** Chỗ này đang có ai giữ (agent đang ngồi / đang đi tới) */
+export const claimedBy = (spot: string) => claims.get(spot)
+
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
 
 export function newActor(id: string, slot: DeskSlot): LifeActor {
   const t = clock.t
   return {
     id, slot, x: slot.seat.x, z: slot.seat.z, yaw: slot.yaw,
-    where: 'seat', spot: null, lookAt: null, pts: [], i: 0, dest: 'seat',
+    where: 'seat', spot: null, exit: null, lookAt: null, pts: [], i: 0, dest: 'seat',
     timer: rand(2, 8), arrivedAt: t - 10,
     face: null, faceUntil: 0, gesture: null, gestureUntil: 0, mood: null, moodUntil: 0,
     talkUntil: 0, chatCd: t + rand(4, 12), nextMuse: t + rand(6, 25), greetAt: 0, visitCd: t + rand(30, 60),
@@ -77,7 +91,7 @@ export function newActor(id: string, slot: DeskSlot): LifeActor {
 /** Đưa agent về ngồi ở bàn ngay (khi mới vào hoặc bàn đổi chỗ). */
 export function resetToSeat(a: LifeActor, slot: DeskSlot) {
   release(a.id)
-  Object.assign(a, { slot, x: slot.seat.x, z: slot.seat.z, yaw: slot.yaw, where: 'seat', spot: null, pts: [], i: 0, dest: 'seat', cmd: null })
+  Object.assign(a, { slot, x: slot.seat.x, z: slot.seat.z, yaw: slot.yaw, where: 'seat', spot: null, exit: null, pts: [], i: 0, dest: 'seat', cmd: null })
 }
 
 /**
@@ -96,7 +110,7 @@ export function chooseSpot(self: LifeActor, exclude?: string | null): string | n
   const free = spots.filter((p) => p.id !== exclude && (!claims.has(p.id) || claims.get(p.id) === self.id))
   const list = free.length ? free : spots
   const weights = list.map((p) => {
-    let w = p.act === 'dust' ? 0.6 : 1
+    let w = p.act === 'dust' ? 0.6 : p.weight ?? 1
     if (p.area && crowd.get(p.area)) w *= p.act === 'chat' || p.act === 'foos' ? 8 : 4
     return w
   })

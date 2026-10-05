@@ -14,6 +14,9 @@ import { charSheet, frameAt, type CharSheet } from './chars'
 import { CleanOverlay, cleanHover, jobAt } from './CleanMode'
 import { DecoOverlay, decoClick, decoCtx, decoDown, decoLeave, decoMove, decoUp } from './Decorate'
 import { useDeco } from '../ui/decoStore'
+import { nearestUse, using } from '../life/playerUse'
+import { spotById } from '../life/spots'
+import { SIT_BACK_DROP, SIT_DROP, SIT_SIDE_DROP } from './Agents'
 import { buildDirt, jobBox, wipe, type DirtView } from './dirt'
 import { partsOf, usePixelLooks } from './look'
 import { stage, ticks, toScreen } from './stage'
@@ -224,38 +227,59 @@ export function PixelScene({ world, statusOfSlot, children }: {
         let mz = (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) - (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0)
         const len = Math.hypot(mx, mz)
         const running = k.has('ShiftLeft') || k.has('ShiftRight')
-        if (len > 0) {
-          mx /= len
-          mz /= len
-          const sp = running ? RUN : WALK
-          player.x += mx * sp * dt
-          player.z += mz * sp * dt
-          player.facing = Math.atan2(mx, mz)
-          facing = dirOf(player.facing)
+        // Đang ngồi / dùng đồ: đi tiếp là đứng dậy; món bị dời / cất / bán thì cũng đứng dậy
+        let usingSpot = using.spot ? spotById(using.spot) : undefined
+        if (using.spot && (len > 0 || !usingSpot || useDeco.getState().open)) {
+          useCoop.getState().leaveUse()
+          usingSpot = undefined
         }
-        const p = { x: player.x, z: player.z }
-        resolveCircle(p, RADIUS, w.colliders)
-        for (const a of agentPos.values()) {
-          const dx = p.x - a.x, dz = p.z - a.z
-          const d = Math.hypot(dx, dz), min = RADIUS + AGENT_RADIUS
-          if (d < min && d > 1e-5) { p.x = a.x + (dx / d) * min; p.z = a.z + (dz / d) * min }
+        if (usingSpot) {
+          player.x = usingSpot.x
+          player.z = usingSpot.z
+          if (usingSpot.yaw !== undefined) facing = dirOf(usingSpot.yaw)
+        } else {
+          if (len > 0) {
+            mx /= len
+            mz /= len
+            const sp = running ? RUN : WALK
+            player.x += mx * sp * dt
+            player.z += mz * sp * dt
+            player.facing = Math.atan2(mx, mz)
+            facing = dirOf(player.facing)
+          }
+          const p = { x: player.x, z: player.z }
+          resolveCircle(p, RADIUS, w.colliders)
+          for (const a of agentPos.values()) {
+            const dx = p.x - a.x, dz = p.z - a.z
+            const d = Math.hypot(dx, dz), min = RADIUS + AGENT_RADIUS
+            if (d < min && d > 1e-5) { p.x = a.x + (dx / d) * min; p.z = a.z + (dz / d) * min }
+          }
+          resolveCircle(p, RADIUS, w.colliders)
+          player.x = p.x
+          player.z = p.z
         }
-        resolveCircle(p, RADIUS, w.colliders)
-        player.x = p.x
-        player.z = p.z
 
         const sheet = playerSheet.current
         if (playerSprite && sheet) {
-          const anim = len > 0 ? 'walk' : 'idle'
-          const fi = frameAt(anim, running ? t * 1.5 : t)
-          playerSprite.texture = sheet.frame(anim, facing, fi)
+          // Ngồi: như agent (quay ngang thì khung ngồi LimeZu, quay xuống / lên thì hạ / nâng người); dùng đồ đứng thì
+          // chơi game / bi-a nhún nhanh, đọc sách thì khung đọc
+          const sit = usingSpot?.sit !== undefined
+          const side = facing === 'left' || facing === 'right'
+          const act = usingSpot?.act
+          const anim = len > 0 ? 'walk' : sit && side ? 'sit' : act === 'books' ? 'read' : 'idle'
+          const dir = anim === 'read' ? 'down' : facing
+          const quick = act === 'game' || act === 'pool' || act === 'foos' ? 2.2 : 1
+          const fi = frameAt(anim, running && len > 0 ? t * 1.5 : t * quick)
+          const dy = !sit ? 0 : side ? SIT_SIDE_DROP : facing === 'up' ? SIT_BACK_DROP : SIT_DROP
+          playerSprite.texture = sheet.frame(anim, dir, fi)
           const X = Math.round(px(player.x)), Y = Math.round(py(player.z))
-          playerSprite.position.set(X, Y + 2)
-          playerSprite.zIndex = Y
-          personHit('player', X, Y + 2, HEAD, Y)
-          playerHl.position.set(X, Y + 2)
-          playerHl.zIndex = Y - 0.5
-          setOutline(playerHl, stage.hover === 'player' ? sheet.silhouette(anim, facing, fi) : null)
+          playerSprite.position.set(X, Y + 2 + dy)
+          // Ngồi quay mặt xuống: vẽ đè lên ghế / sofa (như agent)
+          playerSprite.zIndex = sit && facing !== 'up' ? Y + 10 : Y
+          personHit('player', X, Y + 2 + dy, HEAD, playerSprite.zIndex)
+          playerHl.position.set(X, Y + 2 + dy)
+          playerHl.zIndex = playerSprite.zIndex - 0.5
+          setOutline(playerHl, stage.hover === 'player' ? sheet.silhouette(anim, dir, fi) : null)
         }
 
         // ── Camera: phóng to nguyên lần pixel màn hình thật, bám theo bạn, không ra ngoài bản đồ ──
@@ -336,10 +360,14 @@ export function PixelScene({ world, statusOfSlot, children }: {
         const fameD = fm ? wallDist({ x: wx(fm.x), z: BOARD.z, w: 3 }) : Infinity
         const fame = !board && fameD < BOARD_DIST && (!best || fameD - 0.8 < bd)
         if (fame) best = null
-        const key = board ? '#board' : fame ? '#fame' : best
+        // Đồ dùng được (sofa, máy game...): gần hơn agent thì bấm E là dùng đồ
+        const nu = !board && !fame && !using.spot && !useDeco.getState().open ? nearestUse() : null
+        const use = nu && (!best || nu.d < bd) ? nu.spot.id : null
+        if (use) best = null
+        const key = board ? '#board' : fame ? '#fame' : use ? `#use:${use}` : best
         if (key !== lastNear) {
           lastNear = key
-          useCoop.getState().setNear(best, board, fame)
+          useCoop.getState().setNear(best, board, fame, use)
         }
       })
       setPhase('ready')
