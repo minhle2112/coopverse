@@ -1,8 +1,11 @@
 // Gom app desktop vào build/app (thư mục electron-builder đóng gói):
 //   main.cjs, preload.cjs (esbuild), web/ (bản build Vite), setup/ (màn hình kết nối), pc-hook.cjs, icon.png, package.json.
 // Chạy sau `vite build`: npm run desktop:build
+//
+// `--with-art`: đóng kèm hình LimeZu vào app (chỉ những file app dùng), lấy từ COOPVERSE_ASSETS hoặc
+// ../coopverse-assets/limezu. Hình chỉ nằm trong file build trên máy, không bao giờ vào repo.
 import { build } from 'esbuild'
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -30,6 +33,35 @@ const require = createRequire(import.meta.url)
 const fonts = path.join(path.dirname(require.resolve('@fontsource/vt323/package.json')), 'files')
 for (const sub of ['latin', 'latin-ext', 'vietnamese']) {
   cpSync(path.join(fonts, `vt323-${sub}-400-normal.woff2`), path.join(out, 'setup', `vt323-${sub}.woff2`))
+}
+
+if (process.argv.includes('--with-art')) bundleArt()
+
+/** Chép đúng những hình app dùng: các sheet trong atlas.json + bộ phận nhân vật 16x16 (tủ đồ chọn được mọi kiểu) */
+function bundleArt() {
+  const src = path.resolve(root, process.env.COOPVERSE_ASSETS?.trim() || '../coopverse-assets/limezu')
+  const dst = path.join(out, 'limezu')
+  const atlas = JSON.parse(readFileSync(at('src', 'pixel', 'atlas.json'), 'utf8'))
+  const files = new Set(Object.values(atlas.sheets))
+  const gen = path.join(src, '2_Characters', 'Character_Generator')
+  for (const part of ['Bodies', 'Eyes', 'Outfits', 'Hairstyles', 'Accessories']) {
+    const dir = path.join(gen, part, '16x16')
+    for (const f of readdirSync(dir)) if (f.toLowerCase().endsWith('.png')) files.add(`2_Characters/Character_Generator/${part}/16x16/${f}`)
+  }
+  let bytes = 0
+  for (const rel of files) {
+    const from = path.join(src, rel)
+    if (!existsSync(from)) throw new Error(`Thiếu hình ${rel} trong ${src}`)
+    mkdirSync(path.dirname(path.join(dst, rel)), { recursive: true })
+    cpSync(from, path.join(dst, rel))
+    bytes += statSync(from).size
+  }
+  writeFileSync(
+    path.join(dst, 'CREDITS.txt'),
+    'Pixel art by LimeZu (https://limezu.itch.io): Modern Interiors and Modern Office.\n' +
+      'Licensed for use in Coopverse only. Do not extract, reuse or redistribute these images.\n',
+  )
+  console.log(`desktop: đóng kèm ${files.size} hình LimeZu (${(bytes / 1048576).toFixed(1)} MB)`)
 }
 
 const pkg = JSON.parse(readFileSync(at('package.json'), 'utf8'))

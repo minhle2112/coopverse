@@ -107,6 +107,11 @@ function DesktopSection() {
       <p className="set-hint" aria-live="polite">
         {note || 'Nhập EXP cũ: chọn thư mục .coopverse của bản chạy bằng trình duyệt để giữ điểm và lời khen. F11: toàn màn hình.'}
       </p>
+      <p className="set-hint">
+        Hình pixel: LimeZu (
+        <a href="https://limezu.itch.io" target="_blank" rel="noreferrer">limezu.itch.io</a>
+        ), gói Modern Interiors và Modern Office.
+      </p>
     </>
   )
 }

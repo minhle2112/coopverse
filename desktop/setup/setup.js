@@ -72,8 +72,10 @@ function render(s) {
   for (const el of $('form').elements) el.disabled = BUSY.includes(s.phase)
 }
 
-function renderAssets(ok, dir) {
-  $('assets-msg').textContent = ok
+function renderAssets(ok, dir, bundled) {
+  $('assets-msg').textContent = bundled
+    ? 'Dùng gói hình LimeZu đi kèm app. Muốn dùng bản bạn tự giải nén thì chọn thư mục khác.'
+    : ok
     ? `Đã có gói hình LimeZu: ${dir}`
     : 'Chưa có gói hình. Bản pixel vẽ bằng 2 gói của LimeZu (Modern Interiors và Modern Office) bạn mua trên itch.io. Gói có bản quyền nên không đi kèm app: giải nén cả hai vào một thư mục (Modern Office vào thư mục con Modern_Office) rồi chọn thư mục đó.'
   $('pick-assets').textContent = ok ? 'Đổi thư mục…' : 'Chọn thư mục gói hình…'
@@ -85,7 +87,7 @@ async function load() {
   setupDone = cfg.setupDone
   $('ver').textContent = `phiên bản ${info.version}`
   fillForm(cfg)
-  renderAssets(info.assetsOk, cfg.assetsDir)
+  renderAssets(info.assetsOk, cfg.assetsDir, info.assetsBundled)
   // Màn hình kết nối lần đầu: báo những gì app đoán được
   if (!setupDone && info.detected && info.detected.dataDir) {
     info.state.message = `Đã tìm thấy Paperclip đang chạy (dữ liệu ở ${info.detected.dataDir}). Kiểm tra lại rồi bấm "Lưu và kết nối".`

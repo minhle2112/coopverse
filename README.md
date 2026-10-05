@@ -105,7 +105,7 @@ Tải `Coopverse-Setup-<phiên bản>.exe` ở mục [Releases](https://github.c
   - **Khi Paperclip chưa chạy**: tự bật lệnh `paperclipai` (cài bằng npm), tự bật trong một **thư mục cài riêng** (thư mục có `node_modules\paperclipai`), tự bật trong **WSL**, hoặc không tự bật.
   - **Thư mục dữ liệu Paperclip**: thư mục bạn vẫn truyền bằng `-d` (để trống nếu dùng mặc định `~\.paperclip`). Chọn xong, app tự đọc cổng của Paperclip trong đó.
 - **Máy chưa có Paperclip**: bấm **Cài Paperclip**, app chạy `npm install -g paperclipai` (cần [Node.js](https://nodejs.org) 24.11 trở lên).
-- **Gói hình pixel**: app không đi kèm hình LimeZu (xem giấy phép bên dưới). Lần đầu mở, bấm **Chọn thư mục gói hình…** và chỉ tới thư mục đã giải nén như hướng dẫn ở phần cài bằng mã nguồn bên dưới. Nếu đặt ở `C:\coopverse-assets\limezu` thì app tự tìm thấy.
+- **Hình pixel**: file tải về đã kèm sẵn những hình LimeZu mà app dùng, chỉ để dùng trong Coopverse (xem giấy phép bên dưới). Ai có gói LimeZu riêng thì vẫn chọn được thư mục của mình trong **Cài đặt → Ứng dụng → Thư mục gói hình…**.
 - **Dữ liệu của bạn an toàn**: app không mang theo Paperclip riêng và không đụng vào dữ liệu Paperclip. Nó chỉ bật đúng bản Paperclip đã cài, với đúng thư mục dữ liệu của bạn, nên không có chuyện hai phiên bản nâng cấp database của nhau.
 - **Đóng app**: nếu chính app đã bật Paperclip thì app tắt Paperclip theo. Có agent đang làm việc thì app hỏi trước. App tắt kiểu "tắt gọn", giống nhấn Ctrl+C trong cửa sổ Paperclip: chờ lượt chạy dừng rồi đóng database. Paperclip bạn tự bật từ trước thì app không tắt.
 - Đổi kết nối, đổi thư mục hình, nhập điểm EXP từ bản chạy bằng trình duyệt (thư mục `.coopverse`), kiểm tra bản mới: **Cài đặt ⚙️ → Ứng dụng**. Có bản mới thì app báo và mở trang tải về, không tự cài. **F11**: toàn màn hình.
@@ -313,7 +313,7 @@ paperclip-plugin/
 - Toạ độ từng hình trong gói LimeZu nằm ở `src/pixel/atlas.json` (chỉ toạ độ, không có hình).
 - Mọi lời gọi tới Paperclip nằm trong `src/data/paperclip.ts`. Paperclip đổi API thì chỉ sửa ở đó.
 - Kiểm tra kiểu và build: `npm run build` (cả phần desktop: `npm run typecheck`).
-- File cài trên Releases do GitHub Actions build (`.github/workflows/desktop-release.yml`): đẩy một tag dạng `v0.1.0` là có bản phát hành nháp, bạn kiểm tra rồi tự bấm Publish. Trên máy bật Smart App Control, `npm run dist:win` có thể hỏng ở bước NSIS (lỗi `spawn UNKNOWN`), vì Windows chặn chạy file chưa ký số.
+- File phát hành build trên máy có gói hình: `npm run dist:win:art` (lấy hình từ `COOPVERSE_ASSETS` hoặc `../coopverse-assets/limezu`, chỉ chép những hình app dùng vào trong app), rồi tải 2 file trong `release/` lên trang Releases. Hình không bao giờ vào repo. GitHub Actions (`.github/workflows/desktop-release.yml`) chỉ build thử bản không có hình khi đẩy tag. Trên máy bật Smart App Control, bước NSIS có thể hỏng (lỗi `spawn UNKNOWN`) vì Windows chặn chạy file chưa ký số.
 - App desktop: `npm run desktop` chạy thử app từ mã nguồn; `npm run dist:win` tạo file cài `release/Coopverse-Setup-<phiên bản>.exe`. Muốn thử mà không đụng cấu hình thật thì đặt biến môi trường `COOPVERSE_USER_DATA=<thư mục tạm>`.
 - Sửa plugin: `cd paperclip-plugin && npm install && npm run build`, rồi cài lại plugin.
 - Khi dev có `window.__coop`: `store.getState().openFocus(agentId)` mở màn hình một agent, `inject(...)` bơm sự kiện realtime giả, `settings.getState().set({ hour: 21 })` đổi giờ. Bản pixel có thêm `step(giây)` chạy mô phỏng khi tab bị ẩn, `resume()`, `go(x, z, 'near' | 'far')` dịch tới chỗ khác, `grant(agentId, exp)` thử lên cấp.
@@ -322,4 +322,4 @@ paperclip-plugin/
 
 Mã nguồn: [MIT](LICENSE).
 
-Hình pixel: **LimeZu**, gói [Modern Interiors](https://limezu.itch.io/moderninteriors) và [Modern Office](https://limezu.itch.io/modernoffice). Hình không nằm trong repo và không thuộc giấy phép MIT; mỗi người tự mua gói để dùng. Cảm ơn LimeZu!
+Hình pixel: **LimeZu**, gói [Modern Interiors](https://limezu.itch.io/moderninteriors) và [Modern Office](https://limezu.itch.io/modernoffice). Hình không nằm trong repo và không thuộc giấy phép MIT. File tải về ở trang Releases có kèm những hình app dùng, chỉ để chạy Coopverse: đừng trích ra dùng lại hay chia sẻ tiếp. Muốn dùng hình cho việc khác (hoặc chạy bản mã nguồn) thì mua gói của LimeZu. Cảm ơn LimeZu!

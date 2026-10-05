@@ -107,7 +107,7 @@ Download `Coopverse-Setup-<version>.exe` from [Releases](https://github.com/minh
   - **When Paperclip isn't running**: start `paperclipai` (installed with npm), start it from a **separate install folder** (one that contains `node_modules\paperclipai`), start it inside **WSL**, or don't start it at all.
   - **Paperclip data folder**: the folder you normally pass with `-d`. Leave it empty for the default `~\.paperclip`. Once you pick it, the app reads Paperclip's port from it.
 - **No Paperclip yet**: click **Cài Paperclip** (Install Paperclip). The app runs `npm install -g paperclipai`, which needs [Node.js](https://nodejs.org) 24.11 or newer.
-- **Pixel art pack**: the LimeZu images are not bundled (see License). On first launch, click **Chọn thư mục gói hình…** (Choose art folder…) and point it at the folder you unpacked as described in the source install below. If it is at `C:\coopverse-assets\limezu`, the app finds it by itself.
+- **Pixel art**: the download already includes the LimeZu images the app uses, for use within Coopverse only (see License). If you own the LimeZu packs, you can still point the app to your own copy in **Settings → Ứng dụng → Thư mục gói hình…**.
 - **Your data is safe**: the app doesn't ship its own Paperclip and never touches Paperclip's data. It only starts the Paperclip you already have, with your own data folder, so two different versions can never migrate the same database.
 - **Closing the app** also stops Paperclip, but only if the app started it. If agents are working, the app asks first. Shutdown is graceful, like pressing Ctrl+C in the Paperclip window: running work stops, then the database is closed. A Paperclip you started yourself keeps running.
 - To change the connection or art folder, import EXP from the browser version (its `.coopverse` folder), or check for updates, go to **Settings ⚙️ → Ứng dụng** (App). The app tells you when a new version exists and opens the download page; it never installs updates by itself. **F11** toggles full screen.
@@ -315,7 +315,7 @@ paperclip-plugin/
 - Sprite coordinates inside the LimeZu packs live in `src/pixel/atlas.json` (coordinates only, no images).
 - Every Paperclip call lives in `src/data/paperclip.ts`.
 - Type-check and build: `npm run build` (including the desktop code: `npm run typecheck`).
-- The installer on Releases is built by GitHub Actions (`.github/workflows/desktop-release.yml`). Pushing a tag such as `v0.1.0` creates a draft release; check it, then click Publish yourself. On a machine with Smart App Control on, `npm run dist:win` can fail at the NSIS step with `spawn UNKNOWN`, because Windows blocks running unsigned files.
+- Release files are built on a machine that has the art packs: `npm run dist:win:art` (images come from `COOPVERSE_ASSETS` or `../coopverse-assets/limezu`; only the images the app uses are copied into the app). Then upload the 2 files in `release/` to the Releases page. The images never go into the repo. GitHub Actions (`.github/workflows/desktop-release.yml`) only test-builds a version without art when a tag is pushed. On a machine with Smart App Control on, the NSIS step can fail with `spawn UNKNOWN`, because Windows blocks running unsigned files.
 - Desktop app: `npm run desktop` runs it from source; `npm run dist:win` builds the installer `release/Coopverse-Setup-<version>.exe`. To try it without touching your real settings, set the environment variable `COOPVERSE_USER_DATA=<temp folder>`.
 - Plugin changes: `cd paperclip-plugin && npm install && npm run build`, then reinstall the plugin.
 - Dev hooks on `window.__coop`: `store.getState().openFocus(agentId)`, `inject(...)` for fake realtime events, `settings.getState().set({ hour: 21 })`. The pixel version adds `step(seconds)` to simulate while the tab is hidden, `resume()`, `go(x, z, 'near' | 'far')` to jump elsewhere, and `grant(agentId, exp)` to test level-ups.
@@ -324,4 +324,4 @@ paperclip-plugin/
 
 Code: [MIT](LICENSE).
 
-Pixel art: **LimeZu**, [Modern Interiors](https://limezu.itch.io/moderninteriors) and [Modern Office](https://limezu.itch.io/modernoffice). The art is not in this repo and is not covered by the MIT license; everyone buys the packs to use them. Thanks, LimeZu!
+Pixel art: **LimeZu**, [Modern Interiors](https://limezu.itch.io/moderninteriors) and [Modern Office](https://limezu.itch.io/modernoffice). The art is not in this repo and is not covered by the MIT license. The downloads on the Releases page include the images the app uses, only to run Coopverse: don't extract, reuse or share them. To use the art for anything else (or to run from source), buy the packs from LimeZu. Thanks, LimeZu!

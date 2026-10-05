@@ -31,6 +31,10 @@ let closing = false
 let quitting = false
 
 const target = () => pc.state.url || normUrl(config().paperclipUrl)
+/** Hình LimeZu đóng kèm bản phát hành (npm run dist:win:art); bản build không kèm hình thì không có thư mục này */
+const bundledArt = path.join(root, 'limezu')
+/** Thư mục gói hình người dùng tự chọn (nếu đủ hình), không thì hình đi kèm app */
+const assetsDir = () => (assetsOk(config().assetsDir) ? config().assetsDir : assetsOk(bundledArt) ? bundledArt : config().assetsDir)
 const setupUrl = (q = '') => `${srv.origin}/__desktop/setup.html${q}`
 
 function send() {
@@ -261,7 +265,8 @@ function setupIpc() {
     config: config(),
     state: pc.state,
     detected,
-    assetsOk: assetsOk(config().assetsDir),
+    assetsOk: assetsOk(assetsDir()),
+    assetsBundled: assetsDir() === bundledArt,
     version: app.getVersion(),
     logFile: path.join(logDir(), 'paperclip.log'),
   }), true)
@@ -337,7 +342,7 @@ void app.whenReady().then(async () => {
     setupDir: path.join(root, 'setup'),
     dataDir: dataDir(),
     target,
-    assets: () => config().assetsDir,
+    assets: assetsDir,
   })
   setupIpc()
   win = createWindow()
