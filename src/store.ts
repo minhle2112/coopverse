@@ -243,16 +243,17 @@ export const useCoop = create<CoopState>((set, get) => ({
   pickClean: (id) => set({ cleanPick: id }),
   closeTop: () => {
     const s = get()
+    // Màn hình đang thấy (CLI, bảng to, tủ đồ, phiếu duyệt) đóng trước; bảng dọn / trang trí / cài đặt nằm dưới, đang bị ẩn
     if (s.askId) set({ askId: null })
-    else if (s.cleanPick) set({ cleanPick: null })
     else if (s.wardrobeId) set({ wardrobeId: null })
+    else if (s.focusId) set({ focusId: null })
+    else if (s.boardOpen) set({ boardOpen: false })
+    else if (s.fameOpen) set({ fameOpen: false })
+    else if (s.cleanPick) set({ cleanPick: null })
     else if (s.inboxOpen) set({ inboxOpen: false })
     else if (s.settingsOpen) set({ settingsOpen: false })
     else if (useDeco.getState().back()) { /* bỏ chỗ đặt thử / món đang cầm / đóng chế độ trang trí */ }
     else if (s.cleanOpen) set({ cleanOpen: false })
-    else if (s.focusId) set({ focusId: null })
-    else if (s.boardOpen) set({ boardOpen: false })
-    else if (s.fameOpen) set({ fameOpen: false })
     else return false
     return true
   },
@@ -268,7 +269,9 @@ export const useCoop = create<CoopState>((set, get) => ({
     if (get().nearFame) return get().openFame()
     const use = get().nearUse
     if (use && !nearId) {
+      // Agent vừa giành chỗ đúng lúc bấm: báo cho biết thay vì im lặng
       if (takeSpot(use)) set({ using: use, nearUse: null })
+      else get().showToast('Chỗ này có người rồi')
       return
     }
     if (nearId) get().openAgent(nearId)

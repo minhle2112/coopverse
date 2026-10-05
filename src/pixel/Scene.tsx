@@ -183,8 +183,9 @@ export function PixelScene({ world, statusOfSlot, children }: {
           return
         }
         const id = pickClient(e.clientX, e.clientY)
-        if (id) return activate(id)
         const job = jobClient(e.clientX, e.clientY)
+        // Chế độ dọn: bảng ticket còn bẩn thì bấm vào là chọn chỗ dọn, không mở bảng
+        if (id && !(id === '#board' && job?.id === 'board')) return activate(id)
         if (job) useCoop.getState().pickClean(job.id)
       })
       await loadSheets()
@@ -286,9 +287,11 @@ export function PixelScene({ world, statusOfSlot, children }: {
         const res = app.renderer.resolution
         const sw = app.screen.width, sh = app.screen.height
         const auto = Math.max(2, Math.round((sh * res) / VIEW_PX))
-        // Chỉ hai mức, chọn trong Cài đặt (không lăn chuột): gần = một nấc dưới mức tự động, xa = hai nấc
-        view.zoomBias = useSettings.getState().zoom === 'far' ? -2 : -1
-        const zDev = Math.max(1, auto + view.zoomBias)
+        // Chỉ hai mức, chọn trong Cài đặt (không lăn chuột): xa = hai nấc dưới mức tự động, gần = một nấc.
+        // Màn thấp (mức tự động 2) thì xa chạm đáy 1: gần giữ hơn xa một nấc để hai mức vẫn khác nhau
+        const far = Math.max(1, auto - 2)
+        const zDev = useSettings.getState().zoom === 'far' ? far : Math.max(far + 1, auto - 1)
+        view.zoomBias = zDev - auto
         const z = zDev / res
         view.zoom = zDev
         // Dịch chuyển tức thời (dev / tìm agent): nhảy luôn, không trượt

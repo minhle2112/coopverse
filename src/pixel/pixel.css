@@ -259,6 +259,8 @@
 }
 .xu-badge:hover { background: #48425f; }
 .xu-row { display: flex; align-items: stretch; gap: 4px; }
+/* HUD không nhận chuột (để bấm xuyên xuống bản đồ): bật lại cho huy hiệu Xu và nút +500 */
+.xu-badge, .xu-add { pointer-events: auto; }
 /* Bản demo: nút thêm Xu để thử */
 .xu-add {
   margin-top: 6px; padding: 1px 6px; font: inherit; font-size: 16px; color: #10200f; cursor: pointer; vertical-align: middle;

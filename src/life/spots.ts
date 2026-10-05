@@ -1,5 +1,6 @@
 import { footprint, itemById, type Item } from '../data/catalog'
-import { CELL, JOBS, cellX, cellZ, isClean, type OfficeState, type Placed } from '../data/officeState'
+import { cellsOf } from '../data/decor'
+import { CELL, JOBS, cellKey, cellX, cellZ, colOf, isClean, rowOf, type OfficeState, type Placed } from '../data/officeState'
 import { cellIndex, flood, snapFree, type Nav } from '../world/nav'
 import { BOARD, OFFICE, SPAWN, WINDOWS, type Activity, type Vec2, type World } from '../world/layout'
 
@@ -161,13 +162,31 @@ export function officeSpots(world: World, office: OfficeState): Spot[] {
     out.push({ id: `chat${i}a`, ...at({ x: x - 0.55, z }), yaw: E, act: 'chat', area: `chat${i}` })
     out.push({ id: `chat${i}b`, ...at({ x: x + 0.55, z }), yaw: -E, act: 'chat', area: `chat${i}` })
   })
-  // Đồ đã mua: chỗ ngồi / chỗ dùng (bỏ chỗ không đi tới được, vd bị vách quây kín)
+  // Đồ đã mua: chỗ ngồi / chỗ dùng (bỏ chỗ không đi tới được, vd bị vách quây kín).
+  // Vách bao sát món: chỗ đứng bị đẩy ra ngoài vòng vách (snapFree) nên vẫn tới được, phải kiểm thêm vách nằm giữa chỗ đứng và món
   const reach = flood(n, SPAWN)
   const ok = (p: Vec2) => reach[cellIndex(n, snapFree(n, p))] === 1
+  const doors = new Set<string>()
+  for (const p of office.items) {
+    const i = itemById.get(p.item)
+    if (i?.mount === 'door' && !p.stored) for (const [c, r] of cellsOf(i, p.c, p.r, p.rot)) doors.add(cellKey(c, r))
+  }
+  const wallBetween = (a: Vec2, b: Vec2) => {
+    const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / (CELL / 4))
+    for (let s = 0; s <= steps; s++) {
+      const t = steps ? s / steps : 0
+      const k = cellKey(colOf(a.x + (b.x - a.x) * t), rowOf(a.z + (b.z - a.z) * t))
+      if (office.walls[k] && !doors.has(k)) return true
+    }
+    return false
+  }
   for (const p of office.items) {
     const i = itemById.get(p.item)
     if (!i || p.stored) continue
-    for (const sp of itemSpots(n, i, p)) if (ok(sp.via ?? sp)) out.push(sp)
+    const { w, d } = footprint(i, p.rot)
+    const mid = { x: cellX(p.c) + (w * CELL) / 2, z: cellZ(p.r) + (d * CELL) / 2 }
+    // Đồ treo tường (TV): đứng xem từ xa, không cần sát món
+    for (const sp of itemSpots(n, i, p)) if (ok(sp.via ?? sp) && (i.mount === 'wall' || !wallBetween(sp.via ?? sp, mid))) out.push(sp)
   }
   // Mảng sàn còn bẩn: một chỗ đứng nhìn xuống sàn
   for (const j of JOBS) {

@@ -17,6 +17,8 @@ export function CleanupPanel() {
   const demo = useCoop((s) => s.conn === 'demo')
   const office = useOffice((s) => s.office)
   const ready = useOffice((s) => s.ready)
+  // "Làm bẩn lại" xoá cả đồ, vách, chỗ bàn và các lần +500: bấm 2 lần cho chắc
+  const [sureReset, setSureReset] = useState(false)
   const byAgent = useOffice((s) => s.earned.byAgent)
   const balance = useBalance()
   const [busy, setBusy] = useState<string | null>(null)
@@ -101,7 +103,13 @@ export function CleanupPanel() {
       )}
       {demo && (
         <div className="set-row set-btns">
-          <button type="button" className="desk-btn" onClick={resetDemoOffice}>Làm bẩn lại (demo)</button>
+          {!sureReset
+            ? <button type="button" className="desk-btn" onClick={() => setSureReset(true)}
+              title="Đưa bản demo về lúc đầu: bẩn lại hết, mất cả đồ, vách và Xu đã thêm">Làm bẩn lại (demo)</button>
+            : <>
+              <button type="button" className="desk-btn danger" onClick={() => { setSureReset(false); resetDemoOffice() }}>Chắc chưa? Xoá cả đồ, vách, Xu thêm</button>
+              <button type="button" className="desk-btn" onClick={() => setSureReset(false)}>Thôi</button>
+            </>}
         </div>
       )}
     </section>

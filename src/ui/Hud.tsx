@@ -160,6 +160,7 @@ export function Hud({ world }: { world: World }) {
   const openAgent = useCoop((s) => s.openAgent)
   const focusId = useCoop((s) => s.focusId)
   const nearBoard = useCoop((s) => s.nearBoard)
+  const nearFame = useCoop((s) => s.nearFame)
   const nearUse = useCoop((s) => s.nearUse)
   const usingSpot = useCoop((s) => s.using)
   const office = useOffice((s) => s.office)
@@ -266,7 +267,14 @@ export function Hud({ world }: { world: World }) {
         </div>
       )}
 
-      {(usingSpot || nearUse) && !viewing && !decoOpen && (
+      {nearFame && !nearBoard && !usingSpot && !viewing && (
+        <div className="prompt">
+          <kbd>E</kbd>
+          <span>Xem bảng vinh danh</span>
+        </div>
+      )}
+
+      {(usingSpot || (nearUse && !nearBoard && !nearFame)) && !viewing && !decoOpen && (
         <div className="prompt">
           <kbd>E</kbd>
           <span>{usingSpot ? 'Đứng dậy (hoặc đi tiếp)' : labelOf(nearUse!, office)}</span>
@@ -305,6 +313,7 @@ export function Hud({ world }: { world: World }) {
           <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi</span>
           <span><kbd>Shift</kbd> chạy</span>
           <span><kbd>E</kbd> hoặc bấm chuột: mở CLI agent / bảng ticket</span>
+          <span><kbd>E</kbd> cạnh đồ: ngồi / dùng</span>
           <span><kbd>Q</kbd> việc chờ duyệt</span>
           <span><kbd>B</kbd> dọn dẹp</span>
           <span><kbd>T</kbd> trang trí</span>

@@ -88,11 +88,23 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
       if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur()
     }
 
+    // Bấm chuột vào nút / ô chọn / thanh kéo xong thì bỏ chọn nó, để mũi tên, Space, Enter về lại nhân vật
+    // (dùng Tab tới nút thì vẫn giữ: click từ bàn phím có detail = 0). Chờ một nhịp: bấm nhãn thì ô bên trong mới nhận chọn sau đó
+    const clickBlur = (e: MouseEvent) => {
+      if (e.detail === 0) return
+      setTimeout(() => {
+        const a = document.activeElement
+        if (a instanceof HTMLButtonElement || (a instanceof HTMLInputElement && ['radio', 'checkbox', 'range'].includes(a.type))) a.blur()
+      })
+    }
+
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', clear)
+    window.addEventListener('click', clickBlur)
     el.addEventListener('mousedown', mouseDown)
     return () => {
+      window.removeEventListener('click', clickBlur)
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', clear)

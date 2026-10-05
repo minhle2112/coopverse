@@ -217,7 +217,7 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 | T | Trang trí: cửa hàng, đặt / dời đồ, xây vách, dời bàn (xem dưới). Trong lúc trang trí: **R** xoay, **Enter** mua, **Esc** bỏ |
 | Q | Danh sách việc chờ bạn duyệt / trả lời |
 | M | Bật/tắt nhạc lofi |
-| Esc | Đóng màn hình đang mở |
+| Esc | Đóng màn hình đang thấy trước (CLI, bảng ticket, tủ đồ), rồi tới bảng bên trái. Đang ngồi thì Esc không đứng dậy: bấm E hoặc đi tiếp |
 | Nút 🔊 🎵 🎨 🧹 🛋️ ⚙️ dưới logo | Âm thanh, nhạc, tủ đồ, dọn dẹp, trang trí, cài đặt (âm lượng, xem thử giờ) |
 
 ### Xu và dọn dẹp văn phòng
@@ -225,7 +225,7 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 - Văn phòng lúc đầu là một phòng lớn trống, chỉ có bàn làm việc của agent, bảng ticket, cửa sổ. Mọi thứ phủ bụi: vết ố, mạng nhện, thùng carton cũ, giấy vụn, chuột.
 - **Xu** là tiền chung của văn phòng (số dưới logo). Agent làm xong ticket trên board thì quỹ có Xu: ưu tiên thấp 10, vừa 15, cao 25, khẩn 40; agent cấp càng cao càng được nhiều (mỗi cấp +10%). Ticket đã xong từ trước cũng được tính.
 - Bấm **B** (hoặc nút 🧹): mỗi chỗ bẩn hiện giá. Sàn chia 5 × 3 mảng, mảng càng xa cửa càng đắt; tường bắc, từng cửa sổ, bảng ticket dọn riêng. Bấm một chỗ rồi bấm **Dọn** trong bảng bên trái.
-- Xu và chỗ đã dọn lưu trong Coopverse trên máy này (thư mục `.coopverse`, app desktop: thư mục dữ liệu của app), không gửi gì sang Paperclip. Bản demo lưu trong trình duyệt, có nút "Làm bẩn lại".
+- Xu và chỗ đã dọn lưu trong Coopverse trên máy này (thư mục `.coopverse`, app desktop: thư mục dữ liệu của app), không gửi gì sang Paperclip. Bản demo lưu trong trình duyệt, có nút "Làm bẩn lại" (bấm 2 lần: xoá luôn đồ, vách, chỗ bàn và Xu đã thêm, về như lúc đầu). Bản demo không cộng Xu khi agent làm xong việc: dùng nút +500.
 
 ### Trang trí văn phòng
 
