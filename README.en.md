@@ -5,6 +5,11 @@ Walk around the office and watch your agents type away while they work, grab cof
 
 [Tiếng Việt](README.md)
 
+> **This is the `pixel` branch: a 2D, Stardew Valley-style pixel version**, drawn with PixiJS and [LimeZu](https://limezu.itch.io)'s pixel art packs.
+> The office, agents, chat, CLI, ticket board, EXP… work the same as the 3D version on `main`; only the graphics differ.
+> The art packs are licensed and **not included in this repo**: to run this branch you need to buy two LimeZu packs yourself (see [step 4](#4-install-coopverse)).
+> Screenshots in this README show the 3D version.
+
 ![Coopverse office](docs/images/office.png)
 
 - **Real agents, live**: agents, tickets and runs come from Paperclip over WebSocket. Every Paperclip company gets its own office.
@@ -45,7 +50,8 @@ Walk around the office and watch your agents type away while they work, grab cof
 |---|---|
 | **Node.js 24.11+** | Required by Paperclip. Coopverse itself runs on Node 22.12+. Get it from [nodejs.org](https://nodejs.org). |
 | **Git** | To clone the code. |
-| **Chrome or Edge** | WebGL is required. On slow machines pick Graphics "Nhẹ" (Light) in Settings. |
+| **Chrome or Edge** | WebGL is required (PixiJS). |
+| **LimeZu art packs** | Modern Interiors and Modern Office, bought on itch.io. See [step 4](#4-install-coopverse). |
 | **An agent runtime** | Paperclip agents run on Claude Code, Codex, Gemini… For Claude Code, install `claude` and log in first. |
 | **Windows** | Run Paperclip inside **WSL2** (Ubuntu) and Coopverse on Windows. This is the best-tested setup. |
 
@@ -90,13 +96,35 @@ paperclipai run
 On the machine where you use the browser (on Windows: PowerShell or Git Bash, **not** WSL):
 
 ```bash
-git clone https://github.com/minhle2112/coopverse.git
-cd coopverse
+git clone -b pixel https://github.com/minhle2112/coopverse.git coopverse-pixel
+cd coopverse-pixel
 npm install
+```
+
+**Add the pixel art packs (required for this branch).** The pixel version uses two LimeZu packs, 16×16 version:
+
+- **Modern Interiors**: <https://limezu.itch.io/moderninteriors>
+- **Modern Office**: <https://limezu.itch.io/modernoffice>
+
+Buy and download them, then unzip like this (by default Coopverse looks in `coopverse-assets/limezu` **next to** the project folder):
+
+```
+coopverse-assets/limezu/
+  1_Interiors/ 2_Characters/ 4_User_Interface_Elements/ …   ← contents of Modern Interiors
+  Modern_Office/
+    Modern_Office_16x16.png …                                 ← contents of Modern Office
+```
+
+Somewhere else? Set `COOPVERSE_ASSETS=<path to the limezu folder>` in `.env`. If a pack is missing, the office shows a "Chưa có gói hình pixel" (pixel art missing) message with these instructions.
+The images are only served to your own machine (`127.0.0.1`) while Coopverse runs. Do not commit or share the image files: LimeZu's license does not allow redistribution.
+
+Then run:
+
+```bash
 npm run dev
 ```
 
-Open **http://127.0.0.1:5177**. Coopverse finds Paperclip at `127.0.0.1:3100` and opens the first company.
+Open **http://127.0.0.1:5179** (the 3D version uses port 5177, so both can run side by side). Coopverse finds Paperclip at `127.0.0.1:3100` and opens the first company.
 
 **On Windows** just double-click `start-coopverse.cmd`. It:
 
@@ -106,7 +134,7 @@ Open **http://127.0.0.1:5177**. Coopverse finds Paperclip at `127.0.0.1:3100` an
    - Paperclip installed on Windows: the script uses `paperclipai` if it is on the PATH.
 3. Installs dependencies on first run, starts Coopverse and opens the browser.
 
-To try it without Paperclip, open **http://127.0.0.1:5177/?demo** (fake data).
+To try it without Paperclip, open **http://127.0.0.1:5179/?demo** (fake data).
 
 ## 5. Add the Coopverse button to Paperclip
 
@@ -137,7 +165,7 @@ Reload Paperclip and the button appears. **Settings → Plugins** should list Co
 
 ![Installed plugin](docs/images/paperclip-plugins.png)
 
-**Coopverse not at** `http://127.0.0.1:5177` (other machine or port)? Go to **Settings → Plugins → Coopverse → Configure**, change **Coopverse URL** and click **Save Configuration**.
+**The pixel version runs on port 5179**, while the Paperclip button opens `http://127.0.0.1:5177` (the 3D version) by default. To make the button open the pixel version, or if Coopverse runs elsewhere, go to **Settings → Plugins → Coopverse → Configure**, change **Coopverse URL** and click **Save Configuration**.
 
 ![Plugin settings](docs/images/paperclip-plugin-settings.png)
 
@@ -158,16 +186,17 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 
 | Key | Action |
 |---|---|
-| Click the screen | Lock the mouse to look around (or drag with the left button) |
 | W A S D / arrows | Walk |
 | Shift | Run |
-| Mouse wheel | Camera zoom |
+| Mouse wheel | Zoom in / out (zoom all the way out to see the whole office) |
+| Hover an agent | Show its name plate (seated agents normally show only a status bubble) |
 | **E** | Near an agent: open its screen (**Chat** and **Log** tabs). In front of the ticket board: view it full size. Press E again to step back |
 | C | Wardrobe: restyle yourself or the nearby agent |
+| Q | Things waiting for your approval / answer |
 | M | Toggle lofi music |
-| Esc | Release the mouse; close whatever screen is open |
+| Esc | Close whatever screen is open |
 | Click a name in "Nhân sự" (Staff) | Highlight the agent on the minimap |
-| 🔊 🎵 🎨 ⚙️ under the logo | Sound, music, wardrobe, settings (volume, graphics, time preview) |
+| 🔊 🎵 🎨 ⚙️ under the logo | Sound, music, wardrobe, settings (volume, time preview) |
 
 ### Chatting with an agent
 
@@ -194,13 +223,13 @@ A kanban board hangs on the wall. Press **E** in front of it to view it full siz
 
 ### Multiple companies
 
-Each Paperclip company is an office. With several companies, a picker under the Coopverse logo switches between them, and Coopverse remembers your last choice. Open one directly with `http://127.0.0.1:5177/?company=<company id>` (this is what the Paperclip button does).
+Each Paperclip company is an office. With several companies, a picker under the Coopverse logo switches between them, and Coopverse remembers your last choice. Open one directly with `http://127.0.0.1:5179/?company=<company id>` (this is what the Paperclip button does).
 
 ### Day and night
 
-The sky follows Vietnam time; lights turn on at night. Preview other times with the slider in Settings or `?hour=21.5` in the URL.
+The light follows Vietnam time: bright noon, orange sunrise and sunset. At night the office turns dark blue and ceiling lights, desk lamps, floor lamps and monitors glow. Preview other times with the slider in Settings or `?hour=21.5` in the URL.
 
-![Night](docs/images/office-night.png)
+![Night (3D version)](docs/images/office-night.png)
 
 ## 7. Configuration
 
@@ -211,8 +240,9 @@ Copy `.env.example` to `.env` (optional):
 | `VITE_PAPERCLIP_URL` | `http://127.0.0.1:3100` | Paperclip address |
 | `VITE_COMPANY_ID` | (empty) | Company to open when none was chosen before |
 | `PAPERCLIP_WSL_DISTRO` | (empty) | Only for `start-coopverse.cmd`: WSL distro running Paperclip |
+| `COOPVERSE_ASSETS` | `../coopverse-assets/limezu` | Folder with the LimeZu art packs (pixel version) |
 
-In-app settings (volume, graphics…) and character looks are stored in the browser; nothing changes in Paperclip.
+In-app settings (volume, time preview…) and character looks are stored in the browser; nothing changes in Paperclip.
 
 ## 8. Troubleshooting
 
@@ -224,7 +254,7 @@ In-app settings (volume, graphics…) and character looks are stored in the brow
 | No Coopverse button in Paperclip | Reload. `paperclipai plugin list` should show `coopverse.launcher … ready`; otherwise redo step 5. |
 | The button opens an error page | Coopverse is not running (`npm run dev` / `start-coopverse.cmd`), or the plugin's **Coopverse URL** is wrong. |
 | `plugin install` says "path does not exist" | The path is not visible to the machine running Paperclip. With WSL, copy the plugin folder into WSL (step 5). |
-| The office is slow | Settings (⚙️) → Graphics **Nhẹ** (Light). |
+| "Chưa có gói hình pixel" (pixel art missing) | The LimeZu packs are not in the right place. See [step 4](#4-install-coopverse): you need both `1_Interiors/…` (Modern Interiors) and `Modern_Office/Modern_Office_16x16.png`. Restart `npm run dev` afterwards. |
 | No agents | The company has no agents yet, or you are viewing another company; switch under the logo. |
 
 ## 9. Security
@@ -239,25 +269,31 @@ In-app settings (volume, graphics…) and character looks are stored in the brow
 ```
 src/
   data/        types, Paperclip adapter (paperclip.ts), realtime sync, chat, log parsing, demo data
-  world/       office layout, collisions, furniture, monitors, 3D kanban, day/night, static mesh baking
+  pixel/       pixel version (PixiJS): office built from LimeZu sprites, Character Generator characters, bubbles, day/night, level-up effect, wardrobe
+  world/       shared office layout, collisions, time/light tables (time.ts); the old 3D parts still live here
   audio/       synthesized sound effects and generative lofi (voice.ts: mic/TTS, currently disabled)
   characters/  blocky chibi characters + animation
-  agents/      agent behaviour (working, wandering, desk visits, avoidance, faces)
-  life/        office life: lines, conversations, greetings, emotes
+  agents/      3D agent behaviour
+  life/        shared office life: the agent "brain" (brain.ts: walking, sitting, avoidance), lines, greetings, emotes
   player/      movement, camera, controls
   ui/          HUD, minimap, CLI + Chat (Terminal), ticket board, wardrobe, settings
   dev/         dev-only hooks (window.__coop)
+server/
+  limezu.ts    serves the LimeZu images from COOPVERSE_ASSETS at /limezu/ (127.0.0.1 only)
 paperclip-plugin/
   src/         manifest, worker, UI (sidebar item + top bar button)
   dist/        prebuilt output (committed)
 ```
 
-- Stack: Vite, React 19, React Three Fiber, drei, three.js, zustand, TypeScript.
+- Stack: Vite, React 19, PixiJS 8, zustand, TypeScript. Pixel font: VT323 (OFL, includes Vietnamese).
+- Sprite coordinates inside the LimeZu packs live in `src/pixel/atlas.json` (coordinates only, no images).
 - Every Paperclip call lives in `src/data/paperclip.ts`.
 - Type-check and build: `npm run build`.
 - Plugin changes: `cd paperclip-plugin && npm install && npm run build`, then reinstall the plugin.
-- Dev hooks on `window.__coop`: `store.getState().openFocus(agentId)`, `inject(...)` for fake realtime events, `stats()` for draw calls, `settings.getState().set({ hour: 21 })`.
+- Dev hooks on `window.__coop`: `store.getState().openFocus(agentId)`, `inject(...)` for fake realtime events, `settings.getState().set({ hour: 21 })`. The pixel version adds `step(seconds)` to simulate while the tab is hidden, `resume()`, `go(x, z, zoom)` to jump elsewhere, and `grant(agentId, exp)` to test level-ups.
 
 ## License
 
-[MIT](LICENSE)
+Code: [MIT](LICENSE).
+
+Pixel art: **LimeZu**, [Modern Interiors](https://limezu.itch.io/moderninteriors) and [Modern Office](https://limezu.itch.io/modernoffice). The art is not in this repo and is not covered by the MIT license; everyone buys the packs to use them. Thanks, LimeZu!

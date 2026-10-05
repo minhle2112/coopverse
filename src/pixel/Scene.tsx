@@ -15,6 +15,7 @@ import { stage, ticks } from './stage'
 import { MAP_H, MAP_W, dirOf, px, py, wx, wz, type Dir } from './geom'
 import { buildOffice, drawFame, drawKanban, type OfficeView } from './office'
 import { installDevHooks } from './devhooks'
+import { Lighting } from './light'
 import { view } from './view'
 
 const RADIUS = 0.28
@@ -56,6 +57,7 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
   const appRef = useRef<Application | null>(null)
   const layers = useRef<{ root: Container; floor: Container; sorted: Container; top: Container } | null>(null)
   const office = useRef<OfficeView | null>(null)
+  const light = useRef<Lighting | null>(null)
   const statusRef = useRef(statusOfSlot)
   statusRef.current = statusOfSlot
   const worldRef = useRef(world)
@@ -118,11 +120,15 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
       const sorted = new Container()
       sorted.sortableChildren = true
       const top = new Container()
-      root.addChild(floor, sorted, top)
+      // Ngày/đêm phủ lên tất cả; bong bóng, hiệu ứng lên cấp (fx) nằm trên cùng để luôn rõ
+      const fx = new Container()
+      const lighting = new Lighting()
+      light.current = lighting
+      root.addChild(floor, sorted, top, lighting.shade, lighting.glow, fx)
       app.stage.addChild(root)
       layers.current = { root, floor, sorted, top }
       appRef.current = app
-      Object.assign(stage, { app, root, sorted, top, overlay: overlay.current })
+      Object.assign(stage, { app, root, sorted, top, fx, overlay: overlay.current })
 
       playerSprite = new Sprite(playerSheet.current.frame('idle', 'up', 0))
       playerSprite.anchor.set(0.5, 1)
@@ -189,6 +195,7 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
 
         // ── Người trong văn phòng (agent, ứng viên), đạo diễn đời sống ──
         for (const f of ticks) f(dt, t)
+        lighting.update(t)
 
         // ── Màn hình máy tính: vẽ lại ~8 lần mỗi giây ──
         screenAcc += dt
@@ -224,10 +231,11 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
 
     return () => {
       dead = true
-      Object.assign(stage, { app: null, root: null, sorted: null, top: null, overlay: null })
+      Object.assign(stage, { app: null, root: null, sorted: null, top: null, fx: null, overlay: null })
       appRef.current = null
       layers.current = null
       office.current = null
+      light.current = null
       try { app.destroy(true, { children: true }) } catch { /* chưa init xong */ }
     }
   }, [])
@@ -255,6 +263,7 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
     L.top.addChildAt(v.top, 0)
     for (const c of v.sorted) L.sorted.addChild(c)
     office.current = v
+    light.current?.setOffice(v.lights, v)
     redrawBoards()
   }, [phase, world, tierKey])
 
@@ -279,7 +288,7 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children 
   useEffect(() => {
     if (!import.meta.env.DEV || phase !== 'ready') return
     const w = window as unknown as { __pixel?: unknown }
-    w.__pixel = { app: appRef.current, view, layers: layers.current, office: () => office.current, player }
+    w.__pixel = { app: appRef.current, view, layers: layers.current, office: () => office.current, light: light.current, player }
     return appRef.current ? installDevHooks(appRef.current) : undefined
   }, [phase])
 

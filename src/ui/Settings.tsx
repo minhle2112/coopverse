@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { uiTick, unlockAudio } from '../audio/engine'
-import { useSettings, type Quality } from '../settings'
+import { useSettings } from '../settings'
 import { useCoop } from '../store'
 import { fmtHour, periodOf, sceneHour, sunElevation } from '../world/time'
 
@@ -73,12 +73,6 @@ function Slider({ value, onChange, disabled, label }: { value: number; onChange:
   )
 }
 
-const QUALITY: [Quality, string, string][] = [
-  ['auto', 'Tự động', 'Tự giảm độ nét khi máy chạy chậm'],
-  ['high', 'Cao', 'Nét nhất, có bóng đổ'],
-  ['low', 'Nhẹ', 'Tắt bóng đổ, độ nét thấp, hợp máy yếu'],
-]
-
 export function SettingsPanel() {
   const s = useSettings()
   const close = useCoop((st) => st.toggleSettings)
@@ -108,14 +102,7 @@ export function SettingsPanel() {
       </div>
       <p className="set-hint">Tiếng gõ phím khi agent làm việc, tiếng "ting" khi có thông báo, tiếng bước chân và bong bóng chat. Nhạc do máy tự sáng tác, không lặp lại.</p>
 
-      <div className="set-sec">Đồ hoạ</div>
-      <div className="set-seg" role="group" aria-label="Chất lượng đồ hoạ">
-        {QUALITY.map(([q, label, hint]) => (
-          <button key={q} className={s.quality === q ? 'on' : ''} title={hint} aria-pressed={s.quality === q} onClick={() => { uiTick(); set({ quality: q }) }}>{label}</button>
-        ))}
-      </div>
-      <p className="set-hint">{QUALITY.find(([q]) => q === s.quality)?.[2]}</p>
-
+      {/* Bản pixel không có mục Đồ hoạ: chất lượng (bóng đổ, khử răng cưa…) chỉ dùng cho bản 3D */}
       <div className="set-sec">Giờ trong văn phòng</div>
       <label className="set-row set-check">
         <input type="checkbox" checked={s.hour === null} onChange={(e) => set({ hour: e.target.checked ? null : (Math.round(h * 4) / 4) % 24 })} />

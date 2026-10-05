@@ -11,11 +11,13 @@ export const stage: {
   sorted: Container | null
   /** Lớp trên cùng (mũi tên đánh dấu...) */
   top: Container | null
+  /** Lớp trên cả ngày/đêm: bong bóng trạng thái, mũi tên, hiệu ứng lên cấp */
+  fx: Container | null
   /** Lớp DOM phủ lên canvas, cho bảng tên / bong bóng thoại */
   overlay: HTMLDivElement | null
   /** Người đang được rê chuột lên (id agent) */
   hover: string | null
-} = { app: null, root: null, sorted: null, top: null, overlay: null, hover: null }
+} = { app: null, root: null, sorted: null, top: null, fx: null, overlay: null, hover: null }
 
 export type Tick = (dt: number, t: number) => void
 

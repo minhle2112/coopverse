@@ -73,8 +73,23 @@
   font-size: 20px; line-height: 1; text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000;
   animation: px-rise 2.4s steps(24) both; white-space: nowrap;
 }
-.px-lvup { color: #ffe066; }
-.px-xp { color: #8fe388; font-size: 17px; }
+/* Lên cấp: băng chữ vàng to, viền đen dày, nảy lên rồi đứng yên cho kịp đọc */
+.px-lvup {
+  color: #ffd84a; font-size: 30px; letter-spacing: 1px; margin-bottom: 14px;
+  text-shadow: 3px 0 0 #1a1020, -3px 0 0 #1a1020, 0 3px 0 #1a1020, 0 -3px 0 #1a1020, 2px 2px 0 #1a1020, -2px -2px 0 #1a1020, 2px -2px 0 #1a1020, -2px 2px 0 #1a1020, 0 5px 0 #7a4a10;
+  animation: px-lvup 3.1s steps(31) both;
+}
+@keyframes px-lvup {
+  0% { transform: translateY(10px) scale(0.6); opacity: 0; }
+  10% { transform: translateY(-4px) scale(1.15); opacity: 1; }
+  18% { transform: translateY(0) scale(1); }
+  85% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-14px); opacity: 0; }
+}
+.px-xp {
+  color: #a6f29e; font-size: 20px;
+  text-shadow: 2px 0 0 #1a1020, -2px 0 0 #1a1020, 0 2px 0 #1a1020, 0 -2px 0 #1a1020, 2px 2px 0 #1a1020, -2px -2px 0 #1a1020, 2px -2px 0 #1a1020, -2px 2px 0 #1a1020;
+}
 
 /* Bảng tên dưới chân */
 .px-under { position: absolute; left: 0; top: 0; transform: translateX(-50%); }

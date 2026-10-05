@@ -14,6 +14,7 @@ import { sprite, type SpriteName } from './assets'
 import { charSheet, frameAt, partsKey, type Anim, type CharSheet, type Parts } from './chars'
 import { dirOf, px, py, type Dir } from './geom'
 import { useParts } from './look'
+import { PixelLevelFx, hushedBy } from './LevelFx'
 import { PixelSound } from './Sound'
 import { view } from './view'
 import { stage, ticks, toScreen, type Tick } from './stage'
@@ -90,7 +91,7 @@ function useAsking(id: string): Asking {
 /** Dựng sprite người + bóng + bong bóng biểu cảm + mũi tên đánh dấu, gỡ khi rời đi */
 function makeBody() {
   // Sân khấu đang dựng lại (vd nạp lại nóng khi dev): bỏ qua, lượt sau dựng
-  if (!stage.sorted || !stage.top) return null
+  if (!stage.sorted || !stage.fx) return null
   const body = new Container()
   const shadow = new Graphics().ellipse(0, 0, 5, 2).fill({ color: 0x000000, alpha: 0.22 })
   const man = new Sprite(Texture.EMPTY)
@@ -112,7 +113,7 @@ function makeBody() {
   arrow.anchor.set(0.5, 1)
   arrow.visible = false
   stage.sorted!.addChild(body)
-  stage.top!.addChild(bubble, arrow)
+  stage.fx!.addChild(bubble, arrow)
   return {
     body, shadow, man, rim, bubble, arrow,
     destroy() {
@@ -196,7 +197,7 @@ function placeDom(id: string, head: HTMLDivElement | null, feet: HTMLDivElement 
 /** Bong bóng thường trực: biểu cảm vừa có > đang chờ bạn > trạng thái > đang làm (dấu ba chấm, lúc có lúc không) */
 function bubbleOf(id: string, st: AgentStatus, ask: Asking, t: number, phase: number): SpriteName | null {
   const em = useLife.getState().emotes[id]
-  if (em && em.until > clock.t) return EMOTE_SPRITE[em.icon] ?? null
+  if (em && em.until > clock.t && !hushedBy(id)) return EMOTE_SPRITE[em.icon] ?? null
   if (ask) return ask === 'approval' ? 'emAskGold' : 'emAsk'
   if (st === 'paused') return 'emSleep'
   // Lỗi: nhấp nháy để dễ thấy
@@ -300,12 +301,15 @@ function Overhead({ agent }: { agent: Agent }) {
   const em = useLife((s) => s.emotes[agent.id])
   const emoji = em && !EMOTE_SPRITE[em.icon] ? em : null
   const pop = useExp((s) => s.pops[agent.id])
-  const up = useExp((s) => s.levelUps.find((u) => u.agentId === agent.id))
+  const ups = useExp((s) => s.levelUps)
+  const up = ups.find((u) => u.agentId === agent.id)
+  // Lúc lên cấp (của mình hoặc người sát bên): im lặng cho hiệu ứng nổi bật; câu nói vẫn còn thì hiện lại sau
+  const hush = hushedBy(agent.id, ups)
   const fresh = pop && Date.now() - pop.at < 2500
   return (
     <div className="px-over">
-      {bubble && <div key={bubble.id} className={`px-say${bubble.real ? ' real' : ''}`} data-who={agent.name}>{plain(bubble.text)}</div>}
-      {emoji && <div key={emoji.id} className="px-emoji">{emoji.icon}</div>}
+      {bubble && !hush && <div key={bubble.id} className={`px-say${bubble.real ? ' real' : ''}`} data-who={agent.name}>{plain(bubble.text)}</div>}
+      {emoji && !hush && <div key={emoji.id} className="px-emoji">{emoji.icon}</div>}
       {up && <div key={up.id} className="px-lvup">LÊN CẤP {up.level}!</div>}
       {fresh && <div key={pop.id} className="px-xp">+{pop.amount} EXP</div>}
     </div>
@@ -421,6 +425,7 @@ export function PixelAgents({ world }: { world: World }) {
         .filter((a) => a.status !== 'terminated' && world.seatOf.has(a.id))
         .map((a) => <PixelAgent key={a.id} agent={a} slot={world.seatOf.get(a.id)!} isLead={leadIds.has(a.id)} />)}
       {candidates.map((a, i) => <PixelCandidate key={a.id} agent={a} spot={LOBBY[i]} />)}
+      <PixelLevelFx />
       <PixelSound />
     </>
   )

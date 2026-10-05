@@ -56,7 +56,7 @@ if not exist node_modules (
   echo Dang cai thu vien lan dau...
   call npm install || goto :error
 )
-start "" http://127.0.0.1:5177
+start "" http://127.0.0.1:5179
 call npm run dev
 goto :eof
 
