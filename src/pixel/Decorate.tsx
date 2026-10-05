@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Container, Graphics, Sprite } from 'pixi.js'
-import { DESK_ITEMS, WALLS, footprint, itemById, lowerName, nextRot, resale, wallPrice, type DeskItem, type Item } from '../data/catalog'
+import { DESK_ITEMS, WALLS, footprint, itemById, lowerName, nextRot, resale, rotations, wallPrice, type DeskItem, type Item } from '../data/catalog'
 import {
   RESERVED, apply, canDesk, canPlace, canUnwall, canWall, cellsOf, costOf, deskCells, doorRot, fixedBlock, reserved, type Action, type Cell, type Check, type PlaceOpts,
 } from '../data/decor'
@@ -117,14 +117,32 @@ function anchor(o: OfficeState, i: Item, c: number, r: number, rot: number): { c
   return { c: c - Math.floor((f.w - 1) / 2), r: r - (f.d - 1), rot }
 }
 
-/** Kiểm một chỗ đặt món (kể cả lối đi), có nhớ kết quả cho lần hỏi giống hệt */
-let memo = { key: '', res: { ok: true } as Check }
+/**
+ * Kiểm một chỗ đặt món (kể cả lối đi), có nhớ kết quả cho lần hỏi giống hệt.
+ * Trạng thái văn phòng / bố cục đổi là ra đối tượng mới, nên so theo đối tượng (cất đồ vào kho không đổi số món mà vẫn phải kiểm lại)
+ */
+let memo: { o: OfficeState | null; w: World | null; key: string; res: Check } = { o: null, w: null, key: '', res: { ok: true } }
 function checkItem(o: OfficeState, w: World, i: Item, c: number, r: number, rot: number, uid?: string): Check {
-  const key = `${uid ?? i.id}|${c},${r},${rot}|${o.spent.length}|${o.items.length}|${JSON.stringify(o.walls).length}|${w.slots.length}`
-  if (memo.key === key) return memo.res
+  const key = `${uid ?? i.id}|${c},${r},${rot}`
+  if (memo.o === o && memo.w === w && memo.key === key) return memo.res
   let res = canPlace(o, i, c, r, rot, { ignore: uid, blocked: deskBlock(w) })
   if (res.ok && i.mount === 'floor' && i.h > 0) res = pathsOk(withItem(o, { uid: uid ?? '#try', item: i.id, c, r, rot, at: 0 }))
-  memo = { key, res }
+  memo = { o, w, key, res }
+  return res
+}
+
+/** Kiểm chỗ dời bàn (kể cả lối đi, như lúc bấm đặt), có nhớ kết quả như checkItem */
+let deskMemo: { o: OfficeState | null; w: World | null; key: string; res: Check } = { o: null, w: null, key: '', res: { ok: true } }
+function checkDesk(o: OfficeState, w: World, slot: string, pos: { x: number; z: number; yaw: number }): Check {
+  const key = `${slot}|${pos.x},${pos.z},${pos.yaw}`
+  if (deskMemo.o === o && deskMemo.w === w && deskMemo.key === key) return deskMemo.res
+  const blocked = deskBlock(w, slot)
+  let res = canDesk(o, pos, { blocked })
+  if (res.ok) {
+    const trial = apply(o, { action: 'desk', slot, ...pos }, Infinity, 0, () => '#try', { blocked, levelOf })
+    res = 'error' in trial ? { ok: false, why: trial.error } : pathsOk(trial.office)
+  }
+  deskMemo = { o, w, key, res }
   return res
 }
 
@@ -244,11 +262,12 @@ function deskAt(x: number, y: number, yaw: number) {
 export function decoRotate() {
   const d = useDeco.getState()
   const dr = d.draft
+  // Món không xoay được (cửa: hướng theo vách) thì R không làm gì
+  const turns = (id: string) => rotations(itemById.get(id)!).length > 1
   if (d.pending?.kind === 'item') {
-    const i = itemById.get(d.pending.item)!
-    d.setPending({ ...d.pending, rot: nextRot(i, d.pending.rot) })
+    if (turns(d.pending.item)) d.setPending({ ...d.pending, rot: nextRot(itemById.get(d.pending.item)!, d.pending.rot) })
   } else if (dr?.kind === 'new' || dr?.kind === 'move') {
-    useDeco.setState({ draft: { ...dr, rot: nextRot(itemById.get(dr.item)!, dr.rot) } })
+    if (turns(dr.item)) useDeco.setState({ draft: { ...dr, rot: nextRot(itemById.get(dr.item)!, dr.rot) } })
   } else if (dr?.kind === 'desk') {
     useDeco.setState({ draft: { ...dr, yaw: nextYaw(dr.yaw) } })
   } else if (d.sel) {
@@ -482,7 +501,7 @@ export function DecoOverlay() {
         } else if (dr.kind === 'desk') {
           setGhost('', () => null)
           const pos = deskAt(mouse.x, mouse.y, dr.yaw)
-          const chk = canDesk(o, pos, { blocked: deskBlock(w, dr.slot) })
+          const chk = checkDesk(o, w, dr.slot, pos)
           drawDesk(g, pos, chk.ok ? OK : BAD)
           const rect = cellsRect(deskCells(pos))
           if (!chk.ok) tg = { x: rect.x + rect.w / 2, y: rect.y - 8, text: chk.why!, ok: false }
@@ -553,7 +572,8 @@ export function DecoOverlay() {
       <div ref={tagEl} className="px-anchor deco-tag" style={{ transform: 'translate(-9999px, -9999px)' }}>
         {tag && <span className={tag.ok ? 'ok' : 'bad'}>{tag.text}</span>}
       </div>
-      <div ref={bar} className="px-anchor deco-bar" style={{ transform: 'translate(-9999px, -9999px)' }}>
+      {/* Bấm chuột không giữ focus ở nút: Enter sau đó vẫn là ✓ Mua, không bấm lại nút vừa bấm (Tab tới nút thì Enter vẫn bấm nút đó) */}
+      <div ref={bar} className="px-anchor deco-bar" style={{ transform: 'translate(-9999px, -9999px)' }} onMouseDown={(e) => e.preventDefault()}>
         {pending && (
           <div className="deco-btns">
             <button type="button" className="desk-btn primary" disabled={busy || (cost > 0 && balance < cost)}

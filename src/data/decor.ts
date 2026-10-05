@@ -105,11 +105,12 @@ export interface PlaceOpts {
   levelOf?: (agentId: string) => number
 }
 
-/** Cửa lắp theo hướng nào ở ô (c, r): 0 = vách ngang, 1 = vách dọc, null = không có 2 ô vách liền nhau */
+/** Cửa lắp theo hướng nào ở ô (c, r): 0 = vách ngang, 1 = vách dọc, null = không có 2 ô vách cùng loại liền nhau */
 export function doorRot(o: OfficeState, c: number, r: number): 0 | 1 | null {
-  const w = (cc: number, rr: number) => !!o.walls[cellKey(cc, rr)]
-  if (w(c, r) && w(c + 1, r)) return 0
-  if (w(c, r) && w(c, r + 1)) return 1
+  const k = o.walls[cellKey(c, r)]
+  if (!k) return null
+  if (o.walls[cellKey(c + 1, r)] === k) return 0
+  if (o.walls[cellKey(c, r + 1)] === k) return 1
   return null
 }
 
@@ -122,13 +123,19 @@ export function canPlace(o: OfficeState, i: Item, c: number, r: number, rot: num
     if (!isClean(o, 'wall')) return no('Dọn tường bắc trước đã')
     if (cols.some((k) => FIXED_WALL_COLS.has(k))) return no('Vướng cửa sổ hoặc bảng ticket')
     if (cols.some((k) => occ.wall.has(k))) return no('Vướng đồ treo khác')
-    if (i.id === 'fame' && o.items.some((p) => p.item === 'fame' && p.uid !== opts.ignore && !p.stored)) return no('Chỉ treo một bảng vinh danh')
+    const fame = i.id === 'fame' ? o.items.filter((p) => p.item === 'fame' && p.uid !== opts.ignore) : []
+    if (fame.some((p) => !p.stored)) return no('Chỉ treo một bảng vinh danh')
+    // Mua mới (không phải lấy từ kho ra) khi đã có bảng trong kho: đặt lại bảng đó
+    if (!opts.ignore && fame.length) return no('Đã có bảng vinh danh trong kho')
     return ok
   }
   const cells = cellsOf(i, c, r, rot)
   if (cells.some(([cc, rr]) => !inGrid(cc, rr))) return no('Ra ngoài phòng')
   if (i.mount === 'door') {
-    if (doorRot(o, c, r) !== rot) return no('Cửa phải lắp vào 2 ô vách liền nhau')
+    if (doorRot(o, c, r) !== rot) {
+      const k = o.walls[cellKey(c, r)], next = o.walls[rot === 1 ? cellKey(c, r + 1) : cellKey(c + 1, r)]
+      return no(k && next && k !== next ? 'Cửa phải lắp vào 2 ô vách cùng loại' : 'Cửa phải lắp vào 2 ô vách liền nhau')
+    }
     if (cells.some(([cc, rr]) => occ.door.has(cellKey(cc, rr)))) return no('Đã có cửa ở đây')
     return ok
   }

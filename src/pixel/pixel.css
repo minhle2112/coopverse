@@ -308,6 +308,10 @@
 .shop-card:hover { background: #3a3550; }
 .shop-card.on { background: #4d4470; border-color: #f4d35e; }
 .shop-card.poor .shop-price { color: #f3b3a8; }
+/* Món trong kho: thẻ Đặt lại + nút Bán bên dưới */
+.shop-stored { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.shop-stored .shop-card { flex: 1; }
+.shop-sell { width: 100%; padding: 1px 2px; font-size: 12px; white-space: nowrap; }
 .shop-thumb {
   display: block; height: 40px; width: auto; max-width: 100%; object-fit: contain; image-rendering: pixelated;
   filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.35));

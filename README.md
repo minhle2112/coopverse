@@ -230,10 +230,10 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 ### Trang trí văn phòng
 
 - Bấm **T** (hoặc nút 🛋️): bảng cửa hàng mở bên trái, gần 50 món chia 5 nhóm: cây và đồ nhỏ (chậu cây, đèn, kệ sách, thảm…), treo tường (tranh, đồng hồ, TV, **bảng vinh danh**), nghỉ ngơi và bếp (sofa, ghế bành, bàn trà, tủ bếp, quầy cà phê…), giải trí (máy game, bóng bàn, bi-a, mèo văn phòng), xây vách.
-- Chọn một món: bóng mờ của món chạy theo chuột. Khung xanh là đặt được, khung đỏ kèm lý do là không. Bấm để đặt thử, rồi bấm **✓ Mua** (hoặc Enter); chưa bấm ✓ thì chưa mất Xu. **R** xoay: sofa, ghế bành xoay đủ 4 hướng, món khác lật trái/phải.
+- Chọn một món: bóng mờ của món chạy theo chuột. Khung xanh là đặt được, khung đỏ kèm lý do là không. Bấm để đặt thử, rồi bấm **✓ Mua** (hoặc Enter); chưa bấm ✓ thì chưa mất Xu. **R** xoay: sofa, ghế bành xoay đủ 4 hướng, ghế họp quay mặt / quay lưng, chậu cây, đèn, ghế băng, mèo lật trái/phải; các món khác (kệ sách, thảm, tủ lạnh…) không xoay. Cửa kính tự theo hướng của vách.
 - Đồ chỉ đặt trên mảng sàn đã dọn; đồ treo tường cần tường bắc đã dọn. Cửa vào và sảnh chờ ứng viên luôn để trống (tô đỏ nhạt). Không cho đặt đồ chặn kín lối tới bàn làm việc hay bảng ticket.
-- Bấm vào món đã đặt: xoay, dời (miễn phí), cất vào kho (miễn phí, lấy ra đặt lại lúc nào cũng được) hoặc bán lại được nửa giá.
-- Bấm vào bàn làm việc: xoay, dời đi chỗ khác. Bàn của mỗi agent miễn phí; agent tự đi tới chỗ mới.
+- Bấm vào món đã đặt: xoay, dời (miễn phí), cất vào kho (miễn phí, lấy ra đặt lại lúc nào cũng được) hoặc bán lại được nửa giá. Món trong kho cũng bán thẳng được.
+- Bấm vào bàn làm việc: xoay, dời đi chỗ khác. Bàn của mỗi agent miễn phí; agent tự đi tới chỗ mới. Bàn dời được cả lên sàn chưa dọn (bàn vốn nằm sẵn trên sàn bẩn).
 - **Đồ để bàn** (bấm vào bàn, hàng dưới): cây để bàn, khung ảnh (cấp 2), màn hình thứ hai, đèn bàn (cấp 3), ghế da (cấp 4), cúp vàng kèm viền vàng (cấp 5). Agent ngồi bàn đó đạt cấp thì món mở khoá, rồi bạn trả Xu mua. Đồ là của riêng agent, đổi chỗ thì đi theo; bán lại được nửa giá.
 - Tab 🧱: giữ chuột kéo một đường thẳng để xây vách, thả ra rồi bấm ✓. Vách thấp, vách kính luôn thấy người; tường cao như tường thật, tự mờ đi khi có người đứng phía sau. Mua **cửa kính** rồi lắp vào 2 ô vách liền nhau (cửa tự mở khi có người tới gần). Dỡ vách: bấm vào một đoạn vách trên bản đồ rồi chọn **Dỡ cả đoạn**, hoặc dùng công cụ **Dỡ vách** kéo qua từng khúc; được trả lại nửa giá. Vách có cửa thì bấm vào cửa để cất trước.
 - Mua bảng vinh danh rồi treo lên tường thì mới xem được bảng xếp hạng EXP (bấm vào bảng, hoặc đứng trước bảng bấm E).

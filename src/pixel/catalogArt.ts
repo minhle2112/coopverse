@@ -73,7 +73,8 @@ export interface ItemView {
 
 /** Khung pixel của các ô một món chiếm trên sàn */
 export function footRect(i: Item, c: number, r: number, rot: number): Rect {
-  const { w, d } = footprint(i, rot)
+  // Cửa: 2 ô theo vách (ngang 2×1, dọc 1×2)
+  const { w, d } = i.mount === 'door' ? (rot === 1 ? { w: 1, d: 2 } : { w: 2, d: 1 }) : footprint(i, rot)
   return { x: Math.round(px(cellX(c))), y: Math.round(py(cellZ(r))), w: w * CELL * PPM, h: d * CELL * PPM }
 }
 
@@ -93,6 +94,7 @@ const bounds = (o: Container): Rect => {
 export function itemView(i: Item, c: number, r: number, rot: number, fame?: Graphics): ItemView {
   if (i.mount === 'wall') return wallItem(i, c, fame)
   const f = footRect(i, c, r, rot)
+  if (i.mount === 'door') return doorGhost(f, rot)
   const cx = f.x + f.w / 2, bottom = f.y + f.h
   if (i.mount === 'rug') {
     const [name, lr, tb] = RUGS[i.id]
@@ -154,6 +156,28 @@ export function itemView(i: Item, c: number, r: number, rot: number, fame?: Grap
   wrap.addChild(node)
   wrap.zIndex = node.zIndex
   return { node: wrap, layer: 'sorted', hit: bounds(wrap), light, front: armFront(i, rot, cx, bottom) }
+}
+
+/**
+ * Bóng mờ cửa kính lúc đặt thử (cửa thật do walls.ts vẽ trên vách): vách ngang thì cửa LimeZu đóng như trên tường cao,
+ * vách dọc thì tấm kính hẹp chạy dọc 2 ô, khớp với vách kính dọc
+ */
+function doorGhost(f: Rect, rot: number): ItemView {
+  const node = new Container()
+  if (rot === 1) {
+    const g = new Graphics()
+    g.rect(f.x + 5, f.y - 20, 6, f.h + 20).fill({ color: 0xbfe3ff, alpha: 0.45 })
+    g.rect(f.x + 4, f.y - 20, 1, f.h + 20).fill(0x5b6475)
+    g.rect(f.x + 11, f.y - 20, 1, f.h + 20).fill(0x5b6475)
+    g.rect(f.x + 4, f.y + f.h / 2 - 11, 8, 2).fill(0x5b6475)
+    node.addChild(g)
+  } else {
+    const a = new Sprite(frames('door', 32, 48)[0])
+    a.position.set(f.x, f.y + f.h - 48)
+    node.addChild(a)
+  }
+  node.zIndex = f.y + f.h
+  return { node, layer: 'sorted', hit: f }
 }
 
 /** Ghế bành quay ngang: 7 px dưới cùng của hình (tay ghế + mép đệm phía camera) vẽ đè lên người ngồi */

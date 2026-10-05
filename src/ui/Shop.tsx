@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { GROUPS, ITEMS, WALLS, itemById, type Group, type Item } from '../data/catalog'
+import { GROUPS, ITEMS, WALLS, itemById, lowerName, resale, type Group, type Item } from '../data/catalog'
 import { isClean } from '../data/officeState'
-import { useBalance, useOffice } from '../data/officeSync'
+import { act, useBalance, useOffice } from '../data/officeSync'
 import { fmtXu } from '../data/xu'
 import { itemThumb } from '../pixel/catalogArt'
 import { useCoop } from '../store'
@@ -28,6 +28,24 @@ export function ShopPanel() {
   const ready = useOffice((s) => s.ready)
   const balance = useBalance()
   const [tab, setTab] = useState<Group>('plant')
+  const busy = useDeco((s) => s.busy)
+  const [selling, setSelling] = useState<string | null>(null)
+
+  const sellStored = async (uid: string, name: string, back: number) => {
+    const d = useDeco.getState()
+    if (d.busy) return
+    if (d.draft?.kind === 'move' && d.draft.uid === uid) d.setDraft(null)
+    d.setBusy(true)
+    try {
+      await act({ action: 'sell', uid })
+      useCoop.getState().showToast(`Đã bán ${lowerName(name)} · +${fmtXu(back)} Xu`)
+    } catch (e) {
+      useCoop.getState().showToast(e instanceof Error ? e.message : 'Không bán được')
+    } finally {
+      useDeco.getState().setBusy(false)
+      setSelling(null)
+    }
+  }
 
   const stored = office.items.filter((p) => p.stored)
   const placed = office.items.filter((p) => !p.stored).length
@@ -112,13 +130,22 @@ export function ShopPanel() {
               const i = itemById.get(p.item)
               if (!i) return null
               const on = draft?.kind === 'move' && draft.uid === p.uid
+              const back = resale(i.price)
               return (
-                <button key={p.uid} type="button" className={`shop-card${on ? ' on' : ''}`} title="Lấy ra đặt (miễn phí)"
-                  onClick={() => setDraft(on ? null : { kind: 'move', uid: p.uid, item: p.item, rot: p.rot })}>
-                  <Thumb item={i} />
-                  <span className="shop-name">{i.name}</span>
-                  <span className="shop-price">Đặt lại</span>
-                </button>
+                <div key={p.uid} className="shop-stored">
+                  <button type="button" className={`shop-card${on ? ' on' : ''}`} title="Lấy ra đặt (miễn phí)"
+                    onClick={() => setDraft(on ? null : { kind: 'move', uid: p.uid, item: p.item, rot: p.rot })}>
+                    <Thumb item={i} />
+                    <span className="shop-name">{i.name}</span>
+                    <span className="shop-price">Đặt lại</span>
+                  </button>
+                  {/* Bán thẳng từ kho, bấm 2 lần cho chắc như bán món đang đặt */}
+                  {selling === p.uid
+                    ? <button type="button" className="desk-btn danger shop-sell" disabled={busy}
+                      onClick={() => void sellStored(p.uid, i.name, back)}>Chắc chưa?</button>
+                    : <button type="button" className="desk-btn shop-sell" disabled={busy}
+                      onClick={() => setSelling(p.uid)} title="Bán lại nửa giá">Bán +{fmtXu(back)}</button>}
+                </div>
               )
             })}
           </div>
