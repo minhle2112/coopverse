@@ -1,43 +1,15 @@
 import { create } from 'zustand'
-import { emptyLedger, type Kudos, type Ledger } from './ledger'
+import { emptyLedger, type Ledger } from './ledger'
+import { EXP, levelOf, expForLevel, ticketExp } from './levels'
 import type { Agent } from './types'
 
 /**
  * EXP và cấp của agent. Tính hoàn toàn từ sổ (src/data/ledger.ts): Coopverse không ghi gì vào Paperclip.
- * Việc hỏng (run lỗi, bị huỷ) được 0 điểm, nên không bao giờ bị trừ.
+ * Quy tắc tính điểm nằm ở src/data/levels.ts (dùng chung với server).
  */
-export const EXP = {
-  /** Ticket xong, theo độ ưu tiên */
-  ticket: { critical: 120, high: 80, medium: 50, low: 30 } as Record<string, number>,
-  run: 10,
-  approval: 30,
-  kudos: 25,
-}
-export const ticketExp = (priority: string) => EXP.ticket[priority] ?? EXP.ticket.medium
+export { EXP, TITLES, expForLevel, levelOf, ticketExp, titleOf } from './levels'
 
-/** EXP tích luỹ để đạt cấp L: cấp 2 = 100, cấp 3 = 300, cấp 4 = 600… (cấp sau cần thêm 100 × cấp hiện tại) */
-export const expForLevel = (level: number) => 50 * level * (level - 1)
-
-export function levelOf(exp: number) {
-  let l = 1
-  while (expForLevel(l + 1) <= exp) l++
-  return l
-}
-
-export const TITLES = [
-  'Thực tập sinh', 'Nhân viên mới', 'Nhân viên', 'Nhân viên chính', 'Chuyên viên',
-  'Chuyên viên chính', 'Chuyên gia', 'Chuyên gia cao cấp', 'Bậc thầy', 'Huyền thoại',
-]
-export const titleOf = (level: number) => TITLES[Math.min(level, TITLES.length) - 1]
-
-/**
- * Bàn nâng cấp theo cấp: 0 bàn thường · 1 (cấp 3) chậu cây · 2 (cấp 5) màn hình thứ hai
- * · 3 (cấp 7) đèn bàn + ghế da · 4 (cấp 9) cúp vàng + viền bàn vàng
- */
-export const deskTier = (level: number) => Math.min(4, Math.floor((level - 1) / 2))
-export const DESK_PERKS = ['Bàn thường', 'Chậu cây trên bàn', 'Màn hình thứ hai', 'Đèn bàn và ghế da', 'Cúp vàng và viền bàn vàng']
-
-export interface Counts { tickets: number; runs: number; approvals: number; kudos: number }
+export interface Counts { tickets: number; runs: number; approvals: number }
 export interface AgentExp {
   total: number
   /** EXP từ thứ Hai tuần này */
@@ -55,7 +27,7 @@ export function weekStart(now = new Date()) {
   return d.getTime()
 }
 
-const zero = (): Counts => ({ tickets: 0, runs: 0, approvals: 0, kudos: 0 })
+const zero = (): Counts => ({ tickets: 0, runs: 0, approvals: 0 })
 
 /** Cộng sổ thành EXP từng agent */
 export function computeStats(L: Ledger, now = new Date()): Record<string, AgentExp> {
@@ -73,7 +45,6 @@ export function computeStats(L: Ledger, now = new Date()): Record<string, AgentE
   for (const [agentId, at] of Object.values(L.runs)) add(agentId, at, EXP.run, 'runs')
   for (const [agentId, at, priority] of Object.values(L.tickets)) add(agentId, at, ticketExp(priority), 'tickets')
   for (const [agentId, at] of Object.values(L.approvals)) add(agentId, at, EXP.approval, 'approvals')
-  for (const k of L.kudos) add(k.agentId, k.at, EXP.kudos, 'kudos')
   for (const s of Object.values(out)) s.level = levelOf(s.total)
   return out
 }
@@ -85,14 +56,12 @@ export function gainedBetween(prev: Ledger, next: Ledger): Map<string, number> {
   for (const [id, [agentId]] of Object.entries(next.runs)) if (!prev.runs[id]) add(agentId, EXP.run)
   for (const [id, [agentId, , p]] of Object.entries(next.tickets)) if (!prev.tickets[id]) add(agentId, ticketExp(p))
   for (const [id, [agentId]] of Object.entries(next.approvals)) if (!prev.approvals[id]) add(agentId, EXP.approval)
-  const seen = new Set(prev.kudos.map((k) => k.id))
-  for (const k of next.kudos) if (!seen.has(k.id)) add(k.agentId, EXP.kudos)
   return g
 }
 
 /** Chữ "+EXP" bay lên trên đầu agent */
 export interface ExpPop { id: number; amount: number; at: number }
-/** Một lần lên cấp (hiệu ứng 3D + băng rôn trên đầu) */
+/** Một lần lên cấp (hiệu ứng + băng rôn trên đầu) */
 export interface LevelUp { id: number; agentId: string; level: number }
 
 interface ExpState {
@@ -138,14 +107,6 @@ export function applyLedger(next: Ledger, onLevelUp?: (agentId: string, level: n
     setTimeout(() => useExp.setState((x) => ({ levelUps: x.levelUps.filter((v) => v.id !== u.id) })), LEVEL_FX_MS)
   }
 }
-
-/** Lời khen tạo ngay trên trang (bản demo không có server) */
-export const localKudos = (agentId: string, note: string): Kudos => ({
-  id: `local-${Date.now()}-${++seq}`,
-  agentId,
-  at: Date.now(),
-  note,
-})
 
 export type RankBy = 'week' | 'total'
 export interface RankRow { agent: Agent; exp: number; stats: AgentExp | undefined }

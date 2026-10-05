@@ -2,9 +2,10 @@ import { titleOf } from '../data/exp'
 import type { Agent, AskKind } from '../data/types'
 import { player } from '../runtime'
 import { useCoop } from '../store'
-import { GRAPH } from '../world/layout'
+import type { CleanJob } from '../data/officeState'
 import { actors, type LifeActor } from './actors'
-import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, EXCUSE, LEVEL_UP, PRAISED, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
+import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, CLEANED, EXCUSE, LEVEL_UP, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
+import { spotById } from './spots'
 import { clock, emote, expireLife, isSpeaking, readTime, say, useLife } from './store'
 
 /**
@@ -59,15 +60,17 @@ function play(ids: [string, string], d: Dialogue) {
   return at
 }
 
-const actOf = (a: LifeActor) => (a.where === 'spot' && a.node ? GRAPH.nodes[a.node].act ?? null : null)
+const spotOf = (a: LifeActor) => (a.where === 'spot' ? spotById(a.spot) : undefined)
+const actOf = (a: LifeActor) => spotOf(a)?.act ?? null
 const settled = (a: LifeActor) => a.where !== 'walk' && clock.t - a.arrivedAt > 1.5
-const standing = (a: LifeActor) => (a.where === 'spot' && GRAPH.nodes[a.node!].sit === undefined) || a.where === 'visit'
+const standing = (a: LifeActor) => (a.where === 'spot' && spotOf(a)?.sit === undefined) || a.where === 'visit'
 const lead = (ag: Agent, agents: Agent[]) => agents.some((x) => x.reportsTo === ag.id)
 
-/** Hai agent đủ gần để nói chuyện: cùng khu (sofa, bóng bàn, pantry...) hoặc sát nhau */
+/** Hai agent đủ gần để nói chuyện: cùng khu (góc tán gẫu, cửa sổ...) hoặc sát nhau */
 function closeEnough(a: LifeActor, b: LifeActor) {
   const d = Math.hypot(a.x - b.x, a.z - b.z)
-  const sameArea = a.where === 'spot' && b.where === 'spot' && GRAPH.nodes[a.node!].area === GRAPH.nodes[b.node!].area
+  const area = spotOf(a)?.area
+  const sameArea = !!area && area === spotOf(b)?.area
   return (sameArea && d < CHAT_DIST_SPOT) || d < CHAT_DIST_SEAT
 }
 
@@ -257,12 +260,18 @@ export function leveledUp(agentId: string, level: number) {
   say(a.id, pick(LEVEL_UP(level, titleOf(level))))
 }
 
-/** Bạn vừa khen agent (nút Khen): cảm ơn, đọc lại lời khen nếu có */
-export function praised(agentId: string, note: string) {
-  const a = actors.get(agentId)
-  if (!a) return
-  celebrate(a, '🥰', 2.8)
-  say(a.id, note ? `“${note.length > 60 ? `${note.slice(0, 59)}…` : note}” Cảm ơn sếp! 🥰` : pick(PRAISED), { sec: 5 })
+/**
+ * Bạn vừa trả Xu dọn một chỗ: vài agent ở gần đó (mảng sàn) hoặc trong phòng (tường, cửa sổ, bảng) mừng rỡ.
+ */
+export function cleaned(job: CleanJob) {
+  const r = job.rect
+  const inside = (a: LifeActor) => !r || (a.x > r.minX - 1 && a.x < r.maxX + 1 && a.z > r.minZ - 1 && a.z < r.maxZ + 1)
+  const list = [...actors.values()].filter(inside).sort(() => Math.random() - 0.5)
+  list.slice(0, 3).forEach((a, i) => {
+    if (a.where !== 'seat') celebrate(a, '✨', 2.6)
+    else emote(a.id, '✨', 2.4)
+    if (i < 2) say(a.id, pick(CLEANED[job.kind]))
+  })
 }
 
 /** Agent vừa tới một chỗ: thỉnh thoảng hiện biểu tượng việc đang làm (☕, ⚽...). */

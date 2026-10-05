@@ -36,7 +36,9 @@ const AT: Record<Activity, string[]> = {
   stool: ['Ăn vặt chút đã', 'Bánh mì hôm nay giòn ghê', 'Chiều nay ai đặt trà sữa không?'],
   meeting: ['Phòng họp trống, mượn ngồi chút', 'Tập thuyết trình tí', 'Ghế phòng họp êm hơn ghế mình'],
   kanban: ['Để xem bảng còn gì nào', 'Cột Xong dài ra rồi 😎', 'Chưa có ticket mới à?', 'Ai kéo thẻ này qua vậy?'],
-  fame: ['Tuần này ai dẫn đầu nhỉ?', 'Phải cày thêm mới lên top được 💪', 'Ủa ai cày dữ vậy?', 'Tên mình phải lên bảng vàng mới được', 'Lên cấp là được bàn xịn hơn đó'],
+  fame: ['Tuần này ai dẫn đầu nhỉ?', 'Phải cày thêm mới lên top được 💪', 'Ủa ai cày dữ vậy?', 'Tên mình phải lên bảng vàng mới được'],
+  chat: ['Phòng rộng mà trống trơn ghê', 'Bao giờ mới có sofa ta?', 'Mua cái máy cà phê đi sếp ơi ☕', 'Có chậu cây chắc đẹp hơn 🪴', 'Đứng duỗi chân tí', 'Làm thêm ticket là có Xu sắm đồ đó'],
+  dust: ['Chỗ này bụi quá… 🤧', 'Hắt xì! Ai dọn giùm với', 'Sàn này bao lâu rồi chưa lau vậy?', 'Sếp ơi, thuê người dọn đi 😅', 'Xong ticket là có Xu dọn chỗ này', 'Giẫm phải gì dính dính…'],
 }
 
 const SEAT_IDLE = ['Rảnh quá, ai giao việc đi', 'Dọn bàn chút', 'Đọc lại checklist cái', 'Hôm nay ăn trưa ở đâu ta?']
@@ -87,20 +89,27 @@ const WINDOW_NIGHT = ['Trăng sáng ghê 🌙', 'Ngoài kia tối om', 'Đêm na
 const isDark = () => { const p = periodNow(); return p === 'night' || p === 'evening' }
 export const EXCUSE = ['Cho em qua với sếp 🙏', 'Xin lỗi sếp, mượn đường!', 'Sếp ơi nhường em tí']
 
-/** Được bạn khen (nút Khen), và lúc lên cấp */
-export const PRAISED = ['Cảm ơn sếp nhiều! 🥰', 'Được sếp khen là vui cả ngày 😄', 'Em sẽ cố hơn nữa!', 'Hihi, cảm ơn sếp 🙏']
-export const LEVEL_UP = (level: number, title: string) => [`Lên cấp ${level} rồi! 🎉`, `Yeah! Giờ em là ${title} 😎`, `Cấp ${level}! Bàn mới đâu sếp ơi 😆`]
+/** Lúc lên cấp */
+export const LEVEL_UP = (level: number, title: string) => [`Lên cấp ${level} rồi! 🎉`, `Yeah! Giờ em là ${title} 😎`, `Cấp ${level}! Giờ mỗi ticket ra nhiều Xu hơn 😆`]
+
+/** Bạn vừa trả Xu dọn một chỗ */
+export const CLEANED: Record<'floor' | 'wall' | 'window' | 'board', string[]> = {
+  floor: ['Sạch bong! ✨', 'Sàn bóng loáng luôn', 'Ôi thơm tho ghê', 'Giờ mới dám ngồi bệt nè 😄'],
+  wall: ['Hết mạng nhện rồi! 🕸️❌', 'Tường sáng hẳn ra', 'Không còn con nhện nào nữa chứ?'],
+  window: ['Cửa sổ trong veo ✨', 'Giờ mới thấy rõ ngoài trời', 'Nắng vào sáng cả phòng'],
+  board: ['Bảng sạch rồi, dễ đọc ghê', 'Giờ mới thấy rõ ticket 📌'],
+}
 
 export const ACT_EMOTE: Record<Activity, string> = {
   coffee: '☕', fridge: '🧃', water: '💧', window: '🌤️', tv: '📺', foos: '🏓', books: '📖',
-  sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌', fame: '🏆',
+  sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌', fame: '🏆', chat: '💬', dust: '🤧',
 }
 
 const DIALOGUES: Dialogue[] = [
   [[0, fun('Trưa nay ăn gì?')], [1, fun('Cơm tấm đầu hẻm đi!')], [0, fun('Chốt!')]],
-  [[0, fun('Làm ván bóng bàn không?')], [1, fun('Thua thì bao cà phê nha')], [0, fun('Ok, chơi luôn')]],
+  [[0, fun('Phòng mình trống trơn ha')], [1, fun('Làm thêm ticket, có Xu sắm đồ')], [0, fun('Chiến thôi! 💪')]],
   [[0, fun('Cuối tuần làm gì?')], [1, fun('Ngủ bù thôi')], [0, fun('Chuẩn bài!')]],
-  [[0, fun('Ai để cốc ở bàn họp vậy?')], [1, fun('Không phải tôi nha 😅')]],
+  [[0, fun('Bụi quá, hắt xì mãi 🤧')], [1, fun('Sếp sắp cho dọn rồi đó')], [0, fun('Mong lắm luôn')]],
   [[0, fun('Mạng hôm nay lag ghê')], [1, fun('Chắc ai đang tải game')], [0, fun('Nghi lắm…')]],
   [[0, fun('Đọc checklist mới chưa?')], [1, fun('Đọc rồi, dài phết')], [0, fun('Mà viết kỹ thật')]],
   [[0, fun('Context còn nhiều không?')], [1, fun('Còn 40%, thoải mái')], [0, fun('Sướng ghê')]],

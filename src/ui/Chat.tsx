@@ -21,7 +21,7 @@ function time(iso: string) {
 /**
  * Ô chat với một agent (Agent Chat của Paperclip): gõ tiếng Việt.
  * Mic (nói → chữ) và đọc to câu trả lời đang tạm tắt: trên một số máy Chrome không nhận
- * giọng được (máy chủ Google lỗi "network", gói tiếng Việt trên máy tải mãi không xong). Code còn trong src/audio/voice.ts.
+ * giọng được (máy chủ Google lỗi "network", gói tiếng Việt trên máy tải mãi không xong). Code cũ nằm ở src/audio/voice.ts trên nhánh main.
  * Mỗi tin gửi đi đánh thức agent chạy một lượt để trả lời.
  */
 export function ChatPane({ agent }: { agent: Agent }) {

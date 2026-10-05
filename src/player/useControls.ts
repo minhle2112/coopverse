@@ -56,6 +56,11 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
         useCoop.getState().openWardrobe()
         return
       }
+      // B: chế độ dọn dẹp (trả Xu dọn chỗ bẩn)
+      if (shortcut && e.code === 'KeyB' && !focused()) {
+        useCoop.getState().toggleClean()
+        return
+      }
       if (focused() || e.ctrlKey || e.metaKey) return
       input.keys.add(e.code)
       if (BLOCK_DEFAULT.has(e.code)) e.preventDefault()

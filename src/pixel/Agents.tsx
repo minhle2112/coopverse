@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { titleOf, useExp, useLevel } from '../data/exp'
+import { useOffice } from '../data/officeSync'
 import { STATUS_COLOR, STATUS_LABEL, type Agent, type AgentStatus } from '../data/types'
 import { actorFor, placeActor, dropActor, stepActor, type Asking, type Body } from '../life/brain'
 import type { LifeActor } from '../life/actors'
@@ -349,12 +350,15 @@ function Overhead({ agent }: { agent: Agent }) {
   // Lúc lên cấp (của mình hoặc người sát bên): im lặng cho hiệu ứng nổi bật; câu nói vẫn còn thì hiện lại sau
   const hush = hushedBy(agent.id, ups)
   const fresh = pop && Date.now() - pop.at < 2500
+  const xu = useOffice((s) => s.pops[agent.id])
+  const xuFresh = xu && Date.now() - xu.at < 2500
   return (
     <div className="px-over">
       {bubble && !hush && <div key={bubble.id} className={`px-say${bubble.real ? ' real' : ''}`} data-who={agent.name}>{plain(bubble.text)}</div>}
       {emoji && !hush && <div key={emoji.id} className="px-emoji">{emoji.icon}</div>}
       {up && <div key={up.id} className="px-lvup">LÊN CẤP {up.level}!</div>}
       {fresh && <div key={pop.id} className="px-xp">+{pop.amount} EXP</div>}
+      {xuFresh && <div key={`xu${xu.id}`} className="px-xp px-xu">+{xu.amount} Xu</div>}
     </div>
   )
 }

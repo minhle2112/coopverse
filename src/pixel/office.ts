@@ -1,15 +1,16 @@
 import { AnimatedSprite, Container, Graphics, NineSliceSprite, Sprite, TilingSprite, type Texture } from 'pixi.js'
 import type { AgentStatus } from '../data/types'
 import {
-  BOARD, DESK_D, DESK_W, FAME, FURNITURE, LEAD_ROOM, MEET_ROOM, OFFICE, deskCenter, forward,
+  BOARD, DESK_D, DESK_W, FURNITURE, OFFICE, WINDOWS, deskCenter, forward,
   type DeskSlot, type Furniture, type World,
 } from '../world/layout'
 import { cut, frames, sprite, stitch, type SpriteName } from './assets'
 import { CAP, MAP_H, MAP_W, PPM, WALL_FACE, px, py } from './geom'
 
 /*
- * Dựng văn phòng pixel từ cùng bố cục với bản 3D (world/layout.ts).
- * - `floor`: sàn, thảm, tường bắc và mọi thứ treo trên đó (luôn nằm dưới nhân vật)
+ * Dựng văn phòng pixel từ bố cục ở world/layout.ts: một phòng lớn trống, cửa sổ và bảng ticket trên tường bắc,
+ * bàn của agent. Bụi bẩn vẽ riêng ở dirt.ts (dọn chỗ nào thì gỡ chỗ đó, không dựng lại cả phòng).
+ * - `floor`: sàn, tường bắc và mọi thứ treo trên đó (luôn nằm dưới nhân vật)
  * - `sorted`: đồ đạc đứng trên sàn, xếp lớp theo cạnh dưới (zIndex = y pixel của chân) cùng với nhân vật
  * - `top`: tường nam (luôn nằm trên cùng)
  */
@@ -22,14 +23,8 @@ const CAP_FILL = 0xece8f1
 const CAP_SHADE = 0xc5bfd2
 const OUTSIDE = 0x1c1a26
 
-/** Gạch sàn của từng khu: một ô 16×16 không có bóng tường (ô giữa hàng dưới của mỗi khối 3×2 trong Room_Builder_Floors) */
-const FLOOR: Record<string, [number, number, number, number]> = {
-  open: [16, 400, 16, 16],
-  lead: [16, 464, 16, 16],
-  meet: [144, 272, 16, 16],
-  pantry: [208, 496, 16, 16],
-  lounge: [16, 336, 16, 16],
-}
+/** Gạch sàn: một ô 16×16 không có bóng tường (ô giữa hàng dưới của một khối 3×2 trong Room_Builder_Floors) */
+const FLOOR: [number, number, number, number] = [16, 400, 16, 16]
 /** Mặt tường bắc (vùng 48×32 trong Room_Builder_Walls) */
 const WALL: [number, number, number, number] = [16, 352, 16, 32]
 
@@ -50,7 +45,6 @@ export interface OfficeView {
   screens: Screen[]
   /** Vẽ lại bảng ticket trên tường (đếm ticket theo cột) */
   kanban: Graphics
-  fame: Graphics
   /** Vệt nắng qua cửa sổ (mờ đi khi trời tối) */
   sun: Graphics
   /** Kính cửa sổ (màu trời) và sao, đổi theo giờ */
@@ -58,8 +52,8 @@ export interface OfficeView {
   stars: Graphics
   /** Nguồn sáng ban đêm (pixel gốc) */
   lights: Light[]
-  /** Khung bảng ticket / bảng vàng trên tường (pixel gốc), để bấm chuột */
-  boards: { kanban: Rect; fame: Rect }
+  /** Khung bảng ticket trên tường (pixel gốc), để bấm chuột */
+  boards: { kanban: Rect }
 }
 
 export interface Rect { x: number; y: number; w: number; h: number }
@@ -102,34 +96,25 @@ function box(g: Graphics, x: number, y: number, w: number, h: number, fill: numb
 
 // ───────────────────────── Sàn, tường ─────────────────────────
 
+/** Mép trên mặt tường bắc (pixel gốc) */
+export const wallTop = () => py(OFFICE.minZ) - WALL_FACE
+
 function buildFloor(c: Container) {
   const bg = new Graphics().rect(0, 0, MAP_W, MAP_H).fill(OUTSIDE)
   c.addChild(bg)
-  const zone = (k: keyof typeof FLOOR, x1: number, z1: number, x2: number, z2: number) => {
-    const [x, y, w, h] = FLOOR[k]
-    c.addChild(tiled(cut('floors', x, y, w, h), px(x1), py(z1), (x2 - x1) * PPM, (z2 - z1) * PPM))
-  }
-  zone('open', OFFICE.minX, OFFICE.minZ, OFFICE.maxX, OFFICE.maxZ)
-  zone('lead', LEAD_ROOM.minX, LEAD_ROOM.minZ, LEAD_ROOM.maxX, LEAD_ROOM.maxZ)
-  zone('meet', MEET_ROOM.minX, MEET_ROOM.minZ, MEET_ROOM.maxX, MEET_ROOM.maxZ)
-  zone('lounge', OFFICE.minX, LEAD_ROOM.maxZ, LEAD_ROOM.maxX, OFFICE.maxZ)
-  zone('pantry', MEET_ROOM.minX, MEET_ROOM.maxZ, OFFICE.maxX, OFFICE.maxZ)
-  // Nẹp giữa các khu không có vách
-  const seam = new Graphics()
-  seam.rect(px(LEAD_ROOM.maxX) - 1, py(LEAD_ROOM.maxZ), 2, py(OFFICE.maxZ) - py(LEAD_ROOM.maxZ)).fill({ color: 0x000000, alpha: 0.18 })
-  seam.rect(px(MEET_ROOM.minX) - 1, py(MEET_ROOM.maxZ), 2, py(OFFICE.maxZ) - py(MEET_ROOM.maxZ)).fill({ color: 0x000000, alpha: 0.18 })
-  c.addChild(seam)
+  const [x, y, w, h] = FLOOR
+  c.addChild(tiled(cut('floors', x, y, w, h), px(OFFICE.minX), py(OFFICE.minZ), (OFFICE.maxX - OFFICE.minX) * PPM, (OFFICE.maxZ - OFFICE.minZ) * PPM))
 
   // Tường bắc: mặt tường + nắp + bóng đổ xuống sàn
-  const top = py(OFFICE.minZ) - WALL_FACE
+  const top = wallTop()
   const [wx0, wy0, ww, wh] = WALL
   // Tường cao 3 ô: dải trên lặp phần giữa của viên tường LimeZu, 2 ô dưới là viên tường nguyên (có chân tường)
   const W = (OFFICE.maxX - OFFICE.minX) * PPM
   c.addChild(tiled(cut('walls', wx0, wy0 + 8, ww, WALL_FACE - wh), px(OFFICE.minX), top, W, WALL_FACE - wh))
   c.addChild(tiled(cut('walls', wx0, wy0, ww, wh), px(OFFICE.minX), top + WALL_FACE - wh, W, wh))
   const g = new Graphics()
-  g.rect(px(OFFICE.minX), py(OFFICE.minZ), (OFFICE.maxX - OFFICE.minX) * PPM, 4).fill({ color: 0x000000, alpha: 0.16 })
-  g.rect(px(OFFICE.minX), py(OFFICE.minZ) + 4, (OFFICE.maxX - OFFICE.minX) * PPM, 3).fill({ color: 0x000000, alpha: 0.07 })
+  g.rect(px(OFFICE.minX), py(OFFICE.minZ), W, 4).fill({ color: 0x000000, alpha: 0.16 })
+  g.rect(px(OFFICE.minX), py(OFFICE.minZ) + 4, W, 3).fill({ color: 0x000000, alpha: 0.07 })
   c.addChild(g)
 }
 
@@ -142,7 +127,7 @@ function capBand(g: Graphics, x: number, y: number, w: number, h: number) {
 
 function buildOuterWalls(floor: Container, top: Container) {
   const g = new Graphics()
-  const yTop = py(OFFICE.minZ) - WALL_FACE - CAP
+  const yTop = wallTop() - CAP
   const x0 = px(OFFICE.minX) - CAP, x1 = px(OFFICE.maxX)
   capBand(g, x0, yTop, x1 - x0 + CAP, CAP)
   // Tường tây, đông: chỉ thấy nắp
@@ -160,60 +145,30 @@ function buildOuterWalls(floor: Container, top: Container) {
   top.addChild(s)
 }
 
-/** Vách kính: phòng Lead và phòng họp */
-function buildGlass(floor: Container, sorted: Container[]) {
-  const H = 26
-  // Vách dọc: chỉ thấy nắp (khung nhôm + kính)
-  const v = new Graphics()
-  for (const x of [LEAD_ROOM.maxX, MEET_ROOM.minX]) {
-    const sx = px(x) - 3
-    const y0 = py(OFFICE.minZ) - 2, y1 = py(LEAD_ROOM.maxZ)
-    v.rect(sx, y0, 6, y1 - y0).fill(0x7d8597)
-    v.rect(sx + 1, y0, 4, y1 - y0).fill(0xbfe3ee)
-    v.rect(sx + 2, y0, 1, y1 - y0).fill(0xeaf7fb)
-  }
-  floor.addChild(v)
-
-  // Vách ngang (mặt kính quay về phía nam): người trong phòng bị kính phủ lên, người ngoài đứng trước kính
-  const pane = (x1: number, x2: number) => {
-    if (x2 - x1 < 0.05) return
-    const g = new Graphics()
-    const sx = px(x1), w = (x2 - x1) * PPM, base = py(LEAD_ROOM.maxZ)
-    g.rect(sx, base - H, w, H).fill({ color: 0xbfe6f2, alpha: 0.32 })
-    // Vệt sáng chéo
-    for (let k = 10; k < w - 6; k += 37) g.poly([sx + k, base - 2, sx + k + 6, base - 2, sx + k + 14, base - H + 2, sx + k + 8, base - H + 2]).fill({ color: 0xffffff, alpha: 0.22 })
-    // Khung: nắp trên, chân, đố dọc mỗi mét
-    g.rect(sx, base - H - 4, w, 4).fill(0x7d8597)
-    g.rect(sx, base - H - 3, w, 1).fill(0xd8dee8)
-    g.rect(sx, base - 2, w, 2).fill(0x5d6575)
-    for (let m = Math.ceil(x1); m <= Math.floor(x2); m++) g.rect(px(m) - 1, base - H, 2, H).fill(0x7d8597)
-    sorted.push(sortAt(g, base + 1))
-  }
-  pane(LEAD_ROOM.minX, LEAD_ROOM.door[0])
-  pane(LEAD_ROOM.door[1], LEAD_ROOM.maxX)
-  pane(MEET_ROOM.minX, MEET_ROOM.door[0])
-  pane(MEET_ROOM.door[1], MEET_ROOM.maxX)
-}
-
 // ───────────────────────── Đồ treo tường bắc ─────────────────────────
 
 /** Đồ treo tường (cửa sổ, tranh, bảng) hạ xuống giữa mặt tường cao 3 ô */
 const WALL_SHIFT = 10
 const onWall = (s: Sprite, x: number, fromTop: number) => {
   s.anchor.set(0.5, 0)
-  s.position.set(Math.round(px(x)), py(OFFICE.minZ) - WALL_FACE + WALL_SHIFT + fromTop)
+  s.position.set(Math.round(px(x)), wallTop() + WALL_SHIFT + fromTop)
   return s
 }
 
 /** Hai ô kính trong hình cửa sổ LimeZu (25×20): x 2–10 và 14–22, y 3–15 */
-const PANES = [[2, 3, 9, 13], [14, 3, 9, 13]] as const
+export const PANES = [[2, 3, 9, 13], [14, 3, 9, 13]] as const
+
+/** Khung hình cửa sổ ở toạ độ x (mét) trên tường bắc (pixel gốc) */
+export function windowBox(x: number): Rect {
+  const t = sprite('window')
+  return { x: Math.round(px(x) - t.width / 2), y: wallTop() + WALL_SHIFT + 6, w: t.width, h: t.height }
+}
 
 function buildWallDecor(floor: Container) {
-  const wins = [-12.3, -1.5, 1.5]
   // Nắng xiên qua cửa sổ: vệt sáng nhạt trên sàn
   const sun = new Graphics()
   const y0 = py(OFFICE.minZ)
-  for (const x of wins) {
+  for (const x of WINDOWS) {
     const cx = px(x)
     sun.poly([cx - 12, y0, cx + 12, y0, cx + 22, y0 + 44, cx - 2, y0 + 44]).fill({ color: 0xfff1c9, alpha: 0.2 })
   }
@@ -221,34 +176,25 @@ function buildWallDecor(floor: Container) {
   // Kính phủ màu trời (trong suốt ban ngày) và vài ngôi sao ban đêm, vẽ đè lên ô kính
   const panes = new Graphics()
   const stars = new Graphics()
-  for (const x of wins) {
-    const w = onWall(new Sprite(sprite('window')), x, 6)
-    floor.addChild(w)
-    const left = Math.round(w.x - w.width / 2), top = Math.round(w.y)
+  for (const x of WINDOWS) {
+    floor.addChild(onWall(new Sprite(sprite('window')), x, 6))
+    const { x: left, y: top } = windowBox(x)
     for (const [dx, dy, pw, ph] of PANES) panes.rect(left + dx, top + dy, pw, ph).fill(0xffffff)
     for (const [dx, dy] of [[4, 5], [8, 11], [16, 7], [20, 13], [18, 4]]) stars.rect(left + dx, top + dy, 1, 1).fill(0xfff6d0)
   }
   floor.addChild(panes, stars)
-  floor.addChild(onWall(new Sprite(sprite('painting2')), -9.4, 9))
-  floor.addChild(onWall(new Sprite(sprite('painting3')), -6.85, 9))
-  floor.addChild(onWall(new Sprite(sprite('painting1')), 6.85, 9))
-  // TV và bảng biểu đồ (Modern Office) phòng họp
-  floor.addChild(onWall(new Sprite(sprite('tv')), 10.0, 7))
-  floor.addChild(onWall(new Sprite(sprite('moChart2')), 12.3, 4))
-  // Đồng hồ cúc cu (động)
-  const clock = new AnimatedSprite(frames('clock', 16, 32))
-  clock.anchor.set(0.5, 0)
-  clock.position.set(Math.round(px(0)), py(OFFICE.minZ) - WALL_FACE)
-  clock.animationSpeed = 0.06
-  clock.play()
-  floor.addChild(clock)
   return { sun, panes, stars }
 }
 
+/** Khung bảng ticket trên tường bắc (pixel gốc, chưa tính bóng đổ) */
+export function boardBox(): Rect {
+  const w = Math.round(BOARD.w * PPM), h = 26
+  return { x: Math.round(px(BOARD.x) - w / 2), y: wallTop() + WALL_SHIFT + 3, w, h }
+}
+
 /** Khung bảng treo tường bắc, trả về Graphics để vẽ nội dung */
-function wallBoard(floor: Container, b: { x: number; w: number }, frame: 'corkboard' | 'chalkWall', inner?: number) {
-  const w = Math.round(b.w * PPM), h = 26
-  const x = Math.round(px(b.x) - w / 2), y = py(OFFICE.minZ) - WALL_FACE + WALL_SHIFT + 3
+function wallBoard(floor: Container, frame: 'corkboard' | 'chalkWall', inner?: number) {
+  const { x, y, w, h } = boardBox()
   const g = new Graphics()
   g.rect(x + 1, y + h, w - 2, 2).fill({ color: 0x000000, alpha: 0.22 })
   floor.addChild(g)
@@ -264,7 +210,6 @@ function wallBoard(floor: Container, b: { x: number; w: number }, frame: 'corkbo
 }
 
 let kanbanBox = { w: 0, h: 0 }
-let fameBox = { w: 0, h: 0 }
 
 /** Bảng ticket: 5 cột, mỗi ticket một mẩu giấy màu (tối đa 8 mẩu mỗi cột) */
 export function drawKanban(g: Graphics, counts: { color: string; n: number }[]) {
@@ -283,24 +228,9 @@ export function drawKanban(g: Graphics, counts: { color: string; n: number }[]) 
   })
 }
 
-/** Bảng vàng: dải tiêu đề vàng + top 3 (cột cao thấp theo EXP) */
-export function drawFame(g: Graphics, top: { color: string; frac: number }[]) {
-  g.clear()
-  const { w } = fameBox
-  g.rect(0, 0, w, 4).fill(GOLD)
-  g.rect(Math.round(w / 2) - 4, 1, 8, 2).fill(0xfff3c4)
-  const medal = [GOLD, 0xc9d1db, 0xd68a4c]
-  top.slice(0, 3).forEach((t, i) => {
-    const y = 6 + i * 4
-    g.rect(2, y, 2, 3).fill(medal[i])
-    g.rect(6, y, 3, 3).fill(t.color)
-    g.rect(11, y + 1, Math.max(2, Math.round((w - 14) * t.frac)), 1).fill(medal[i])
-  })
-}
-
 // ───────────────────────── Bàn làm việc ─────────────────────────
 
-/** Màn hình nhìn ngang (bàn Lead: người ngồi quay sang phải) */
+/** Màn hình nhìn ngang (bàn quay ngang: người ngồi quay sang phải) */
 function monitorSide(g: Graphics, x: number, bottom: number) {
   const y = Math.round(bottom - 13)
   g.rect(x, y, 3, 10).fill(0x2b2f3a)
@@ -310,14 +240,13 @@ function monitorSide(g: Graphics, x: number, bottom: number) {
 }
 
 /**
- * Mặt bàn: bàn gỗ mật ong của LimeZu (1_Generic), giữ mép và chân bàn, lặp vân gỗ cho đủ kích thước.
- * Bậc cao nhất thêm viền vàng.
+ * Mặt bàn: bàn văn phòng LimeZu (Modern Office), giữ mép và chân bàn, lặp phần giữa cho đủ kích thước.
+ * `gold`: viền vàng (đồ trên bàn, mua ở cửa hàng ở đợt sau).
  */
 function deskTop(x: number, y: number, w: number, d: number, gold: boolean) {
   const X = Math.round(x), Y = Math.round(y), W = Math.round(w), D = Math.round(d)
   const c = new Container()
   c.addChild(new Graphics().rect(X + 2, Y + D + DESK_LIFT - 2, W - 1, 3).fill({ color: 0x000000, alpha: 0.2 }))
-  // Bàn văn phòng của gói LimeZu Modern Office (giữ mép, lặp phần giữa cho vừa kích thước)
   const t = new Sprite(stitch('moDesk', W, D + DESK_LIFT, 3, 4, 4, 7))
   t.position.set(X, Y)
   c.addChild(t)
@@ -369,8 +298,9 @@ function liveScreen(slotId: string, r: { x: number; y: number; w: number; h: num
 const CHAIR_TINT = [0xffffff, 0xffffff, 0xffffff, 0xb07a5a, 0xb07a5a]
 
 /**
- * Bàn của một chỗ ngồi + ghế + đồ trang trí theo bậc (cây, màn thứ hai, đèn và ghế da, cúp và viền vàng).
- * Bàn quay về nam (người ngồi phía bắc, nhìn về camera), về bắc (người ngồi quay lưng), hoặc về đông (bàn Lead).
+ * Bàn của một chỗ ngồi + ghế. `tier` = đồ trên bàn (0 = bàn cơ bản miễn phí; cây, màn thứ hai, đèn và ghế da,
+ * cúp và viền vàng sẽ mua ở cửa hàng ở đợt sau).
+ * Bàn quay về nam (người ngồi phía bắc, nhìn về camera), về bắc (người ngồi quay lưng), hoặc về đông.
  */
 function buildDesk(s: DeskSlot, tier: number, sorted: Container[], screens: Screen[], lights: Light[], phase: number) {
   const c = deskCenter(s)
@@ -462,9 +392,9 @@ function buildDesk(s: DeskSlot, tier: number, sorted: Container[], screens: Scre
   }
 }
 
-// ───────────────────────── Đồ đạc ─────────────────────────
+// ───────────────────────── Đồ đạc (dùng lại cho đồ mua ở cửa hàng, đợt sau) ─────────────────────────
 
-function rug(f: Furniture) {
+export function rug(f: Furniture) {
   const blue = f.color === '#7a8fb8' || f.color === '#4f9d94'
   const tex = sprite(blue ? 'rugBlue' : 'rugRed')
   const r = new NineSliceSprite({ texture: tex, leftWidth: 14, rightWidth: 14, topHeight: 12, bottomHeight: 12 })
@@ -520,7 +450,7 @@ function row(names: SpriteName[], cx: number, bottom: number) {
 }
 
 /** Bóng đổ nhạt sát chân đồ đạc (hình LimeZu không kèm bóng) */
-function withShadow(o: Container) {
+export function withShadow(o: Container) {
   const b = o.getBounds()
   const g = new Graphics()
   g.ellipse(Math.round(b.x + b.width / 2), Math.round(b.y + b.height - 1), Math.max(4, Math.round(b.width * 0.46)), 3).fill({ color: 0x000000, alpha: 0.2 })
@@ -530,7 +460,7 @@ function withShadow(o: Container) {
   return c
 }
 
-function furniture(f: Furniture): Container | null {
+export function furniture(f: Furniture): Container | null {
   const bottom = (dz: number) => py(f.z + dz)
   switch (f.kind) {
     case 'plant': {
@@ -588,52 +518,31 @@ function furniture(f: Furniture): Container | null {
   }
 }
 
-export function buildOffice(world: World, tierOfSlot: Map<string, number>): OfficeView {
+export function buildOffice(world: World): OfficeView {
   const floor = new Container()
   const top = new Container()
   const sorted: Container[] = []
   const screens: Screen[] = []
 
   buildFloor(floor)
-  const all = [...FURNITURE, ...world.extras]
-  for (const f of all) if (f.kind === 'rug') floor.addChild(rug(f))
-  // Thảm xanh dưới mỗi cụm bàn: chia open space thành từng góc làm việc
-  for (const p of world.pods) {
-    const w = Math.round(6.0 * PPM), h = Math.round(3.7 * PPM)
-    const r = new Sprite(stitch('rugGrey', w, h, 16, 16, 13, 13))
-    r.position.set(Math.round(px(p.x) - w / 2), Math.round(py(p.z) - h / 2))
-    floor.addChild(r)
-  }
   const { sun, panes, stars } = buildWallDecor(floor)
-  const kb = wallBoard(floor, BOARD, 'corkboard', CORK)
+  const kb = wallBoard(floor, 'corkboard', CORK)
   kanbanBox = { w: kb.w, h: kb.h }
-  const fb = wallBoard(floor, FAME, 'chalkWall')
-  fameBox = { w: fb.w, h: fb.h }
   buildOuterWalls(floor, top)
-  buildGlass(floor, sorted)
 
-  for (const f of all) {
+  for (const f of FURNITURE) {
     const o = furniture(f)
     if (o) sorted.push(f.kind === 'fruitBowl' || f.kind === 'coffeeMachine' || f.kind === 'printer' ? o : withShadow(o))
   }
   const lights: Light[] = []
-  world.slots.forEach((s, i) => buildDesk(s, tierOfSlot.get(s.id) ?? 0, sorted, screens, lights, i * 1.7))
-  // Đèn cây: bóng đèn ở đỉnh (~1,4 m, tức 45 px phía trên chân)
-  for (const f of all) if (f.kind === 'floorLamp') lights.push({ x: px(f.x), y: py(f.z) - 40, r: 44, kind: 'lamp' })
-  // Đèn trần chỉ ở chỗ làm việc (mỗi cụm bàn, phòng Lead, phòng họp). Phòng kính thì kẹp trong phòng;
-  // cụm bàn không có vách nên ánh sáng tràn nhẹ ra ngoài thảm.
-  // Chỗ khác sáng nhờ đèn có thật: đèn cây, đèn bàn, màn hình, đèn dưới tủ bếp, TV, máy game, đèn cửa.
+  // Bàn cơ bản miễn phí cho mỗi agent (đồ trên bàn mua ở cửa hàng, đợt sau)
+  world.slots.forEach((s, i) => buildDesk(s, 0, sorted, screens, lights, i * 1.7))
+  // Đèn trần trên mỗi cụm bàn (ánh sáng tràn nhẹ ra ngoài), đèn cửa vào.
+  // Chỗ khác sáng nhờ đèn có thật: màn hình, và (sau này) đèn cây, đèn bàn mua ở cửa hàng.
   for (const p of world.pods) lights.push({ x: px(p.x), y: py(p.z), r: 3.3 * PPM, kind: 'ceiling' })
-  for (const r of [LEAD_ROOM, MEET_ROOM]) {
-    const clip = { x: px(r.minX + 0.15), y: py(r.minZ), w: (r.maxX - r.minX - 0.3) * PPM, h: (r.maxZ - r.minZ - 0.15) * PPM }
-    lights.push({ x: px((r.minX + r.maxX) / 2), y: py((r.minZ + r.maxZ) / 2 + 0.4), r: 2.6 * PPM, kind: 'ceiling', clip })
-  }
-  for (const f of all) {
-    if (f.kind === 'kitchen') lights.push({ x: px(f.x), y: py(f.z) + 4, r: 1.6 * PPM, kind: 'lamp' })
-    if (f.kind === 'tvStand') lights.push({ x: px(f.x), y: py(f.z) + 10, r: 1.4 * PPM, kind: 'screen' })
-    if (f.kind === 'arcade') lights.push({ x: px(f.x), y: py(f.z) - 6, r: 0.9 * PPM, kind: 'screen' })
+  for (const f of FURNITURE) {
     if (f.kind === 'door') lights.push({ x: px(f.x), y: py(f.z) - 12, r: 1.5 * PPM, kind: 'lamp' })
   }
 
-  return { floor, sorted, top, screens, kanban: kb.content, fame: fb.content, sun, panes, stars, lights, boards: { kanban: kb.rect, fame: fb.rect } }
+  return { floor, sorted, top, screens, kanban: kb.content, sun, panes, stars, lights, boards: { kanban: kb.rect } }
 }

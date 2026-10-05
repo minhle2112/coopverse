@@ -1,26 +1,13 @@
 import type { Mood, PoseMode } from '../characters/Character'
-import { GRAPH, POIS, type DeskSlot, type Vec2 } from '../world/layout'
+import type { DeskSlot, Vec2 } from '../world/layout'
+import { allSpots, spotById } from './spots'
 import { clock } from './store'
 
-/** Điểm trên đường đi của agent. */
-export interface WP {
-  x: number
-  z: number
-  /** Nút lối đi */
-  node?: string
-  /** Ghế của chính agent */
-  seat?: boolean
-  /** Thứ tự điểm ra khỏi ghế của chính agent */
-  exit?: number
-  /** Đường ghé bàn người khác: nút lối đi gần bàn đó */
-  via?: string
-  /** Chỗ đứng sau ghế người được ghé; `back` = điểm lối đi để quay ra */
-  stand?: boolean
-  back?: Vec2
-}
+/** Điểm trên đường đi của agent */
+export type WP = Vec2
 
 /**
- * Trạng thái sống của một agent, dùng chung giữa AgentActor (di chuyển, dáng) và director (hội thoại, chào hỏi).
+ * Trạng thái sống của một agent, dùng chung giữa bộ não (di chuyển, dáng) và director (hội thoại, chào hỏi).
  * Để ngoài React: đổi mỗi khung hình.
  */
 export interface LifeActor {
@@ -29,12 +16,10 @@ export interface LifeActor {
   x: number
   z: number
   yaw: number
-  /** seat: ngồi bàn · spot: ở một điểm (cà phê, sofa...) · visit: đứng sau ghế đồng nghiệp · walk: đang đi */
+  /** seat: ngồi bàn · spot: ở một chỗ (cửa sổ, bảng...) · visit: đứng sau ghế đồng nghiệp · walk: đang đi */
   where: 'seat' | 'spot' | 'visit' | 'walk'
-  /** Nút đang đứng (spot) hoặc nút lối đi gần bàn đang ghé (visit) */
-  node: string | null
-  /** Điểm lối đi để rời chỗ đứng khi ghé bàn */
-  back: Vec2 | null
+  /** Chỗ đang đứng, hoặc đang đi tới (id trong spots.ts) */
+  spot: string | null
   /** Chỗ nhìn vào khi ghé bàn */
   lookAt: Vec2 | null
   pts: WP[]
@@ -68,7 +53,7 @@ export interface LifeActor {
 
 export const actors = new Map<string, LifeActor>()
 
-/** Chỗ (POI) → agent đã nhận chỗ đó. Mỗi chỗ chỉ một người. */
+/** Chỗ → agent đã nhận chỗ đó. Mỗi chỗ chỉ một người. */
 const claims = new Map<string, string>()
 
 export function release(id: string) {
@@ -81,7 +66,7 @@ export function newActor(id: string, slot: DeskSlot): LifeActor {
   const t = clock.t
   return {
     id, slot, x: slot.seat.x, z: slot.seat.z, yaw: slot.yaw,
-    where: 'seat', node: null, back: null, lookAt: null, pts: [], i: 0, dest: 'seat',
+    where: 'seat', spot: null, lookAt: null, pts: [], i: 0, dest: 'seat',
     timer: rand(2, 8), arrivedAt: t - 10,
     face: null, faceUntil: 0, gesture: null, gestureUntil: 0, mood: null, moodUntil: 0,
     talkUntil: 0, chatCd: t + rand(4, 12), nextMuse: t + rand(6, 25), greetAt: 0, visitCd: t + rand(30, 60),
@@ -92,28 +77,27 @@ export function newActor(id: string, slot: DeskSlot): LifeActor {
 /** Đưa agent về ngồi ở bàn ngay (khi mới vào hoặc bàn đổi chỗ). */
 export function resetToSeat(a: LifeActor, slot: DeskSlot) {
   release(a.id)
-  Object.assign(a, { slot, x: slot.seat.x, z: slot.seat.z, yaw: slot.yaw, where: 'seat', node: null, back: null, pts: [], i: 0, dest: 'seat', cmd: null })
+  Object.assign(a, { slot, x: slot.seat.x, z: slot.seat.z, yaw: slot.yaw, where: 'seat', spot: null, pts: [], i: 0, dest: 'seat', cmd: null })
 }
 
 /**
  * Chọn chỗ tiếp theo cho agent rảnh và giữ chỗ đó. Ưu tiên khu đang có đồng nghiệp (để tụ tập nói chuyện),
- * và chỗ bóng bàn còn lại khi đã có người đứng một bên.
+ * và chỗ còn lại của một cặp (bóng bàn, góc tán gẫu) khi đã có người đứng một bên.
  */
-export function chooseSpot(self: LifeActor, exclude?: string | null): string {
+export function chooseSpot(self: LifeActor, exclude?: string | null): string | null {
+  const spots = allSpots()
+  if (!spots.length) return null
   const crowd = new Map<string, number>()
   for (const o of actors.values()) {
-    if (o === self) continue
-    const n = o.node && (o.where === 'spot' || (o.where === 'walk' && o.dest === 'spot')) ? GRAPH.nodes[o.node] : null
-    const target = o.where === 'walk' && o.dest === 'spot' ? GRAPH.nodes[o.pts[o.pts.length - 1]?.node ?? ''] : n
-    if (target?.area) crowd.set(target.area, (crowd.get(target.area) ?? 0) + 1)
+    if (o === self || (o.where !== 'spot' && !(o.where === 'walk' && o.dest === 'spot'))) continue
+    const area = spotById(o.spot)?.area
+    if (area) crowd.set(area, (crowd.get(area) ?? 0) + 1)
   }
-  const foosTaken = POIS.some((p) => p.act === 'foos' && claims.has(p.id) && claims.get(p.id) !== self.id)
-  const free = POIS.filter((p) => p.id !== exclude && (!claims.has(p.id) || claims.get(p.id) === self.id))
-  const list = free.length ? free : POIS
+  const free = spots.filter((p) => p.id !== exclude && (!claims.has(p.id) || claims.get(p.id) === self.id))
+  const list = free.length ? free : spots
   const weights = list.map((p) => {
-    let w = 1
-    if (p.area && crowd.get(p.area)) w *= 4
-    if (p.act === 'foos' && foosTaken) w *= 6
+    let w = p.act === 'dust' ? 0.6 : 1
+    if (p.area && crowd.get(p.area)) w *= p.act === 'chat' || p.act === 'foos' ? 8 : 4
     return w
   })
   let r = Math.random() * weights.reduce((s, w) => s + w, 0)

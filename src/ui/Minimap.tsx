@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
+import { JOBS, isClean, type OfficeState } from '../data/officeState'
+import { useOffice } from '../data/officeSync'
 import { STATUS_COLOR } from '../data/types'
 import { agentPos, player } from '../runtime'
 import { useCoop } from '../store'
-import { BOARD, DESK_D, DESK_W, LEAD_ROOM, MEET_ROOM, OFFICE, deskCenter, type World } from '../world/layout'
+import { BOARD, DESK_D, DESK_W, OFFICE, deskCenter, type World } from '../world/layout'
 
 const PX = 7 // điểm ảnh mỗi mét
 const W = (OFFICE.maxX - OFFICE.minX) * PX
@@ -11,31 +13,16 @@ const sx = (x: number) => (x - OFFICE.minX) * PX
 const sz = (z: number) => (z - OFFICE.minZ) * PX
 const PING_MS = 5000
 
-type Box = { minX: number; maxX: number; minZ: number; maxZ: number }
-const PANTRY: Box = { minX: 9, maxX: 16, minZ: 3.6, maxZ: 11 }
-const LOUNGE: Box = { minX: -16, maxX: -9, minZ: 3.6, maxZ: 11 }
-
-function drawStatic(ctx: CanvasRenderingContext2D, world: World) {
+function drawStatic(ctx: CanvasRenderingContext2D, world: World, office: OfficeState) {
   ctx.fillStyle = '#2b3242'
   ctx.fillRect(0, 0, W, H)
 
-  const zone = (b: Box, fill: string, label: string, glass = false) => {
-    ctx.fillStyle = fill
-    ctx.fillRect(sx(b.minX), sz(b.minZ), (b.maxX - b.minX) * PX, (b.maxZ - b.minZ) * PX)
-    if (glass) {
-      ctx.strokeStyle = 'rgba(170, 215, 240, 0.7)'
-      ctx.lineWidth = 1.5
-      ctx.strokeRect(sx(b.minX), sz(b.minZ), (b.maxX - b.minX) * PX, (b.maxZ - b.minZ) * PX)
-    }
-    ctx.fillStyle = 'rgba(244, 241, 234, 0.55)'
-    ctx.font = '600 9px "Segoe UI", system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText(label, sx((b.minX + b.maxX) / 2), sz(b.maxZ) - 4)
+  // Mảng sàn còn bẩn: sẫm màu bụi
+  for (const j of JOBS) {
+    if (j.kind !== 'floor' || !j.rect || isClean(office, j.id)) continue
+    ctx.fillStyle = 'rgba(120, 100, 70, 0.32)'
+    ctx.fillRect(sx(j.rect.minX), sz(j.rect.minZ), (j.rect.maxX - j.rect.minX) * PX, (j.rect.maxZ - j.rect.minZ) * PX)
   }
-  zone(LEAD_ROOM, 'rgba(122, 143, 184, 0.28)', 'Lead', true)
-  zone(MEET_ROOM, 'rgba(138, 123, 176, 0.28)', 'Họp', true)
-  zone(PANTRY, 'rgba(242, 181, 68, 0.14)', 'Bếp')
-  zone(LOUNGE, 'rgba(79, 157, 148, 0.24)', 'Góc nghỉ')
 
   ctx.fillStyle = '#9b7a55'
   for (const s of world.slots) {
@@ -61,6 +48,7 @@ function drawStatic(ctx: CanvasRenderingContext2D, world: World) {
 /** Bản đồ nhỏ góc dưới phải: bắc ở trên, chấm màu theo trạng thái, mũi tên là bạn. */
 export function Minimap({ world }: { world: World }) {
   const ref = useRef<HTMLCanvasElement>(null)
+  const office = useOffice((s) => s.office)
 
   useEffect(() => {
     const canvas = ref.current!
@@ -74,7 +62,7 @@ export function Minimap({ world }: { world: World }) {
     bg.height = H * dpr
     const bctx = bg.getContext('2d')!
     bctx.scale(dpr, dpr)
-    drawStatic(bctx, world)
+    drawStatic(bctx, world, office)
 
     // setInterval thay vì rAF: vẫn chạy khi tab bị ẩn, 10 khung/giây là đủ cho bản đồ
     const draw = () => {
@@ -143,7 +131,7 @@ export function Minimap({ world }: { world: World }) {
     draw()
     const id = setInterval(draw, 100)
     return () => clearInterval(id)
-  }, [world])
+  }, [world, office])
 
   return (
     <div className="panel minimap">

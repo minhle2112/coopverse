@@ -1,26 +1,24 @@
 import { useState } from 'react'
 import { partsOf, usePixelLooks } from '../pixel/look'
 import { Avatar } from '../pixel/Wardrobe'
-import { DESK_PERKS, EXP, deskTier, levelProgress, ranking, titleOf, useExp, weekStart, type RankBy } from '../data/exp'
-import { kudosOf } from '../data/expSync'
-import type { Agent } from '../data/types'
+import { EXP, levelProgress, ranking, titleOf, useExp, weekStart, type RankBy } from '../data/exp'
+import { useOffice } from '../data/officeSync'
+import { XU_TICKET, fmtXu } from '../data/xu'
 import { useCoop } from '../store'
-import { KudosDialog } from './Kudos'
 
 const BY_LABEL: Record<RankBy, string> = { week: 'Tuần này', total: 'Mọi lúc' }
 
-/** Bảng vàng phóng to khi bấm E trước bảng: xếp hạng EXP, chi tiết điểm, nút Khen. */
+/** Bảng vàng phóng to khi bấm E trước bảng: xếp hạng EXP, chi tiết điểm, Xu mỗi agent mang về cho quỹ. */
 export function FameView() {
   const agents = useCoop((s) => s.agents)
   const company = useCoop((s) => s.company)
   const demo = useCoop((s) => s.conn === 'demo')
   const closeFame = useCoop((s) => s.closeFame)
   const stats = useExp((s) => s.stats)
-  const ledger = useExp((s) => s.ledger)
   const ready = useExp((s) => s.ready)
+  const xuOf = useOffice((s) => s.earned.byAgent)
   usePixelLooks((s) => s.custom)
   const [by, setBy] = useState<RankBy>('week')
-  const [kudosFor, setKudosFor] = useState<Agent | null>(null)
   const rows = ranking(agents, stats, by)
   const leads = new Set(agents.map((a) => a.reportsTo).filter(Boolean))
   const since = new Date(weekStart()).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
@@ -54,7 +52,6 @@ export function FameView() {
             const lv = s?.level ?? 1
             const [have, need] = levelProgress(s?.total ?? 0)
             const c = by === 'week' ? s?.weekCounts : s?.counts
-            const last = kudosOf(ledger, r.agent.id, 1)[0]
             return (
               <div key={r.agent.id} className={`fame-row${i < 3 && r.exp > 0 ? ` top top${i + 1}` : ''}`}>
                 <span className="fame-rank">{i + 1}</span>
@@ -66,24 +63,20 @@ export function FameView() {
                     {r.agent.name}
                   </span>
                   <span className="fame-title">
-                    <span className="lv-chip">Lv {lv}</span> {titleOf(lv)} · <span className="muted">{DESK_PERKS[deskTier(lv)]}</span>
+                    <span className="lv-chip">Lv {lv}</span> {titleOf(lv)}
                   </span>
                   <span className="fame-progress" title={`Còn ${need - have} EXP nữa lên cấp ${lv + 1}`}>
                     <span className="exp-mini"><i style={{ width: `${Math.round((100 * have) / need)}%` }} /></span>
                     <span className="muted">{have}/{need} tới cấp {lv + 1}</span>
                   </span>
-                  {last?.note && <span className="fame-quote">“{last.note}”</span>}
                 </span>
-                <span className="fame-counts" title="Ticket xong · lượt chạy thành công · phiếu được duyệt · lời khen">
+                <span className="fame-counts" title="Ticket xong · lượt chạy thành công · phiếu được duyệt · Xu mang về cho quỹ (mọi lúc)">
                   <span>🎫 {c?.tickets ?? 0}</span>
                   <span>▶ {c?.runs ?? 0}</span>
                   <span>✅ {c?.approvals ?? 0}</span>
-                  <span>👏 {c?.kudos ?? 0}</span>
+                  <span className="fame-xu">🪙 {fmtXu(xuOf[r.agent.id] ?? 0)}</span>
                 </span>
                 <span className="fame-exp">{r.exp.toLocaleString('vi-VN')}<small>EXP</small></span>
-                <button className="t-btn kudos-btn" onClick={() => setKudosFor(r.agent)} title={`Khen ${r.agent.name} (+${EXP.kudos} EXP)`}>
-                  👏 Khen
-                </button>
               </div>
             )
           })}
@@ -91,10 +84,9 @@ export function FameView() {
 
         <div className="fame-foot">
           Cách tính: ticket xong +{EXP.ticket.low}/+{EXP.ticket.medium}/+{EXP.ticket.high}/+{EXP.ticket.critical} (ưu tiên thấp/vừa/cao/khẩn) ·
-          lượt chạy thành công +{EXP.run} · phiếu được duyệt +{EXP.approval} · lời khen +{EXP.kudos} · lỗi 0 điểm.
-          Cấp sau cần thêm 100 × cấp hiện tại. Bàn nâng cấp ở cấp 3, 5, 7, 9.
+          lượt chạy thành công +{EXP.run} · phiếu được duyệt +{EXP.approval} · lỗi 0 điểm. Cấp sau cần thêm 100 × cấp hiện tại.
+          Xu: ticket xong {XU_TICKET.low}/{XU_TICKET.medium}/{XU_TICKET.high}/{XU_TICKET.critical} Xu, mỗi cấp của agent thêm 10%.
         </div>
-        {kudosFor && <KudosDialog agent={kudosFor} onClose={() => setKudosFor(null)} />}
       </div>
     </div>
   )

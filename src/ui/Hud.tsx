@@ -6,6 +6,7 @@ import { useCoop } from '../store'
 import type { World } from '../world/layout'
 import { useExp } from '../data/exp'
 import { desktop } from '../desktop'
+import { CleanupPanel, XuBadge } from './Cleanup'
 import { FameView } from './FameView'
 import { AskSheet, Inbox } from './Inbox'
 import { KanbanView } from './KanbanView'
@@ -144,8 +145,8 @@ export function Hud({ world }: { world: World }) {
   const focusId = useCoop((s) => s.focusId)
   const nearBoard = useCoop((s) => s.nearBoard)
   const boardOpen = useCoop((s) => s.boardOpen)
-  const nearFame = useCoop((s) => s.nearFame)
   const fameOpen = useCoop((s) => s.fameOpen)
+  const cleanOpen = useCoop((s) => s.cleanOpen)
   const expStats = useExp((s) => s.stats)
   const wardrobeId = useCoop((s) => s.wardrobeId)
   const settingsOpen = useCoop((s) => s.settingsOpen)
@@ -185,10 +186,12 @@ export function Hud({ world }: { world: World }) {
           <CompanyLine />
           <ConnBadge />
           <Clock />
+          <XuBadge />
         </div>
         <Toolbar />
         <Inbox />
         {settingsOpen && <SettingsPanel />}
+        {cleanOpen && <CleanupPanel />}
         <Notes />
       </div>
 
@@ -242,13 +245,6 @@ export function Hud({ world }: { world: World }) {
         </div>
       )}
 
-      {nearFame && !viewing && (
-        <div className="prompt">
-          <kbd>E</kbd>
-          <span>Xem bảng vàng · xếp hạng EXP</span>
-        </div>
-      )}
-
       {near && !viewing && (
         <div className="prompt">
           <kbd>E</kbd>
@@ -270,8 +266,9 @@ export function Hud({ world }: { world: World }) {
         <div className="help-keys">
           <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi</span>
           <span><kbd>Shift</kbd> chạy</span>
-          <span><kbd>E</kbd> hoặc bấm chuột: mở CLI agent / bảng ticket, bảng vàng</span>
+          <span><kbd>E</kbd> hoặc bấm chuột: mở CLI agent / bảng ticket</span>
           <span><kbd>Q</kbd> việc chờ duyệt</span>
+          <span><kbd>B</kbd> dọn dẹp</span>
           <span><kbd>C</kbd> tủ đồ</span>
           <span><kbd>M</kbd> nhạc</span>
           <span><kbd>Esc</kbd> đóng</span>

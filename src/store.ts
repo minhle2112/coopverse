@@ -47,6 +47,10 @@ interface CoopState {
   /** Tủ đồ đang mở cho ai ('player' = bạn, hoặc id agent) */
   wardrobeId: string | null
   settingsOpen: boolean
+  /** Chế độ dọn dẹp (phím B): hiện giá từng chỗ bẩn, bấm chỗ nào để trả Xu dọn chỗ đó */
+  cleanOpen: boolean
+  /** Chỗ bẩn đang chọn trong chế độ dọn dẹp (id trong src/data/officeState.ts) */
+  cleanPick: string | null
   /** Danh sách "Chờ duyệt" (phím Q) đang mở */
   inboxOpen: boolean
   /** Thẻ duyệt nhanh đang mở (id việc chờ): mở từ danh sách, không cần đi tới bàn */
@@ -82,6 +86,8 @@ interface CoopState {
   openWardrobe: (id?: string) => void
   closeWardrobe: () => void
   toggleSettings: () => void
+  toggleClean: () => void
+  pickClean: (id: string | null) => void
   /** Esc: đóng lớp đang mở trên cùng. Trả về false nếu không có gì để đóng. */
   closeTop: () => boolean
   /** Chỉ bản demo: bấm vào tên trong danh sách để đổi trạng thái */
@@ -113,6 +119,8 @@ export const useCoop = create<CoopState>((set, get) => ({
   fameOpen: false,
   wardrobeId: null,
   settingsOpen: false,
+  cleanOpen: false,
+  cleanPick: null,
   inboxOpen: false,
   askId: null,
   locked: false,
@@ -200,14 +208,22 @@ export const useCoop = create<CoopState>((set, get) => ({
   // Bảng cài đặt nhỏ, không che màn hình: vẫn đi lại được khi đang mở
   toggleSettings: () => {
     if (!get().settingsOpen && document.pointerLockElement) document.exitPointerLock()
-    set((s) => ({ settingsOpen: !s.settingsOpen, wardrobeId: null }))
+    set((s) => ({ settingsOpen: !s.settingsOpen, wardrobeId: null, cleanOpen: false, cleanPick: null }))
   },
+  // Như cài đặt: bảng nhỏ bên cạnh, vẫn đi lại được
+  toggleClean: () => {
+    if (!get().cleanOpen && document.pointerLockElement) document.exitPointerLock()
+    set((s) => ({ cleanOpen: !s.cleanOpen, cleanPick: null, settingsOpen: false }))
+  },
+  pickClean: (id) => set({ cleanPick: id }),
   closeTop: () => {
     const s = get()
     if (s.askId) set({ askId: null })
+    else if (s.cleanPick) set({ cleanPick: null })
     else if (s.wardrobeId) set({ wardrobeId: null })
     else if (s.inboxOpen) set({ inboxOpen: false })
     else if (s.settingsOpen) set({ settingsOpen: false })
+    else if (s.cleanOpen) set({ cleanOpen: false })
     else if (s.focusId) set({ focusId: null })
     else if (s.boardOpen) set({ boardOpen: false })
     else if (s.fameOpen) set({ fameOpen: false })

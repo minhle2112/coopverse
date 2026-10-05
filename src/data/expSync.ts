@@ -1,7 +1,7 @@
-import { leveledUp, praised } from '../life/director'
+import { leveledUp } from '../life/director'
 import { useCoop } from '../store'
-import { applyLedger, localKudos, titleOf, useExp } from './exp'
-import type { Kudos, Ledger } from './ledger'
+import { applyLedger, titleOf } from './exp'
+import type { Ledger } from './ledger'
 import { mockLedger } from './mock'
 
 /** Đọc sổ không dày hơn mức này (dữ liệu Paperclip đổi liên tục lúc agent chạy) */
@@ -65,31 +65,3 @@ export function startExpSync(): () => void {
     clearInterval(poll)
   }
 }
-
-/** Khen một agent: +EXP, ghi vào sổ phía Coopverse (không gửi gì sang Paperclip, không đánh thức agent). */
-export async function giveKudos(agentId: string, note: string): Promise<void> {
-  const text = note.trim()
-  if (useCoop.getState().conn === 'demo') {
-    const s = useExp.getState()
-    applyLedger({ ...s.ledger, kudos: [...s.ledger.kudos, localKudos(agentId, text)] }, onLevelUp)
-  } else {
-    const cid = companyId()
-    if (!cid) throw new Error('Chưa chọn công ty')
-    const r = await fetch(`/coop/kudos/${cid}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json', 'x-coopverse': '1' },
-      body: JSON.stringify({ agentId, note: text }),
-    })
-    if (!r.ok) {
-      let msg = `Coopverse trả ${r.status}`
-      try { msg = ((await r.json()) as { error?: string }).error ?? msg } catch { /* bỏ qua */ }
-      throw new Error(msg)
-    }
-    applyLedger(((await r.json()) as { ledger: Ledger }).ledger, onLevelUp)
-  }
-  praised(agentId, text)
-}
-
-/** Lời khen gần nhất của một agent (mới trước) */
-export const kudosOf = (ledger: Ledger, agentId: string, n = 3): Kudos[] =>
-  ledger.kudos.filter((k) => k.agentId === agentId).slice(-n).reverse()

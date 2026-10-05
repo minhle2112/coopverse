@@ -168,12 +168,12 @@ export const MOCK_COMMENTS: Record<string, Comment[]> = {
 }
 
 /**
- * Sổ EXP giả cho bản demo: đủ các cấp để thấy bàn nâng cấp (Lead cấp 9 có cúp, Tạo Ảnh cấp 7 có đèn bàn…).
- * Viết Bài đang 290 EXP, khen một lần (+25) là lên cấp 3 để xem hiệu ứng lên cấp.
+ * Sổ EXP giả cho bản demo: đủ các cấp (Lead cấp 8, Tạo Ảnh cấp 7…), và vài chục ticket cũ đã xong
+ * để quỹ có sẵn vài trăm Xu thử dọn văn phòng. Viết Bài đang 290 EXP, thêm một lượt chạy là lên cấp 3.
  */
 export function mockLedger(): Ledger {
   const now = Date.now()
-  const L: Ledger = { v: 1, runs: {}, tickets: {}, approvals: {}, kudos: [] }
+  const L: Ledger = { v: 1, runs: {}, tickets: {}, approvals: {} }
   // [agent, số lượt chạy, rải trong bao nhiêu ngày gần đây]
   const plan: [string, number, number][] = [
     ['seo-lead', 328, 60], ['content-seo', 92, 20], ['demo-image', 220, 30], ['demo-translate', 65, 25],
@@ -191,14 +191,13 @@ export function mockLedger(): Ledger {
   }
   L.approvals['appr-1'] = ['seo-lead', now - 3 * 86_400_000, 'request_board_approval']
   L.approvals['appr-2'] = ['seo-lead', now - 12 * 86_400_000, 'request_board_approval']
-  const kudos: [string, number, string][] = [
-    ['seo-lead', 1, 'Audit cannibalization rất kỹ 👍'],
-    ['seo-lead', 9, 'Kế hoạch gộp LAB-8/9/10 gọn gàng'],
-    ['seo-lead', 20, ''],
-    ['seo-lead', 33, 'Keyword audit đầu tiên, làm tốt'],
-    ['content-seo', 2, 'Batch A sạch, không phải sửa gì'],
-    ['content-seo', 15, ''],
+  // Ticket cũ đã xong (không còn trong danh sách ticket demo): [agent, số ticket, độ ưu tiên, rải trong bao nhiêu ngày]
+  const old: [string, number, string, number][] = [
+    ['seo-lead', 5, 'high', 50], ['content-seo', 5, 'medium', 18], ['demo-image', 5, 'medium', 28],
+    ['demo-translate', 3, 'low', 22], ['demo-research', 2, 'high', 5],
   ]
-  kudos.forEach(([agentId, d, note], i) => L.kudos.push({ id: `k${i}`, agentId, at: now - d * 86_400_000, note }))
+  for (const [agentId, n, p, days] of old) {
+    for (let i = 0; i < n; i++) L.tickets[`${agentId}-old${i}`] = [agentId, now - ((i + 0.5) / n) * days * 86_400_000, p, `OLD-${i + 1}`]
+  }
   return L
 }

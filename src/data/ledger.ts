@@ -1,6 +1,6 @@
 /**
- * Sổ EXP của một công ty: mọi việc làm được tính điểm mà Coopverse đã thấy trên Paperclip, cộng lời khen của bạn.
- * Dùng chung cho trang (src/data/exp.ts) và server nhỏ của Coopverse (server/coopData.ts, lưu sổ thành file).
+ * Sổ EXP của một công ty: mọi việc làm được tính điểm mà Coopverse đã thấy trên Paperclip.
+ * Dùng chung cho trang (src/data/exp.ts, src/data/xu.ts) và server nhỏ của Coopverse (server/coopData.ts, lưu sổ thành file).
  * Thời điểm lưu bằng mili giây.
  */
 export interface Ledger {
@@ -11,13 +11,11 @@ export interface Ledger {
   tickets: Record<string, [string, number, string, string]>
   /** Phiếu agent gửi được duyệt: approvalId → [agentId, lúc duyệt, loại phiếu] */
   approvals: Record<string, [string, number, string]>
-  /** Lời khen bạn bấm trong Coopverse */
-  kudos: Kudos[]
+  /**
+   * Lời khen của bản cũ (nút Khen đã bỏ). Giữ nguyên trong file cho khỏi mất dữ liệu,
+   * nhưng không còn tính EXP và không ghi thêm.
+   */
+  kudos?: unknown[]
 }
 
-export interface Kudos { id: string; agentId: string; at: number; note: string }
-
-export const emptyLedger = (): Ledger => ({ v: 1, runs: {}, tickets: {}, approvals: {}, kudos: [] })
-
-/** Lời khen dài tối đa bao nhiêu ký tự */
-export const KUDOS_NOTE_MAX = 200
+export const emptyLedger = (): Ledger => ({ v: 1, runs: {}, tickets: {}, approvals: {} })

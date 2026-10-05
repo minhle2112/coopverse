@@ -45,6 +45,8 @@ export function Toolbar() {
   const openWardrobe = useCoop((s) => s.openWardrobe)
   const toggleSettings = useCoop((s) => s.toggleSettings)
   const settingsOpen = useCoop((s) => s.settingsOpen)
+  const toggleClean = useCoop((s) => s.toggleClean)
+  const cleanOpen = useCoop((s) => s.cleanOpen)
   const tap = (fn: () => void) => () => { unlockAudio(); fn(); uiTick() }
   return (
     <div className="toolbar">
@@ -56,6 +58,9 @@ export function Toolbar() {
       </button>
       <button className="tb-btn" onClick={tap(() => openWardrobe('player'))} title="Tủ đồ (phím C)" aria-label="Tủ đồ" aria-keyshortcuts="C">
         <span aria-hidden>🎨</span>
+      </button>
+      <button className={`tb-btn${cleanOpen ? ' on' : ''}`} onClick={tap(toggleClean)} title="Dọn dẹp văn phòng (phím B)" aria-label="Dọn dẹp" aria-expanded={cleanOpen} aria-keyshortcuts="B">
+        <span aria-hidden>🧹</span>
       </button>
       <button className={`tb-btn${settingsOpen ? ' on' : ''}`} onClick={tap(toggleSettings)} title="Cài đặt" aria-label="Cài đặt" aria-expanded={settingsOpen}>
         <span aria-hidden>⚙️</span>
@@ -105,7 +110,7 @@ function DesktopSection() {
         <button type="button" className="desk-btn" onClick={update}>Kiểm tra bản mới</button>
       </div>
       <p className="set-hint" aria-live="polite">
-        {note || 'Nhập EXP cũ: chọn thư mục .coopverse của bản chạy bằng trình duyệt để giữ điểm và lời khen. F11: toàn màn hình.'}
+        {note || 'Nhập EXP cũ: chọn thư mục .coopverse của bản chạy bằng trình duyệt để giữ điểm, Xu và văn phòng đã dọn. F11: toàn màn hình.'}
       </p>
       <p className="set-hint">
         Hình pixel: LimeZu (

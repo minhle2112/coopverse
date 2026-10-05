@@ -211,14 +211,23 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 | Shift | Run |
 | Settings ⚙️ → Zoom ("Thu phóng") | Two levels: **Near** (default) and **Farthest**. The browser remembers your choice |
 | Hover an agent | Show a full card: name, level, title, current task (no need to walk over) |
-| **Click** | Click an agent: open its screen (CLI). Click a lobby candidate: open the hiring form. Click the ticket board / hall of fame: view it full size. Click yourself: wardrobe. No need to walk over |
+| **Click** | Click an agent: open its screen (CLI). Click a lobby candidate: open the hiring form. Click the ticket board: view it full size. Click yourself: wardrobe. No need to walk over |
 | Click a name in the Staff list | Open that agent's screen (demo: right-click to change its status) |
 | **E** | Near an agent: open its screen (**Chat** and **Log** tabs). In front of the ticket board: view it full size. Press E again to step back |
 | C | Wardrobe: restyle yourself or the nearby agent |
+| B | Cleaning: pay Xu to clean dirty spots (see below) |
 | Q | Things waiting for your approval / answer |
 | M | Toggle lofi music |
 | Esc | Close whatever screen is open |
-| 🔊 🎵 🎨 ⚙️ under the logo | Sound, music, wardrobe, settings (volume, time preview) |
+| 🔊 🎵 🎨 🧹 ⚙️ under the logo | Sound, music, wardrobe, cleaning, settings (volume, time preview) |
+
+### Xu and cleaning the office
+
+- The office starts as one big empty room with only the agents' desks, the ticket board and windows. Everything is dusty: stains, cobwebs, old cardboard boxes, loose paper, rats.
+- **Xu** is the office's shared money (shown under the logo). Each ticket an agent finishes on the board adds Xu: low 10, medium 15, high 25, critical 40 priority; higher-level agents earn more (+10% per level). Tickets finished before this feature count too.
+- Press **B** (or 🧹): every dirty spot shows its price. The floor is split into 5 × 3 patches, farther from the door costs more; the north wall, each window and the ticket board are cleaned separately. Click a spot, then **Dọn** (Clean) in the left panel.
+- Xu and cleaned spots are stored by Coopverse on this machine (the `.coopverse` folder, or the desktop app's data folder), nothing is sent to Paperclip. The demo stores them in the browser and has a "Làm bẩn lại" (make dirty again) button.
+- Coming next: a shop for decorations, and building your own walls.
 
 ### Chatting with an agent
 
@@ -302,7 +311,7 @@ src/
   dev/         dev-only hooks (window.__coop)
 server/
   guard.ts     allow-list of Paperclip endpoints (shared by Vite and the desktop app)
-  coopData.ts  per-company EXP ledger (/coop/)
+  coopData.ts  per-company EXP ledger and office state (cleaned spots, Xu spent) (/coop/)
   limezu.ts    serves the LimeZu images from COOPVERSE_ASSETS at /limezu/ (127.0.0.1 only)
 desktop/       Windows app (Electron): main.ts, local server (server.ts), starting/stopping Paperclip
                (paperclip.ts, pc-hook.cjs), connect screen (setup/), hand-drawn icon (icon/make-icon.py)

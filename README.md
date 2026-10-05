@@ -209,14 +209,23 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 | Shift | Chạy |
 | Cài đặt ⚙️ → Thu phóng | Hai mức: **Gần** (mặc định) và **Xa nhất**. Trình duyệt nhớ mức bạn chọn |
 | Rê chuột lên một agent | Hiện thẻ đầy đủ: tên, cấp, danh hiệu, việc đang làm (không cần đi lại gần) |
-| **Bấm chuột** | Bấm vào agent: mở màn hình của agent (CLI). Bấm ứng viên ở sảnh: xem phiếu thuê. Bấm bảng ticket / bảng vàng: xem bảng to. Bấm vào chính bạn: tủ đồ. Không cần đi lại gần |
+| **Bấm chuột** | Bấm vào agent: mở màn hình của agent (CLI). Bấm ứng viên ở sảnh: xem phiếu thuê. Bấm bảng ticket: xem bảng to. Bấm vào chính bạn: tủ đồ. Không cần đi lại gần |
 | Bấm tên ở danh sách Nhân sự | Mở màn hình của agent đó (bản demo: chuột phải để đổi trạng thái) |
 | **E** | Đứng gần agent: mở màn hình của agent (tab **Chat** và **Log**). Đứng trước bảng ticket: xem bảng to. Bấm lại E để quay ra |
 | C | Tủ đồ: đổi ngoại hình của bạn, hoặc của agent đang đứng gần |
+| B | Dọn dẹp: trả Xu dọn chỗ bẩn (xem dưới) |
 | Q | Danh sách việc chờ bạn duyệt / trả lời |
 | M | Bật/tắt nhạc lofi |
 | Esc | Đóng màn hình đang mở |
-| Nút 🔊 🎵 🎨 ⚙️ dưới logo | Âm thanh, nhạc, tủ đồ, cài đặt (âm lượng, xem thử giờ) |
+| Nút 🔊 🎵 🎨 🧹 ⚙️ dưới logo | Âm thanh, nhạc, tủ đồ, dọn dẹp, cài đặt (âm lượng, xem thử giờ) |
+
+### Xu và dọn dẹp văn phòng
+
+- Văn phòng lúc đầu là một phòng lớn trống, chỉ có bàn làm việc của agent, bảng ticket, cửa sổ. Mọi thứ phủ bụi: vết ố, mạng nhện, thùng carton cũ, giấy vụn, chuột.
+- **Xu** là tiền chung của văn phòng (số dưới logo). Agent làm xong ticket trên board thì quỹ có Xu: ưu tiên thấp 10, vừa 15, cao 25, khẩn 40; agent cấp càng cao càng được nhiều (mỗi cấp +10%). Ticket đã xong từ trước cũng được tính.
+- Bấm **B** (hoặc nút 🧹): mỗi chỗ bẩn hiện giá. Sàn chia 5 × 3 mảng, mảng càng xa cửa càng đắt; tường bắc, từng cửa sổ, bảng ticket dọn riêng. Bấm một chỗ rồi bấm **Dọn** trong bảng bên trái.
+- Xu và chỗ đã dọn lưu trong Coopverse trên máy này (thư mục `.coopverse`, app desktop: thư mục dữ liệu của app), không gửi gì sang Paperclip. Bản demo lưu trong trình duyệt, có nút "Làm bẩn lại".
+- Sắp có: cửa hàng đồ trang trí, tự xây vách chia phòng.
 
 ### Chat với agent
 
@@ -300,7 +309,7 @@ src/
   dev/         hook chỉ dùng khi dev (window.__coop)
 server/
   guard.ts     danh sách endpoint Paperclip được phép đi qua (dùng chung cho Vite và app desktop)
-  coopData.ts  sổ EXP của từng công ty (/coop/)
+  coopData.ts  sổ EXP và văn phòng (chỗ đã dọn, Xu đã tiêu) của từng công ty (/coop/)
   limezu.ts    phục vụ file hình LimeZu từ COOPVERSE_ASSETS ở /limezu/ (chỉ 127.0.0.1)
 desktop/       app Windows (Electron): main.ts, máy chủ nội bộ (server.ts), bật/tắt Paperclip (paperclip.ts,
                pc-hook.cjs), màn hình kết nối (setup/), icon vẽ tay (icon/make-icon.py)

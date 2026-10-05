@@ -33,7 +33,9 @@
     "s_tvStand2": "1_Interiors/16x16/Theme_Sorter_Singles/14_Basement_Singles/Basement_Singles_195.png",
     "s_arcade1": "1_Interiors/16x16/Theme_Sorter_Singles/14_Basement_Singles/Basement_Singles_218.png",
     "s_arcade2": "1_Interiors/16x16/Theme_Sorter_Singles/14_Basement_Singles/Basement_Singles_219.png",
-    "mo": "Modern_Office/Modern_Office_16x16.png"
+    "mo": "Modern_Office/Modern_Office_16x16.png",
+    "hal": "1_Interiors/16x16/Theme_Sorter/11_Halloween_16x16.png",
+    "jail": "1_Interiors/16x16/Theme_Sorter/18_Jail_16x16.png"
   },
   "sprites": {
     "plantBig": [
@@ -742,6 +744,181 @@
       200,
       16,
       18
+    ],
+    "webTop1": [
+      "hal",
+      0,
+      38,
+      16,
+      10
+    ],
+    "webTop2": [
+      "hal",
+      16,
+      38,
+      16,
+      10
+    ],
+    "webTop3": [
+      "hal",
+      32,
+      38,
+      16,
+      10
+    ],
+    "webTop4": [
+      "hal",
+      48,
+      38,
+      16,
+      10
+    ],
+    "spider": [
+      "hal",
+      4,
+      66,
+      8,
+      16
+    ],
+    "stain1": [
+      "hal",
+      113,
+      197,
+      14,
+      8
+    ],
+    "stain2": [
+      "hal",
+      130,
+      197,
+      14,
+      9
+    ],
+    "stain3": [
+      "hal",
+      81,
+      392,
+      14,
+      8
+    ],
+    "stain4": [
+      "hal",
+      97,
+      387,
+      14,
+      9
+    ],
+    "boxStack": [
+      "gen",
+      193,
+      946,
+      16,
+      22
+    ],
+    "boxSmall": [
+      "gen",
+      211,
+      947,
+      12,
+      12
+    ],
+    "boxPile": [
+      "gen",
+      209,
+      959,
+      16,
+      16
+    ],
+    "drip1": [
+      "jail",
+      32,
+      38,
+      15,
+      6
+    ],
+    "drip2": [
+      "jail",
+      51,
+      38,
+      12,
+      8
+    ],
+    "drip3": [
+      "jail",
+      24,
+      38,
+      7,
+      9
+    ],
+    "drip4": [
+      "jail",
+      5,
+      38,
+      5,
+      5
+    ],
+    "rat1": [
+      "jail",
+      0,
+      167,
+      10,
+      9
+    ],
+    "rat2": [
+      "jail",
+      22,
+      167,
+      10,
+      9
+    ],
+    "rat3": [
+      "jail",
+      1,
+      183,
+      11,
+      9
+    ],
+    "rat4": [
+      "jail",
+      20,
+      183,
+      11,
+      9
+    ],
+    "paperPile": [
+      "jail",
+      36,
+      168,
+      26,
+      21
+    ],
+    "paperSheet": [
+      "cls",
+      145,
+      174,
+      10,
+      11
+    ],
+    "booksMess": [
+      "cls",
+      194,
+      246,
+      28,
+      23
+    ],
+    "booksSmall1": [
+      "cls",
+      192,
+      304,
+      16,
+      14
+    ],
+    "booksSmall2": [
+      "cls",
+      211,
+      304,
+      10,
+      15
     ]
   }
 }

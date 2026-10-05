@@ -4,22 +4,27 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
 import type { Plugin } from 'vite'
 import type { Handler } from './guard'
-import { emptyLedger, KUDOS_NOTE_MAX, type Kudos, type Ledger } from '../src/data/ledger'
+import { emptyLedger, type Ledger } from '../src/data/ledger'
+import { emptyOffice, isClean, jobById, spentXu, type OfficeState } from '../src/data/officeState'
+import { earnings } from '../src/data/xu'
 
 /**
- * Dữ liệu riêng của Coopverse (không phải của Paperclip), lưu thành file JSON: sổ EXP của từng công ty.
+ * Dữ liệu riêng của Coopverse (không phải của Paperclip), lưu thành file JSON cho từng công ty:
+ * sổ EXP (`exp-<id>.json`) và văn phòng (`office-<id>.json`: chỗ đã dọn, Xu đã tiêu).
  * Chạy bằng Vite: thư mục `.coopverse/` của dự án (không commit). App desktop: thư mục dữ liệu của app.
  *
  * Vì sao cần sổ: Paperclip chỉ trả tối đa 1000 lượt chạy / ticket gần nhất. Coopverse chép dần những gì đã
- * thấy vào sổ, để EXP không tụt khi dữ liệu cũ trôi khỏi danh sách. Lời khen (nút Khen) cũng nằm trong sổ,
- * nên mọi trình duyệt mở Coopverse trên máy này thấy cùng một con số.
+ * thấy vào sổ, để EXP và Xu không tụt khi dữ liệu cũ trôi khỏi danh sách. Mọi trình duyệt mở Coopverse trên máy này
+ * thấy cùng một con số.
  *
- * - GET  /coop/exp/:companyId    đọc thêm dữ liệu mới từ Paperclip vào sổ rồi trả cả sổ
- * - POST /coop/kudos/:companyId  {agentId, note}  ghi một lời khen (cần header x-coopverse + origin Coopverse)
+ * - GET  /coop/exp/:companyId     đọc thêm dữ liệu mới từ Paperclip vào sổ rồi trả cả sổ
+ * - GET  /coop/office/:companyId  trạng thái văn phòng
+ * - POST /coop/office/:companyId  {action: 'clean', job}  trả Xu dọn một chỗ (cần header x-coopverse + origin Coopverse)
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const fileOf = (dir: string, cid: string) => path.join(dir, `exp-${cid}.json`)
+const officeFileOf = (dir: string, cid: string) => path.join(dir, `office-${cid}.json`)
 
 /** Đọc lại Paperclip không dày hơn mức này (nhiều tab cùng hỏi một lúc) */
 const PULL_EVERY_MS = 2500
@@ -55,21 +60,44 @@ async function load(dir: string, cid: string): Promise<Book> {
   return b
 }
 
-async function save(dir: string, cid: string, ledger: Ledger) {
-  await mkdir(dir, { recursive: true })
-  const tmp = `${fileOf(dir, cid)}.tmp`
-  await writeFile(tmp, JSON.stringify(ledger), 'utf8')
-  await rename(tmp, fileOf(dir, cid))
+/** Ghi JSON an toàn: ghi ra file tạm rồi đổi tên (tắt máy giữa chừng không làm hỏng file cũ) */
+async function writeJson(file: string, data: unknown) {
+  await mkdir(path.dirname(file), { recursive: true })
+  const tmp = `${file}.tmp`
+  await writeFile(tmp, JSON.stringify(data), 'utf8')
+  await rename(tmp, file)
+}
+
+const save = (dir: string, cid: string, ledger: Ledger) => writeJson(fileOf(dir, cid), ledger)
+
+const offices = new Map<string, OfficeState>()
+
+async function readOffice(file: string): Promise<OfficeState | null> {
+  try {
+    const raw = JSON.parse(await readFile(file, 'utf8')) as Partial<OfficeState>
+    return { ...emptyOffice(), ...raw, v: 1 }
+  } catch {
+    return null
+  }
+}
+
+async function loadOffice(dir: string, cid: string): Promise<OfficeState> {
+  let o = offices.get(cid)
+  if (o) return o
+  o = (await readOffice(officeFileOf(dir, cid))) ?? emptyOffice()
+  offices.set(cid, o)
+  return o
 }
 
 /**
- * Gộp các sổ EXP ở thư mục khác (vd `.coopverse/` của bản chạy bằng Vite) vào thư mục `dir`.
- * Gộp chứ không ghi đè: việc đã có giữ nguyên, lời khen gộp theo id. Trả về số sổ đã gộp.
+ * Gộp dữ liệu Coopverse ở thư mục khác (vd `.coopverse/` của bản chạy bằng Vite) vào thư mục `dir`.
+ * Sổ EXP gộp chứ không ghi đè (việc đã có giữ nguyên). Văn phòng chỉ chép sang khi bên này chưa có.
+ * Trả về số công ty đã gộp.
  */
 export async function importLedgers(from: string, dir: string): Promise<number> {
-  const names = (await readdir(from)).filter((n) => /^exp-[0-9a-f-]{36}\.json$/.test(n))
+  const names = await readdir(from)
   let n = 0
-  for (const name of names) {
+  for (const name of names.filter((x) => /^exp-[0-9a-f-]{36}\.json$/.test(x))) {
     const cid = name.slice(4, -5)
     const src = await readLedger(path.join(from, name))
     if (!src) continue
@@ -79,11 +107,20 @@ export async function importLedgers(from: string, dir: string): Promise<number> 
       L.runs = { ...src.runs, ...L.runs }
       L.tickets = { ...src.tickets, ...L.tickets }
       L.approvals = { ...src.approvals, ...L.approvals }
-      const ids = new Set(L.kudos.map((k) => k.id))
-      L.kudos = [...L.kudos, ...src.kudos.filter((k) => !ids.has(k.id))].sort((a, b) => a.at - b.at)
       await save(dir, cid, L)
     })
     n++
+  }
+  for (const name of names.filter((x) => /^office-[0-9a-f-]{36}\.json$/.test(x))) {
+    const cid = name.slice(7, -5)
+    const src = await readOffice(path.join(from, name))
+    if (!src) continue
+    await serial(cid, async () => {
+      const mine = await loadOffice(dir, cid)
+      if (mine.spent.length || Object.keys(mine.cleaned).length) return
+      offices.set(cid, src)
+      await writeJson(officeFileOf(dir, cid), src)
+    })
   }
   return n
 }
@@ -177,19 +214,34 @@ export function coopDataHandler(opts: { target: () => string; isOwnOrigin: (o: u
       return
     }
 
-    if (kind === 'kudos' && method === 'POST') {
+    if (kind === 'office' && method === 'GET') {
+      serial(cid, async () => send(res, 200, { office: await loadOffice(dir, cid) }))
+        .catch((e: Error) => send(res, 500, { error: `coopverse: ${e.message}` }))
+      return
+    }
+
+    if (kind === 'office' && method === 'POST') {
       if (req.headers['x-coopverse'] !== '1' || !opts.isOwnOrigin(req.headers.origin)) {
         return send(res, 403, { error: 'coopverse: lệnh phải gửi từ trang Coopverse' })
       }
       serial(cid, async () => {
-        const body = (await readBody(req)) as { agentId?: unknown; note?: unknown }
-        if (typeof body.agentId !== 'string' || !UUID.test(body.agentId)) return send(res, 400, { error: 'coopverse: thiếu agentId' })
-        const note = typeof body.note === 'string' ? body.note.trim().slice(0, KUDOS_NOTE_MAX) : ''
-        const b = await load(dir, cid)
-        const k: Kudos = { id: randomUUID(), agentId: body.agentId, at: Date.now(), note }
-        b.ledger.kudos.push(k)
-        await save(dir, cid, b.ledger)
-        send(res, 200, { ledger: b.ledger, kudos: k })
+        const body = (await readBody(req)) as { action?: unknown; job?: unknown }
+        const job = typeof body.job === 'string' ? jobById.get(body.job) : undefined
+        if (body.action !== 'clean' || !job) return send(res, 400, { error: 'coopverse: không có việc dọn này' })
+        const o = await loadOffice(dir, cid)
+        if (isClean(o, job.id)) return send(res, 200, { office: o })
+        // Số dư tính lại từ sổ EXP trên máy (không tin con số trang gửi lên)
+        const have = earnings((await load(dir, cid)).ledger).total - spentXu(o)
+        if (have < job.price) return send(res, 409, { error: `Chưa đủ Xu: cần ${job.price}, quỹ còn ${have}` })
+        const at = Date.now()
+        const next: OfficeState = {
+          ...o,
+          cleaned: { ...o.cleaned, [job.id]: at },
+          spent: [...o.spent, { id: randomUUID(), at, kind: 'clean', ref: job.id, xu: job.price }],
+        }
+        await writeJson(officeFileOf(dir, cid), next)
+        offices.set(cid, next)
+        send(res, 200, { office: next })
       }).catch((e: Error) => send(res, 400, { error: `coopverse: ${e.message}` }))
       return
     }
