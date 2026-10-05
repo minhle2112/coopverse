@@ -18,7 +18,7 @@ import { buildNav, flood, snapFree, cellIndex, type Nav } from './nav'
  */
 
 export * from './room'
-import { BOARD, DESK_D, DESK_W, OFFICE, SPAWN, box, deskCenter, turned, type AABB, type DeskSlot, type Vec2 } from './room'
+import { BOARD, DESK_D, DESK_W, DOOR_X, OFFICE, SPAWN, box, deskCenter, turned, type AABB, type DeskSlot, type Vec2 } from './room'
 
 // ───────────────────────── Đồ đạc ─────────────────────────
 
@@ -66,7 +66,7 @@ const SIZE: Record<FurnitureKind, [number, number, number] | null> = {
 }
 
 /** Đồ có sẵn từ đầu: chỉ cửa vào */
-export const FURNITURE: Furniture[] = [{ kind: 'door', x: 0, z: 6.85 }]
+export const FURNITURE: Furniture[] = [{ kind: 'door', x: DOOR_X, z: 6.85 }]
 
 // ───────────────────────── Chỗ ngồi ─────────────────────────
 

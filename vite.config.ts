@@ -1,5 +1,7 @@
 import { defineConfig, loadEnv, type Plugin, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'node:path'
+import { writeMarkers } from './scripts/map-markers.mjs'
 import { paperclipUrl } from './src/config'
 import { coopData } from './server/coopData'
 import { paperclipGuard, wsAllowed } from './server/guard'
@@ -15,6 +17,23 @@ function guardPlugin(): Plugin {
     name: 'coopverse-paperclip-guard',
     configureServer(server) { server.middlewares.use(guard) },
     configurePreviewServer(server) { server.middlewares.use(guard) },
+  }
+}
+
+/** Lưu maps/office.tmj trong Tiled → sinh lại src/world/mapMarkers.ts (vị trí cửa sổ, bảng, cửa...), trang tự tải lại */
+function mapMarkers(): Plugin {
+  const MAP = path.resolve('maps/office.tmj')
+  const run = (log: (m: string) => void, warn: (m: string) => void) => {
+    try { if (writeMarkers()) log('map: đã cập nhật src/world/mapMarkers.ts (server dùng vị trí mới sau khi chạy lại dev)') } catch (e) { warn(String(e)) }
+  }
+  return {
+    name: 'coopverse-map-markers',
+    buildStart() { run(console.log, (m) => this.warn(m)) },
+    configureServer(server) {
+      const { logger } = server.config
+      server.watcher.add(MAP)
+      server.watcher.on('change', (f) => { if (path.resolve(f) === MAP) run((m) => logger.info(m), (m) => logger.error(m)) })
+    },
   }
 }
 
@@ -41,7 +60,7 @@ export default defineConfig(({ mode }) => {
 
   // Chỉ mở trên máy này (127.0.0.1)
   return {
-    plugins: [react(), guardPlugin(), coopData({ target, isOwnOrigin }), limezu(assetDir(env))],
+    plugins: [react(), mapMarkers(), guardPlugin(), coopData({ target, isOwnOrigin }), limezu(assetDir(env))],
     server: { host: '127.0.0.1', port: 5179, strictPort: true, proxy },
     preview: { host: '127.0.0.1', port: 5180, strictPort: true, proxy },
     build: {

@@ -3,7 +3,7 @@ import {
   COLS, ROWS, CELL, cellKey, cellX, cellZ, colOf, isClean, jobById, patchAt, rowOf,
   type DeskPos, type OfficeState, type Placed, type Spend,
 } from './officeState'
-import { BOARD, DESK_D, DESK_W, LOBBY, OFFICE, SPAWN, WINDOWS, deskCenter, turned } from '../world/room'
+import { BOARD, DESK_D, DESK_W, DOOR_X, LOBBY, OFFICE, SPAWN, WINDOWS, deskCenter, turned } from '../world/room'
 
 /**
  * Luật trang trí văn phòng, dùng chung cho server (kiểm trước khi trừ Xu) và trang (khung xanh / đỏ khi đặt thử):
@@ -25,7 +25,7 @@ const zone = (minX: number, maxX: number, minZ: number, maxZ: number): Zone =>
 
 /** Chỗ luôn để trống: lối vào ở giữa tường nam, sảnh chờ ứng viên, chỗ bạn xuất hiện */
 export const RESERVED: Zone[] = [
-  zone(-1.5, 1.5, SPAWN.z - 0.7, OFFICE.maxZ),
+  zone(DOOR_X - 1.5, DOOR_X + 1.5, SPAWN.z - 0.7, OFFICE.maxZ),
   zone(Math.min(...LOBBY.map((p) => p.x)) - 0.5, Math.max(...LOBBY.map((p) => p.x)) + 0.5, Math.min(...LOBBY.map((p) => p.z)) - 0.5, OFFICE.maxZ),
 ]
 export const reserved = (c: number, r: number) => RESERVED.some((z) => c >= z.c0 && c <= z.c1 && r >= z.r0 && r <= z.r1)

@@ -1,5 +1,9 @@
+import { MAP_MARKERS as M } from './mapMarkers'
+
 /*
- * Kích thước và đồ cố định của căn phòng (không phụ thuộc gì): layout.ts, trạng thái văn phòng và server dùng chung.
+ * Kích thước và đồ cố định của căn phòng: layout.ts, trạng thái văn phòng và server dùng chung.
+ * Vị trí cửa sổ, bảng ticket, cửa, chỗ xuất hiện, sảnh chờ lấy từ các mốc trong bản đồ Tiled (maps/office.tmj,
+ * qua file sinh mapMarkers.ts, không phụ thuộc gì nên server cũng dùng được).
  */
 
 export interface Vec2 { x: number; z: number }
@@ -26,24 +30,32 @@ export type Activity =
 
 /** 27 × 15 m */
 export const OFFICE = { minX: -13.5, maxX: 13.5, minZ: -8, maxZ: 7, wallH: 3.2, wallT: 0.3 }
-export const SPAWN: Vec2 = { x: 0, z: 5.2 }
 
-/** Sảnh chờ bên phải cửa vào: ứng viên đứng chờ bạn duyệt hồ sơ, mặt nhìn vào văn phòng. */
-export const LOBBY: (Vec2 & { yaw: number })[] = [
-  { x: 3.0, z: 5.7, yaw: Math.PI - 0.2 },
-  { x: 5.2, z: 5.7, yaw: Math.PI + 0.25 },
-  { x: 3.1, z: 4.85, yaw: Math.PI - 0.2 },
-  { x: 5.1, z: 4.85, yaw: Math.PI + 0.25 },
-]
+/** Pixel của bản đồ mỗi mét: mốc "room" (sàn) phủ đúng cả phòng */
+const MAP_PPM = M.room.w / (OFFICE.maxX - OFFICE.minX)
+if (M.room.h !== (OFFICE.maxZ - OFFICE.minZ) * MAP_PPM) throw new Error('maps/office.tmj: mốc "room" phải có tỉ lệ đúng như phòng 27 × 15 m')
+/** Toạ độ pixel trong bản đồ → mét, làm tròn để khỏi lệch ô lưới (5.1999… thay vì 5.2) */
+const round = (v: number) => Math.round(v * 1e4) / 1e4
+const mx = (p: number) => round((p - M.room.x) / MAP_PPM + OFFICE.minX)
+const mz = (p: number) => round((p - M.room.y) / MAP_PPM + OFFICE.minZ)
+
+export const SPAWN: Vec2 = { x: mx(M.spawn.x), z: mz(M.spawn.y) }
+
+/** Sảnh chờ bên phải cửa vào: ứng viên đứng chờ bạn duyệt hồ sơ, mặt nhìn vào văn phòng (hơi xoay vào giữa). */
+const LOBBY_YAW = [Math.PI - 0.2, Math.PI + 0.25]
+export const LOBBY: (Vec2 & { yaw: number })[] = M.lobby.map((p, i) => ({ x: mx(p.x), z: mz(p.y), yaw: LOBBY_YAW[i % 2] }))
 
 /**
  * Bảng ticket treo ở tường bắc (mặt bảng nhìn về hướng nam, +z).
  * Bản pixel nhìn từ trên xuống nghiêng về phía bắc: chỉ thấy được mặt tường bắc.
  */
-export const BOARD = { x: -4.6, y: 1.55, z: OFFICE.minZ + OFFICE.wallT / 2 + 0.04, w: 3.0, h: 1.6 }
+export const BOARD = { x: mx(M.kanban.x + M.kanban.w / 2), y: 1.55, z: OFFICE.minZ + OFFICE.wallT / 2 + 0.04, w: round(M.kanban.w / MAP_PPM), h: 1.6 }
 
 /** Cửa sổ trên tường bắc (toạ độ x tâm, mét) */
-export const WINDOWS = [-10.5, -1.5, 1.5, 10.5]
+export const WINDOWS = M.windows.map((w) => mx(w.x + w.w / 2))
+
+/** Cửa ra vào ở tường nam (toạ độ x tâm, mét) */
+export const DOOR_X = mx(M.door.x + M.door.w / 2)
 
 /** Khoảng cách từ ghế tới tâm bàn */
 export const SEAT_TO_DESK = 0.83

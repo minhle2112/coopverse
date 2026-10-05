@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/map-markers.mjs && tsc --noEmit && vite build",
+    "map": "node scripts/map-markers.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p desktop",
     "preview": "vite preview",
     "desktop:build": "npm run build && node desktop/build.mjs",
