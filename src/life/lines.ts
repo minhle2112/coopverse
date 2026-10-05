@@ -36,7 +36,7 @@ const AT: Record<Activity, string[]> = {
   stool: ['Ăn vặt chút đã', 'Bánh mì hôm nay giòn ghê', 'Chiều nay ai đặt trà sữa không?'],
   meeting: ['Phòng họp trống, mượn ngồi chút', 'Tập thuyết trình tí', 'Ghế phòng họp êm hơn ghế mình'],
   kanban: ['Để xem bảng còn gì nào', 'Cột Xong dài ra rồi 😎', 'Chưa có ticket mới à?', 'Ai kéo thẻ này qua vậy?'],
-  fame: ['Tuần này ai dẫn đầu nhỉ?', 'Phải cày thêm mới lên top được 💪', 'Ủa ai cày dữ vậy?', 'Tên mình phải lên bảng vàng mới được'],
+  fame: ['Tuần này ai dẫn đầu nhỉ?', 'Phải cày thêm mới lên top được 💪', 'Ủa ai cày dữ vậy?', 'Tên mình phải lên bảng vinh danh mới được'],
   game: ['Kỷ lục mới nè! 🕹️', 'Một ván thôi rồi làm tiếp', 'Máy này khó ghê', 'Ai phá kỷ lục của tôi vậy?'],
   pool: ['Bi số 8 vào lỗ góc!', 'Cú này khó đây…', 'Đánh nhẹ tay thôi', 'Ván này tôi thắng nha 🎱'],
   pet: ['Mèo ơi lại đây 🐱', 'Bé mèo ngủ suốt ngày ha', 'Ai cho mèo ăn chưa?', 'Meo~'],
@@ -208,7 +208,7 @@ export function muse(agent: Agent, w: World, act: Activity | null): Line {
     default: {
       // Thỉnh thoảng nói chuyện theo giờ (sáng ăn phở, trưa buồn ngủ, khuya...)
       if (Math.random() < 0.22) return fun(any(TIME_MUSE[periodNow()]))
-      // Đứng trước bảng vàng: hay nói về cấp của chính mình (số thật)
+      // Đứng trước bảng vinh danh: hay nói về cấp của chính mình (số thật)
       if (act === 'fame' && Math.random() < 0.5) return real(levelTalk(agent.id))
       const pool = act === 'window' && isDark() ? WINDOW_NIGHT : act ? AT[act] : SEAT_IDLE
       return mix(agent, w, pool)

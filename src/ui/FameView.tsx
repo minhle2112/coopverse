@@ -8,7 +8,7 @@ import { useCoop } from '../store'
 
 const BY_LABEL: Record<RankBy, string> = { week: 'Tuần này', total: 'Mọi lúc' }
 
-/** Bảng vàng phóng to khi bấm E trước bảng: xếp hạng EXP, chi tiết điểm, Xu mỗi agent mang về cho quỹ. */
+/** Bảng vinh danh phóng to khi bấm E trước bảng: xếp hạng EXP, chi tiết điểm, Xu mỗi agent mang về cho quỹ. */
 export function FameView() {
   const agents = useCoop((s) => s.agents)
   const company = useCoop((s) => s.company)

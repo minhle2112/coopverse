@@ -696,7 +696,7 @@ a.card:hover { box-shadow: 0 0 0 2px #2c7fc0, 0 4px 12px rgba(0, 0, 0, 0.15); }
 .hire-warns .lvl-red { background: rgba(239, 90, 76, 0.16); color: #ff8a7d; font-weight: 600; }
 .hire-warns .lvl-warn { background: rgba(242, 181, 68, 0.12); color: #f2c46d; }
 
-/* ───────── Giai đoạn C: EXP, cấp, bảng vàng ───────── */
+/* ───────── Giai đoạn C: EXP, cấp, bảng vinh danh ───────── */
 
 /* Cấp trên bảng tên */
 .np-lv {
@@ -737,7 +737,7 @@ a.card:hover { box-shadow: 0 0 0 2px #2c7fc0, 0 4px 12px rgba(0, 0, 0, 0.15); }
   100% { opacity: 0; transform: translateX(-50%) translateY(-16px); }
 }
 
-/* Chip cấp dùng chung (danh sách nhân sự, CLI, bảng vàng) */
+/* Chip cấp dùng chung (danh sách nhân sự, CLI, bảng vinh danh) */
 .lv-chip {
   display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px;
   background: rgba(242, 193, 78, 0.18); color: #f2c46d; font-size: 10.5px; font-weight: 800; line-height: 16px; vertical-align: 1px;
@@ -753,7 +753,7 @@ a.card:hover { box-shadow: 0 0 0 2px #2c7fc0, 0 4px 12px rgba(0, 0, 0, 0.15); }
 .kudos-btn { padding: 3px 10px; font-size: 12px; border-color: rgba(242, 193, 78, 0.45); color: #f2c46d; }
 .t-primary.t-btn-kudos { background: #e0a52f; color: #2a1f05; border-color: transparent; }
 
-/* Bảng vàng phóng to: cùng tỉ lệ với bảng 3D (3 : 1.6) */
+/* Bảng vinh danh phóng to: cùng tỉ lệ với bảng 3D (3 : 1.6) */
 .fame {
   position: relative; pointer-events: auto;
   width: min(80vw, 150vh); aspect-ratio: 15 / 8; min-height: 360px;

@@ -159,7 +159,7 @@
 .roster-av .px-avatar { margin: -8px 0 0; display: block; }
 .roster-av .np-dot { position: absolute; right: -1px; bottom: 1px; width: 6px; height: 6px; margin: 0; box-shadow: 0 0 0 1px #100e18; }
 
-/* ───────── Bảng lớn (CLI, bảng ticket, bảng vàng, duyệt, tủ đồ): cùng khung pixel ───────── */
+/* ───────── Bảng lớn (CLI, bảng ticket, bảng vinh danh, duyệt, tủ đồ): cùng khung pixel ───────── */
 .hud .term, .hud .board, .hud .fame, .hud .wardrobe, .hud .ask-sheet-box, .hud .inbox {
   border: 2px solid var(--px-edge) !important; border-radius: 0 !important;
   box-shadow: 0 0 0 4px var(--px-dark), 0 0 0 6px #3d3856, 8px 8px 0 6px rgba(0, 0, 0, 0.4) !important;
@@ -230,7 +230,7 @@
 /* Thẻ ticket: người làm và thời gian mỗi thứ một dòng */
 .hud .card-foot { flex-direction: column; gap: 1px; font-size: 15px; }
 .hud .card .muted, .hud .board .card-foot .muted { color: #4d5566; }
-/* Bảng vàng: tiến độ cấp to hơn */
+/* Bảng vinh danh: tiến độ cấp to hơn */
 .hud .fame-progress, .hud .fame-counts { font-size: 15px; color: #c3bfd8; }
 .hud .fame-quote { font-size: 15px; }
 /* Phiếu duyệt: cột nhãn rộng hơn */

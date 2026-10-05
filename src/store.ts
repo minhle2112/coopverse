@@ -42,9 +42,9 @@ interface CoopState {
   nearBoard: boolean
   /** Đang xem bảng ticket phóng to */
   boardOpen: boolean
-  /** Đứng trước bảng vàng (xếp hạng EXP) */
+  /** Đứng trước bảng vinh danh (xếp hạng EXP) */
   nearFame: boolean
-  /** Đang xem bảng vàng phóng to */
+  /** Đang xem bảng vinh danh phóng to */
   fameOpen: boolean
   /** Đứng gần đồ dùng được (sofa, máy game...): id chỗ trong life/spots.ts */
   nearUse: string | null
