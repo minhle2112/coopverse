@@ -3,19 +3,13 @@ import { uiTick } from '../audio/engine'
 import { resolveAsk, useAskDetail, type AskAction } from '../data/asks'
 import { issueUrl, PAPERCLIP_UI, type ApprovalVerb, type AskAnswer } from '../data/paperclip'
 import { candidateCanHire, hireWarnings } from '../data/hire'
+import { ago } from '../data/kanban'
 import { askLabel, type Agent, type Ask, type Comment } from '../data/types'
 import { useCoop } from '../store'
 import { Md } from './Md'
 
-/** "vừa xong", "5 phút trước", "2 giờ trước"… */
-export function ago(iso: string) {
-  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
-  if (m < 1) return 'vừa xong'
-  if (m < 60) return `${m} phút trước`
-  const h = Math.round(m / 60)
-  if (h < 24) return `${h} giờ trước`
-  return `${Math.round(h / 24)} ngày trước`
-}
+// "x phút trước" dùng chung với bảng ticket (làm tròn xuống), để cùng một mốc thì hai nơi ghi giống nhau
+export { ago }
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 const rec = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {})

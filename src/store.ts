@@ -62,6 +62,8 @@ interface CoopState {
   /** Thẻ duyệt nhanh đang mở (id việc chờ): mở từ danh sách, không cần đi tới bàn */
   askId: string | null
   locked: boolean
+  /** Ứng viên bạn đã bấm "Yêu cầu sửa" hồ sơ: đứng chờ ở sảnh, chưa có phiếu mới để duyệt */
+  revising: Record<string, true>
   toast: Toast | null
 
   setCompanies: (companies: Company[], company: Company | null) => void
@@ -136,6 +138,7 @@ export const useCoop = create<CoopState>((set, get) => ({
   inboxOpen: false,
   askId: null,
   locked: false,
+  revising: {},
   toast: null,
 
   setCompanies: (companies, company) => set({ companies, company }),
@@ -144,10 +147,16 @@ export const useCoop = create<CoopState>((set, get) => ({
       const list = asks ?? s.asks
       // Việc đang mở đã được xử lý ở nơi khác (vd trong Paperclip): đóng thẻ
       const askId = s.askId && list.some((a) => a.id === s.askId) ? s.askId : null
-      return { agents, issues, chats, asks: list, askId, hasData: true }
+      // Hết việc chờ thì danh sách coi như đóng: việc mới tới không tự bung ra
+      return { agents, issues, chats, asks: list, askId, hasData: true, inboxOpen: s.inboxOpen && list.length > 0 }
     }),
-  removeAsk: (id) => set((s) => ({ asks: s.asks.filter((a) => a.id !== id), askId: s.askId === id ? null : s.askId })),
+  removeAsk: (id) => set((s) => {
+    const asks = s.asks.filter((a) => a.id !== id)
+    return { asks, askId: s.askId === id ? null : s.askId, inboxOpen: s.inboxOpen && asks.length > 0 }
+  }),
   toggleInbox: () => {
+    // Không có việc chờ: không có gì để mở
+    if (!get().inboxOpen && !get().asks.length) return
     if (!get().inboxOpen && document.pointerLockElement) document.exitPointerLock()
     set((s) => ({ inboxOpen: !s.inboxOpen }))
   },
@@ -166,7 +175,12 @@ export const useCoop = create<CoopState>((set, get) => ({
     for (const n of added) setTimeout(() => get().dismissNote(n.id), NOTE_MS)
   },
   dismissNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
-  pingAgent: (id) => set({ ping: { id, at: performance.now() } }),
+  pingAgent: (id) => {
+    // Mũi tên trên đầu tắt sau 6 s: vạch 📍 trong danh sách nhân sự tắt cùng lúc
+    const ping = { id, at: performance.now() }
+    set({ ping })
+    setTimeout(() => { if (get().ping === ping) set({ ping: null }) }, 6000)
+  },
   setNear: (id, board = false, fame = false, use = null) => set({ nearId: id, nearBoard: board, nearFame: fame, nearUse: use }),
   leaveUse: () => {
     if (!get().using) return
@@ -183,17 +197,21 @@ export const useCoop = create<CoopState>((set, get) => ({
     // Ứng viên ở sảnh: mở hồ sơ (phiếu thuê) để duyệt
     if (a.candidate) {
       const hire = asks.find((x) => x.candidateId === a.id)
-      return hire ? openAsk(hire.id) : showToast(`Hồ sơ của ${a.name} chưa tải xong, thử lại sau giây lát.`)
+      if (hire) return openAsk(hire.id)
+      return showToast(get().revising[a.id]
+        ? `${a.name} đang sửa hồ sơ theo yêu cầu của bạn. Có bản mới thì phiếu duyệt hiện lại trong danh sách việc chờ.`
+        : `Hồ sơ của ${a.name} chưa tải xong, thử lại sau giây lát.`)
     }
     if (a.status === 'terminated') return showToast(`${a.name} đã nghỉ việc, máy đã tắt.`)
     openFocus(a.id)
   },
   setLocked: (v) => set({ locked: v }),
   showToast: (text) => set({ toast: { id: ++seq, text } }),
+  // Ứng viên không đổi trạng thái được (nghỉ thì mất khỏi sảnh mà phiếu thuê vẫn còn)
   cycleStatus: (id) =>
     set((s) => ({
       agents: s.agents.map((a) =>
-        a.id === id ? { ...a, status: STATUS_CYCLE[(STATUS_CYCLE.indexOf(a.status) + 1) % STATUS_CYCLE.length] } : a,
+        a.id === id && !a.candidate ? { ...a, status: STATUS_CYCLE[(STATUS_CYCLE.indexOf(a.status) + 1) % STATUS_CYCLE.length] } : a,
       ),
     })),
   openFocus: (id) => {

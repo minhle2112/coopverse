@@ -1,7 +1,7 @@
 # Coopverse
 
-**A game-like 3D office for AI agents running on [Paperclip](https://github.com/paperclipai/paperclip).**
-Walk around the office and watch your agents type away while they work, grab coffee when idle, and clutch their heads when something fails. Walk up to a desk and press **E** to chat with the agent or watch its CLI live.
+**A game-like 2D pixel office for AI agents running on [Paperclip](https://github.com/paperclipai/paperclip).**
+Walk around the office and watch your agents work at their desks (scrolling screens), grab coffee when idle, with a "…" bubble while running, "Zzz" when paused and a red "!" on errors; the name plate border follows their status. Walk up to a desk and press **E** to chat with the agent or watch its CLI live.
 
 [Tiếng Việt](README.md)
 
@@ -85,8 +85,8 @@ paperclipai run
 
 1. Open http://localhost:3100. On first run Paperclip walks you through creating a **company**.
 2. Add agents under **Agents** (name, role, adapter such as Claude Code).
-   - Coopverse seats agents by the org chart. An agent that others **report to** (*Reports to* field) is a **Lead** and sits in the glass office. Everyone else sits in the open space, grouped by Lead.
-   - An office has up to 26 desks (2 Leads + 24 members).
+   - Coopverse seats agents by the org chart. An agent that others **report to** (*Reports to* field) is a **Lead** and sits first; everyone else sits grouped by Lead. Sub-agents (reporting to a member) get a side desk next to their parent.
+   - The office has 16 main desks (4 clusters × 4) plus side desks for sub-agents. Agents without a seat still appear in the Staff list (CLI works) but not on the map.
 3. **Enable Agent Chat** to chat from Coopverse: **Settings → Experimental → Agent Chat**. It is instance-wide, not per company.
 
 ![Enable Agent Chat](docs/images/paperclip-agent-chat.png)
@@ -213,7 +213,7 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 | Hover an agent | Show a full card: name, level, title, current task (no need to walk over) |
 | **Click** | Click an agent: open its screen (CLI). Click a lobby candidate: open the hiring form. Click the ticket board: view it full size. Click yourself: wardrobe. No need to walk over |
 | Click a name in the Staff list | Open that agent's screen (demo: right-click to change its status) |
-| **E** | Near an agent: open its screen (**Chat** and **Log** tabs). In front of the ticket board: view it full size. Near a sofa, chair, arcade machine, coffee bar…: sit down / use it (walk away to get up). Press E again to step back |
+| **E** | Near an agent: open its screen (**Chat** and **Log** tabs, plus a **Review** tab, opened first, when it is waiting on you). In front of the ticket board: view it full size. Near a sofa, chair, arcade machine, coffee bar…: sit down / use it (walk away to get up). Press E again to step back |
 | C | Wardrobe: restyle yourself or the nearby agent |
 | B | Cleaning: pay Xu to clean dirty spots (see below) |
 | T | Decorating: shop, place / move items, build walls, move desks (see below). While decorating: **R** rotates, **Enter** buys, **Esc** cancels |
@@ -315,15 +315,13 @@ In-app settings (volume, time preview…) and character looks are stored in the 
 ```
 src/
   data/        types, Paperclip adapter (paperclip.ts), realtime sync, chat, log parsing, demo data
-  pixel/       pixel version (PixiJS): office built from LimeZu sprites, Character Generator characters, bubbles, day/night, level-up effect, wardrobe
+  pixel/       pixel version (PixiJS): office built from LimeZu sprites, Character Generator characters, bubbles, day/night, level-up effect, wardrobe; dev-only hooks (window.__coop, devhooks.ts)
   world/       shared office layout, collisions, time/light tables (time.ts); the old 3D parts still live here
   audio/       synthesized sound effects and generative lofi (voice.ts: mic/TTS, currently disabled)
   characters/  blocky chibi characters + animation
-  agents/      3D agent behaviour
   life/        shared office life: the agent "brain" (brain.ts: walking, sitting, avoidance), lines, greetings, emotes
   player/      movement, camera, controls
   ui/          HUD, minimap, CLI + Chat (Terminal), ticket board, wardrobe, settings
-  dev/         dev-only hooks (window.__coop)
 server/
   guard.ts     allow-list of Paperclip endpoints (shared by Vite and the desktop app)
   coopData.ts  per-company EXP ledger and office state (cleaned spots, Xu spent) (/coop/)

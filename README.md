@@ -1,7 +1,7 @@
 # Coopverse
 
-**Văn phòng 3D kiểu game cho các agent AI chạy trên [Paperclip](https://github.com/paperclipai/paperclip).**
-Bạn đi lại trong văn phòng, thấy agent ngồi gõ phím khi đang làm việc, đi pha cà phê khi rảnh, ôm đầu khi lỗi. Đến bàn agent bấm **E** để chat bằng tiếng Việt hoặc xem màn hình CLI của nó chạy trực tiếp.
+**Văn phòng 2D pixel kiểu game cho các agent AI chạy trên [Paperclip](https://github.com/paperclipai/paperclip).**
+Bạn đi lại trong văn phòng, thấy agent ngồi làm việc (màn hình chạy chữ), đi pha cà phê khi rảnh, bong bóng "…" khi đang chạy, "Zzz" khi tạm dừng, "!" đỏ khi lỗi; màu viền bảng tên theo trạng thái. Đến bàn agent bấm **E** để chat bằng tiếng Việt hoặc xem màn hình CLI của nó chạy trực tiếp.
 
 [English](README.en.md)
 
@@ -83,8 +83,8 @@ paperclipai run
 
 1. Mở http://localhost:3100. Lần đầu Paperclip hướng dẫn tạo **công ty** đầu tiên.
 2. Vào **Agents** để thêm agent (tên, vai trò, adapter như Claude Code).
-   - Coopverse xếp chỗ ngồi theo sơ đồ tổ chức. Agent nào có người **báo cáo cho mình** (trường *Reports to*) là **Lead**, ngồi phòng kính. Các agent còn lại ngồi open space theo nhóm của Lead.
-   - Mỗi văn phòng có tối đa 26 bàn (2 Lead và 24 thành viên).
+   - Coopverse xếp chỗ ngồi theo sơ đồ tổ chức. Agent nào có người **báo cáo cho mình** (trường *Reports to*) là **Lead**, ngồi trước, các agent còn lại ngồi theo nhóm của Lead. Agent con (báo cáo cho một thành viên) ngồi bàn phụ ngay cạnh bàn agent cha.
+   - Văn phòng có 16 bàn chính (4 cụm × 4 bàn) cộng bàn phụ cho agent con. Agent không còn chỗ thì vẫn có trong danh sách Nhân sự (mở CLI được) nhưng không hiện trên bản đồ.
 3. **Bật Agent Chat** để chat được trong Coopverse: **Settings → Experimental → Agent Chat** (bật công tắc). Tính năng này bật cho cả Paperclip, không phải bật riêng từng công ty.
 
 ![Bật Agent Chat](docs/images/paperclip-agent-chat.png)
@@ -211,7 +211,7 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 | Rê chuột lên một agent | Hiện thẻ đầy đủ: tên, cấp, danh hiệu, việc đang làm (không cần đi lại gần) |
 | **Bấm chuột** | Bấm vào agent: mở màn hình của agent (CLI). Bấm ứng viên ở sảnh: xem phiếu thuê. Bấm bảng ticket: xem bảng to. Bấm vào chính bạn: tủ đồ. Không cần đi lại gần |
 | Bấm tên ở danh sách Nhân sự | Mở màn hình của agent đó (bản demo: chuột phải để đổi trạng thái) |
-| **E** | Đứng gần agent: mở màn hình của agent (tab **Chat** và **Log**). Đứng trước bảng ticket: xem bảng to. Đứng gần sofa, ghế, máy game, quầy cà phê…: ngồi / dùng (đi tiếp là đứng dậy). Bấm lại E để quay ra |
+| **E** | Đứng gần agent: mở màn hình của agent (tab **Chat** và **Log**, thêm tab **Duyệt** khi agent có việc chờ bạn, và mở sẵn tab đó). Đứng trước bảng ticket: xem bảng to. Đứng gần sofa, ghế, máy game, quầy cà phê…: ngồi / dùng (đi tiếp là đứng dậy). Bấm lại E để quay ra |
 | C | Tủ đồ: đổi ngoại hình của bạn, hoặc của agent đang đứng gần |
 | B | Dọn dẹp: trả Xu dọn chỗ bẩn (xem dưới) |
 | T | Trang trí: cửa hàng, đặt / dời đồ, xây vách, dời bàn (xem dưới). Trong lúc trang trí: **R** xoay, **Enter** mua, **Esc** bỏ |
@@ -313,15 +313,13 @@ Cài đặt trong app (âm lượng, giờ xem thử…) và ngoại hình nhân
 ```
 src/
   data/        kiểu dữ liệu, adapter Paperclip (paperclip.ts), đồng bộ realtime, chat, đọc + parse log, dữ liệu demo
-  pixel/       bản pixel (PixiJS): dựng văn phòng từ gói LimeZu, nhân vật ghép từ Character Generator, bong bóng, ngày/đêm, hiệu ứng lên cấp, tủ đồ
+  pixel/       bản pixel (PixiJS): dựng văn phòng từ gói LimeZu, nhân vật ghép từ Character Generator, bong bóng, ngày/đêm, hiệu ứng lên cấp, tủ đồ; hook chỉ dùng khi dev (window.__coop, devhooks.ts)
   world/       sơ đồ văn phòng dùng chung, va chạm, bảng giờ/ánh sáng (time.ts); phần 3D cũ vẫn nằm ở đây
   audio/       âm thanh tự tổng hợp: hiệu ứng theo vị trí, nhạc lofi tự sinh (voice.ts: mic/giọng đọc, đang tắt)
   characters/  nhân vật khối chibi + animation
-  agents/      hành vi agent bản 3D
   life/        đời sống văn phòng dùng chung: "não" agent (brain.ts: đi, ngồi, né người), lời thoại, chào hỏi, biểu cảm
   player/      di chuyển, camera, điều khiển
   ui/          HUD, minimap, CLI + Chat (Terminal), bảng ticket, tủ đồ, cài đặt
-  dev/         hook chỉ dùng khi dev (window.__coop)
 server/
   guard.ts     danh sách endpoint Paperclip được phép đi qua (dùng chung cho Vite và app desktop)
   coopData.ts  sổ EXP và văn phòng (chỗ đã dọn, Xu đã tiêu) của từng công ty (/coop/)

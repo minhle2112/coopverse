@@ -63,7 +63,10 @@ export class Lighting {
   readonly shade = new Graphics()
   /** Lớp quầng sáng (đặt trên lớp tối) */
   readonly glow = new Container()
-  private lights: { s: Sprite; kind: Light['kind'] }[] = []
+  /** `k`: hệ số sáng của màn hình máy theo trạng thái agent (1 đang chạy, nhỏ hơn khi màn chờ, 0 khi tắt) */
+  private lights: { s: Sprite; kind: Light['kind']; slot?: string; k: number }[] = []
+  /** Độ sáng quầng màn hình theo giờ (trước khi nhân hệ số trạng thái) */
+  private screenA = 0
   private masks: Graphics[] = []
   private sun: Graphics | null = null
   private panes: Graphics | null = null
@@ -102,12 +105,27 @@ export class Lighting {
         s.mask = m
       }
       this.glow.addChild(s)
-      return { s, kind: l.kind }
+      return { s, kind: l.kind, slot: l.slot, k: 1 }
     })
     this.sun = o.sun
     this.panes = o.panes
     this.stars = o.stars
     this.at = -1
+  }
+
+  /**
+   * Màn hình máy ở bàn: đang chạy sáng hẳn, rảnh (màn chờ xanh tối) sáng nhẹ, tạm dừng / lỗi / nghỉ / bàn trống thì không hắt sáng.
+   * Scene gọi cùng lúc vẽ lại màn hình.
+   */
+  setScreens(statusOf: (slot: string) => string | null) {
+    for (const l of this.lights) {
+      if (!l.slot) continue
+      const st = statusOf(l.slot)
+      const k = st === 'running' ? 1 : st === 'idle' ? 0.4 : 0
+      if (k === l.k) continue
+      l.k = k
+      l.s.alpha = this.screenA * k
+    }
   }
 
   /** Mỗi khung hình. Giờ chỉ tính lại mỗi giây (hoặc ngay khi đổi giờ xem thử). */
@@ -121,8 +139,9 @@ export class Lighting {
     const a = ambienceAt(h, this.amb)
     this.shade.tint = tintAt(h, this.tint).getHex()
     // Đỉnh quầng sáng vừa phải để vẫn thấy vân sàn ở giữa vùng sáng
+    this.screenA = 0.1 + 0.26 * a.lamp
     for (const l of this.lights) {
-      l.s.alpha = l.kind === 'lamp' ? 0.5 * a.lamp : l.kind === 'ceiling' ? 0.34 * a.lamp : 0.1 + 0.26 * a.lamp
+      l.s.alpha = l.kind === 'lamp' ? 0.5 * a.lamp : l.kind === 'ceiling' ? 0.34 * a.lamp : this.screenA * l.k
     }
     if (this.sun) this.sun.alpha = Math.min(1, a.sunI / 1.9) * (1 - a.night)
     // Kính cửa sổ: trong suốt khi trời sáng, ngả màu trời lúc chạng vạng, xanh đậm có sao ban đêm

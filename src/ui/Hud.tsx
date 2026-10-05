@@ -230,8 +230,8 @@ export function Hud({ world }: { world: World }) {
             key={a.id}
             className={`roster-item${ping?.id === a.id ? ' pinged' : ''}`}
             onClick={() => openAgent(a.id)}
-            onContextMenu={demo ? (e) => { e.preventDefault(); cycleStatus(a.id) } : undefined}
-            title={(a.candidate ? 'Bấm để xem hồ sơ' : 'Bấm để mở CLI') + (demo ? ' · chuột phải: đổi trạng thái (demo)' : '')}
+            onContextMenu={demo ? (e) => { e.preventDefault(); if (!a.candidate) cycleStatus(a.id) } : undefined}
+            title={a.candidate ? 'Bấm để xem hồ sơ' : 'Bấm để mở CLI' + (demo ? ' · chuột phải: đổi trạng thái (demo)' : '')}
           >
             <span className="roster-av">
               <Avatar parts={partsOf(a.id, a.name, leadIds.has(a.id))} scale={1} />

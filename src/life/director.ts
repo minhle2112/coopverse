@@ -242,9 +242,9 @@ export function askAnswered(agentId: string, good: boolean) {
 }
 
 /** Ăn mừng: giơ tay, mặt vui */
-function celebrate(a: LifeActor, icon: string, sec: number) {
+function celebrate(a: LifeActor, icon: string | null, sec: number) {
   const t = clock.t
-  emote(a.id, icon, sec)
+  if (icon) emote(a.id, icon, sec)
   a.gesture = 'cheer'
   a.gestureUntil = t + sec - 0.4
   a.mood = 'happy'
@@ -256,7 +256,8 @@ function celebrate(a: LifeActor, icon: string, sec: number) {
 export function leveledUp(agentId: string, level: number) {
   const a = actors.get(agentId)
   if (!a) return
-  celebrate(a, '⭐', 3.2)
+  // Không kèm emote ⭐: lúc lên cấp đầu agent đã có chữ "LÊN CẤP!" (emote bị ẩn đúng lúc đó nên chẳng bao giờ thấy)
+  celebrate(a, null, 3.2)
   say(a.id, pick(LEVEL_UP(level, titleOf(level))))
 }
 

@@ -29,7 +29,7 @@ export function FameView() {
         <div className="term-bar">
           <span className="term-dots"><i /><i /><i /></span>
           <span className="term-title">
-            🏆 Bảng vàng{company ? ` · ${company.name}` : demo ? ' · demo' : ''}
+            🏆 Bảng vinh danh{company ? ` · ${company.name}` : demo ? ' · demo' : ''}
             <span className="muted">· {by === 'week' ? `từ thứ Hai ${since}` : 'từ lúc có Coopverse'}</span>
           </span>
           <div className="term-tabs" role="tablist" aria-label="Xếp hạng theo">

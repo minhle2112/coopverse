@@ -74,6 +74,8 @@ export interface Light {
   /** Bán kính (pixel gốc) */
   r: number
   kind: 'lamp' | 'ceiling' | 'screen'
+  /** Màn hình máy ở bàn này (id chỗ ngồi): chỉ hắt sáng khi máy đang bật (xem Lighting.setScreens) */
+  slot?: string
   /** Kẹp quầng sáng trong phòng (pixel gốc), để không tràn qua vách kính / tường */
   clip?: { x: number; y: number; w: number; h: number }
 }
@@ -401,7 +403,7 @@ function buildDesk(s: DeskSlot, own: ReadonlySet<string>, sorted: Container[], s
     desk.x = 2 * Math.round(px(c.x))
   }
   const sx = west ? 2 * Math.round(px(c.x)) - (scr.x + scr.w / 2) : scr.x + scr.w / 2
-  lights.push({ x: sx, y: scr.y + scr.h / 2, r: 14, kind: 'screen' })
+  lights.push({ x: sx, y: scr.y + scr.h / 2, r: 14, kind: 'screen', slot: s.id })
   const live = liveScreen(s.id, scr, phase)
   desk.addChild(live.g)
   screens.push(live)

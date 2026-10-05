@@ -346,6 +346,7 @@ export function PixelScene({ world, statusOfSlot, children }: {
         if (screenAcc > 0.12 && office.current) {
           screenAcc = 0
           for (const s of office.current.screens) s.draw(statusRef.current.get(s.slotId) ?? null, t)
+          lighting.setScreens((slot) => statusRef.current.get(slot) ?? null)
         }
 
         // ── Thứ gần nhất để bấm E: agent, bảng ticket ──

@@ -358,10 +358,11 @@ function Overhead({ agent }: { agent: Agent }) {
   const xuFresh = xu && Date.now() - xu.at < 2500
   return (
     <div className="px-over">
-      {bubble && !hush && <div key={bubble.id} className={`px-say${bubble.real ? ' real' : ''}`} data-who={agent.name}>{plain(bubble.text)}</div>}
-      {emoji && !hush && <div key={emoji.id} className="px-emoji">{emoji.icon}</div>}
-      {up && <div key={up.id} className="px-lvup">LÊN CẤP {up.level}!</div>}
-      {fresh && <div key={pop.id} className="px-xp">+{pop.amount} EXP</div>}
+      {/* Key có tiền tố: id câu nói / emote (life/store) và id lên cấp / EXP (data/exp) đến từ các bộ đếm khác nhau, có thể trùng số */}
+      {bubble && !hush && <div key={`say${bubble.id}`} className={`px-say${bubble.real ? ' real' : ''}`} data-who={agent.name}>{plain(bubble.text)}</div>}
+      {emoji && !hush && <div key={`emo${emoji.id}`} className="px-emoji">{emoji.icon}</div>}
+      {up && <div key={`up${up.id}`} className="px-lvup">LÊN CẤP {up.level}!</div>}
+      {fresh && <div key={`xp${pop.id}`} className="px-xp">+{pop.amount} EXP</div>}
       {xuFresh && <div key={`xu${xu.id}`} className="px-xp px-xu">+{xu.amount} Xu</div>}
     </div>
   )

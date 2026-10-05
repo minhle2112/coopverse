@@ -68,11 +68,12 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
         useCoop.getState().toggleDeco()
         return
       }
-      if (shortcut && useDeco.getState().open && e.code === 'KeyR') {
+      // R / Enter của chế độ trang trí chỉ chạy khi đang nhìn thấy bản đồ (CLI / bảng to che thì thôi: tránh mua ngầm)
+      if (shortcut && useDeco.getState().open && e.code === 'KeyR' && !focused()) {
         decoRotate()
         return
       }
-      if (shortcut && useDeco.getState().pending && (e.code === 'Enter' || e.code === 'NumpadEnter')) {
+      if (shortcut && useDeco.getState().pending && (e.code === 'Enter' || e.code === 'NumpadEnter') && !focused()) {
         void confirmPending()
         return
       }

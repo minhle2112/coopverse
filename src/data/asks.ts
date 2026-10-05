@@ -82,6 +82,9 @@ export async function resolveAsk(ask: Ask, action: AskAction): Promise<string | 
   s.pushNotes([{ kind: 'info', text: `${what}: ${ask.title}${who ? ` (${who})` : ''}${demo ? ' (demo)' : ''}` }])
   if (ask.agentId) askAnswered(ask.agentId, isGood(action))
   if (demo && ask.candidateId && action.do === 'approval' && action.verb !== 'request-revision') demoHire(ask.candidateId, action.verb === 'approve')
+  // Yêu cầu sửa: ứng viên vẫn ở sảnh chờ nộp lại (Paperclip không còn phiếu "pending"), bấm vào thì báo đang sửa
+  const cand = ask.candidateId
+  if (cand && action.do === 'approval' && action.verb === 'request-revision') useCoop.setState((st) => ({ revising: { ...st.revising, [cand]: true } }))
   requestRefresh()
   return null
 }

@@ -69,7 +69,8 @@ const periodNow = (): Period => {
   if (h < 5) return 'night'
   if (h < 7) return 'dawn'
   if (h < 11) return 'morning'
-  if (h < 13.5) return 'noon'
+  // Cùng mốc với nhãn buổi trên đồng hồ (world/time.ts periodOf): trưa tới 13:00
+  if (h < 13) return 'noon'
   if (h < 18) return 'afternoon'
   if (h < 22) return 'evening'
   return 'night'
