@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "desktop:build": "npm run build && node desktop/build.mjs",
     "desktop": "npm run desktop:build && electron build/app",
-    "dist:win": "npm run desktop:build && electron-builder --win --config desktop/electron-builder.json --publish never"
+    "dist:win": "npm run desktop:build && node node_modules/electron/install.js && electron-builder --win --config desktop/electron-builder.json --publish never"
   },
   "dependencies": {
     "@fontsource/vt323": "^5.3.0",
