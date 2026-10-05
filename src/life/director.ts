@@ -4,7 +4,7 @@ import { player } from '../runtime'
 import { useCoop } from '../store'
 import type { CleanJob } from '../data/officeState'
 import { actors, type LifeActor } from './actors'
-import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, CLEANED, EXCUSE, LEVEL_UP, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
+import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, BOUGHT, BUILT, CLEANED, EXCUSE, LEVEL_UP, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
 import { spotById } from './spots'
 import { clock, emote, expireLife, isSpeaking, readTime, say, useLife } from './store'
 
@@ -271,6 +271,15 @@ export function cleaned(job: CleanJob) {
     if (a.where !== 'seat') celebrate(a, '✨', 2.6)
     else emote(a.id, '✨', 2.4)
     if (i < 2) say(a.id, pick(CLEANED[job.kind]))
+  })
+}
+
+/** Bạn vừa mua món mới / xây vách ở quanh (x, z): agent đứng gần quay ra khen */
+export function decorated(name: string | null, x: number, z: number) {
+  const list = [...actors.values()].filter((a) => Math.hypot(a.x - x, a.z - z) < 4.5).sort(() => Math.random() - 0.5)
+  list.slice(0, 2).forEach((a, i) => {
+    emote(a.id, name ? '😍' : '🤔', 2.4)
+    if (i === 0) say(a.id, name ? pick(BOUGHT).replace('{x}', name) : pick(BUILT))
   })
 }
 

@@ -281,3 +281,72 @@
 .clean-tag.on > span { color: var(--px-ink); background: #f4d35e; border-color: var(--px-dark); font-size: 17px; line-height: 15px; }
 /* Chế độ dọn dẹp: ẩn bảng tên agent cho bớt rối (người đang đứng gần vẫn hiện) */
 .clean-mode .px-under:not(:has(.near)), .clean-mode .px-say { display: none; }
+
+/* ── Trang trí (phím T): cửa hàng bên trái, nút ✓ / ✕ trên bản đồ ── */
+.shop { width: 320px; }
+.shop-tabs { display: flex; gap: 4px; margin: 6px 0 2px; }
+.shop-tab {
+  flex: 1; font: inherit; font-size: 18px; padding: 2px 0; cursor: pointer; background: #2a2640;
+  border: 2px solid var(--px-dark); box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.3);
+}
+.shop-tab:hover { background: #3a3550; }
+.shop-tab.on { background: #4d4470; border-color: #f4d35e; box-shadow: inset 0 -3px 0 #f4d35e; }
+.shop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 4px 0 6px; }
+.shop-card {
+  display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px 3px; cursor: pointer; font: inherit;
+  color: var(--text, #f4f1ea); background: #2a2640; border: 2px solid var(--px-dark); min-width: 0;
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.3), inset 2px 2px 0 rgba(255, 255, 255, 0.06);
+}
+.shop-card:hover { background: #3a3550; }
+.shop-card.on { background: #4d4470; border-color: #f4d35e; }
+.shop-card.poor .shop-price { color: #f3b3a8; }
+.shop-thumb {
+  display: block; height: 40px; width: auto; max-width: 100%; object-fit: contain; image-rendering: pixelated;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.35));
+}
+.shop-name { font-size: 13px; line-height: 1.05; text-align: center; overflow-wrap: anywhere; }
+.shop-price { font-size: 13px; color: #ffd84a; }
+.shop-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 4px 0; }
+.shop-tool {
+  display: flex; flex-direction: row; align-items: center; gap: 6px; padding: 3px 6px; cursor: pointer; font: inherit;
+  color: var(--text, #f4f1ea); background: #2a2640; border: 2px solid var(--px-dark); text-align: left;
+}
+.shop-tool span { display: flex; flex-direction: column; }
+.shop-tool small { font-size: 13px; color: #ffd84a; }
+/* Mẫu nhỏ của từng loại vách: nắp trên, mặt dưới */
+.wall-sw { flex: none; width: 16px; height: 22px; border: 1px solid #2b2633; image-rendering: pixelated; }
+.wall-sw.low { background: linear-gradient(#ece6d8 0 60%, #a98f6c 60%); }
+.wall-sw.glass { background: linear-gradient(#5a6470 0 3px, rgba(191, 227, 240, 0.55) 3px 82%, #5b6475 82%); }
+.wall-sw.tall { background: linear-gradient(#ece8f1 0 25%, #d8c7a6 25% 85%, #9b7f5a 85%); }
+.wall-sw.erase { background: repeating-linear-gradient(45deg, #e04848 0 3px, #2a2640 3px 6px); }
+.shop-tool.on { background: #4d4470; border-color: #f4d35e; }
+.shop-tool:disabled { opacity: 0.45; cursor: default; }
+.deco-bar { z-index: 7; }
+.deco-btns {
+  position: absolute; left: 0; top: 0; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; white-space: nowrap;
+  padding: 3px; background: rgba(16, 14, 24, 0.9); border: 2px solid var(--px-dark); pointer-events: auto;
+}
+.deco-btns .desk-btn { font-size: 15px; padding: 0 7px; }
+.deco-btns .desk-btn:disabled { opacity: 0.45; cursor: default; }
+.desk-btn.danger { background: #a3392b; color: var(--px-paper); }
+.desk-btn.danger:hover { background: #b84535; }
+.deco-name { font-size: 15px; color: #f4d35e; padding: 0 4px; }
+.deco-tag { z-index: 6; }
+/* Nhãn lý do / số ô: ngay trên khung đặt, mũi nhọn chỉ xuống */
+.deco-tag > span {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, calc(-100% - 5px)); white-space: nowrap; pointer-events: none;
+  padding: 1px 5px; font-size: 15px; line-height: 14px; color: #fff; background: #1e1a2b; border: 1px solid #7bd88f;
+}
+.deco-tag > span::after {
+  content: ''; position: absolute; left: 50%; bottom: -6px; margin-left: -5px;
+  border: 5px solid transparent; border-bottom: 0; border-top-color: #7bd88f;
+}
+.deco-tag > span.bad { border-color: #e04848; }
+.deco-tag > span.bad::after { border-top-color: #e04848; }
+/* Chế độ trang trí: ẩn bảng tên, bong bóng thoại cho dễ nhìn chỗ đặt */
+.deco-mode .px-under:not(:has(.near)), .deco-mode .px-say { display: none; }
+/* Đang trang trí: bớt HUD đè lên bảng cửa hàng (việc chờ duyệt vẫn mở được bằng phím Q) */
+.deco-mode .left-col > .inbox { display: none; }
+/* ...danh sách nhân sự thu về một dòng tiêu đề, số Xu chỉ hiện trong bảng cửa hàng */
+.deco-mode .roster > :not(.roster-head) { display: none; }
+.deco-mode .brand .xu-badge { display: none; }

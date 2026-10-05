@@ -9,7 +9,7 @@ import { PixelScene } from './pixel/Scene'
 import { useControls } from './player/useControls'
 import { useCoop } from './store'
 import { Hud } from './ui/Hud'
-import { buildWorld } from './world/layout'
+import { buildWorld, layoutKey } from './world/layout'
 import { navRef } from './world/nav'
 
 export default function App() {
@@ -22,15 +22,17 @@ export default function App() {
   const agents = useCoop((s) => s.agents)
   // Bố cục chỉ dựng lại khi sơ đồ tổ chức đổi, không phải khi trạng thái đổi
   const orgKey = agents.map((a) => `${a.id}>${a.reportsTo}${a.candidate ? '?' : ''}`).join('|')
+  // ...và khi bạn đặt / dời đồ, xây vách, dời bàn (không phải khi dọn bụi hay Xu đổi)
+  const office = useOffice((s) => s.office)
+  const decoKey = layoutKey(office)
   const world = useMemo(() => {
-    const w = buildWorld(useCoop.getState().agents)
+    const w = buildWorld(useCoop.getState().agents, useOffice.getState().office)
     // Agent tìm đường trên bố cục mới ngay từ khung hình sau
     navRef.current = w.nav
     return w
-  }, [orgKey])
+  }, [orgKey, decoKey])
 
   // Chỗ agent rảnh đi tới: đổi khi bố cục đổi hoặc vừa dọn xong một mảng sàn (hết chỗ bụi để than)
-  const office = useOffice((s) => s.office)
   useEffect(() => setSpots(officeSpots(world, office)), [world, office])
 
   const statusOfSlot = useMemo(() => {

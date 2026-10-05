@@ -5,7 +5,8 @@ import path from 'node:path'
 import type { Plugin } from 'vite'
 import type { Handler } from './guard'
 import { emptyLedger, type Ledger } from '../src/data/ledger'
-import { emptyOffice, isClean, jobById, spentXu, type OfficeState } from '../src/data/officeState'
+import { apply, parseAction } from '../src/data/decor'
+import { normOffice, spentXu, type OfficeState } from '../src/data/officeState'
 import { earnings } from '../src/data/xu'
 
 /**
@@ -19,7 +20,8 @@ import { earnings } from '../src/data/xu'
  *
  * - GET  /coop/exp/:companyId     đọc thêm dữ liệu mới từ Paperclip vào sổ rồi trả cả sổ
  * - GET  /coop/office/:companyId  trạng thái văn phòng
- * - POST /coop/office/:companyId  {action: 'clean', job}  trả Xu dọn một chỗ (cần header x-coopverse + origin Coopverse)
+ * - POST /coop/office/:companyId  một lệnh trong src/data/decor.ts (dọn, mua, dời, cất, bán, xây vách, dời bàn);
+ *                                  cần header x-coopverse + origin Coopverse
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -74,8 +76,7 @@ const offices = new Map<string, OfficeState>()
 
 async function readOffice(file: string): Promise<OfficeState | null> {
   try {
-    const raw = JSON.parse(await readFile(file, 'utf8')) as Partial<OfficeState>
-    return { ...emptyOffice(), ...raw, v: 1 }
+    return normOffice(JSON.parse(await readFile(file, 'utf8')) as Partial<OfficeState>)
   } catch {
     return null
   }
@@ -84,7 +85,7 @@ async function readOffice(file: string): Promise<OfficeState | null> {
 async function loadOffice(dir: string, cid: string): Promise<OfficeState> {
   let o = offices.get(cid)
   if (o) return o
-  o = (await readOffice(officeFileOf(dir, cid))) ?? emptyOffice()
+  o = (await readOffice(officeFileOf(dir, cid))) ?? normOffice(null)
   offices.set(cid, o)
   return o
 }
@@ -225,21 +226,15 @@ export function coopDataHandler(opts: { target: () => string; isOwnOrigin: (o: u
         return send(res, 403, { error: 'coopverse: lệnh phải gửi từ trang Coopverse' })
       }
       serial(cid, async () => {
-        const body = (await readBody(req)) as { action?: unknown; job?: unknown }
-        const job = typeof body.job === 'string' ? jobById.get(body.job) : undefined
-        if (body.action !== 'clean' || !job) return send(res, 400, { error: 'coopverse: không có việc dọn này' })
+        const act = parseAction(await readBody(req))
+        if (!act) return send(res, 400, { error: 'coopverse: lệnh không hợp lệ' })
         const o = await loadOffice(dir, cid)
-        if (isClean(o, job.id)) return send(res, 200, { office: o })
         // Số dư tính lại từ sổ EXP trên máy (không tin con số trang gửi lên)
         const have = earnings((await load(dir, cid)).ledger).total - spentXu(o)
-        if (have < job.price) return send(res, 409, { error: `Chưa đủ Xu: cần ${job.price}, quỹ còn ${have}` })
-        const at = Date.now()
-        const next: OfficeState = {
-          ...o,
-          cleaned: { ...o.cleaned, [job.id]: at },
-          spent: [...o.spent, { id: randomUUID(), at, kind: 'clean', ref: job.id, xu: job.price }],
-        }
-        await writeJson(officeFileOf(dir, cid), next)
+        const r = apply(o, act, have, Date.now(), randomUUID)
+        if ('error' in r) return send(res, r.status, { error: r.error })
+        const next = r.office
+        if (next !== o) await writeJson(officeFileOf(dir, cid), next)
         offices.set(cid, next)
         send(res, 200, { office: next })
       }).catch((e: Error) => send(res, 400, { error: `coopverse: ${e.message}` }))

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Application, Container, Graphics, Sprite } from 'pixi.js'
+import { ranking, useExp } from '../data/exp'
 import { COLUMNS, groupIssues } from '../data/kanban'
 import { isClean, jobById } from '../data/officeState'
 import { useOffice } from '../data/officeSync'
@@ -11,12 +12,15 @@ import { assetsReady, loadSheets } from './assets'
 import { PLAYER_ID } from '../characters/look'
 import { charSheet, frameAt, type CharSheet } from './chars'
 import { CleanOverlay, cleanHover, jobAt } from './CleanMode'
+import { DecoOverlay, decoClick, decoCtx, decoDown, decoLeave, decoMove, decoUp } from './Decorate'
+import { useDeco } from '../ui/decoStore'
 import { buildDirt, jobBox, wipe, type DirtView } from './dirt'
 import { partsOf, usePixelLooks } from './look'
 import { stage, ticks, toScreen } from './stage'
 import { hits, makeOutline, personHit, pickAt, setOutline } from './pick'
-import { MAP_H, MAP_W, dirOf, px, py, type Dir } from './geom'
-import { buildOffice, drawKanban, type OfficeView } from './office'
+import { MAP_H, MAP_W, dirOf, px, py, wx, type Dir } from './geom'
+import { buildOffice, drawFame, drawKanban, type OfficeView } from './office'
+import { updateWalls } from './walls'
 import { installDevHooks } from './devhooks'
 import { Lighting } from './light'
 import { view } from './view'
@@ -35,17 +39,21 @@ const VIEW_PX = 336
 /** Chiều cao hình người (pixel gốc) để tính vùng bấm của bạn */
 const HEAD = 24
 const HL = 0xffe27a
+/** Bề rộng bảng cửa hàng bên trái kể cả lề (pixel CSS) */
+const DECO_PANEL = 350
 
 /** Thứ bấm chuột được mà không phải người khác: bạn (tủ đồ) và bảng ticket trên tường */
 const TIPS: Record<string, { name: string; hint: string }> = {
   player: { name: 'Bạn', hint: 'Bấm chuột: tủ đồ' },
   '#board': { name: 'Bảng ticket', hint: 'Bấm chuột: xem bảng' },
+  '#fame': { name: 'Bảng vinh danh', hint: 'Bấm chuột: xem xếp hạng' },
 }
 
 /** Bấm chuột vào một thứ trên bản đồ: làm đúng việc phím E làm khi đứng gần, không cần đi tới */
 function activate(id: string) {
   const s = useCoop.getState()
   if (id === '#board') s.openBoard()
+  else if (id === '#fame') s.openFame()
   else if (id === 'player') s.openWardrobe('player')
   else s.openAgent(id)
 }
@@ -63,6 +71,10 @@ function wallDist(b: { x: number; z: number; w: number }) {
 }
 
 type Phase = 'loading' | 'missing' | 'ready' | 'error'
+
+/** Màu dấu của từng agent trên bảng vinh danh (cố định theo id) */
+const FAME_COLORS = [0x6c8ed8, 0x3ccf6e, 0xe0784f, 0xc77dd8, 0x4fc2c9, 0xe8c547]
+const hashOf = (s: string) => [...s].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)
 
 /**
  * Văn phòng pixel (PixiJS): sàn, tường, đồ đạc, bàn làm việc, bạn đi lại bằng WASD.
@@ -100,6 +112,8 @@ export function PixelScene({ world, statusOfSlot, children }: {
     let lastNear: string | null = null
     let t = 0
     let screenAcc = 0
+    let offUp: (() => void) | null = null
+    let camShift = 0
 
     ;(async () => {
       if (!(await assetsReady())) {
@@ -132,6 +146,8 @@ export function PixelScene({ world, statusOfSlot, children }: {
         return { x: (cx - rect.left - r.position.x) / r.scale.x, y: (cy - rect.top - r.position.y) / r.scale.y }
       }
       const pickClient = (cx: number, cy: number) => {
+        // Đang trang trí: bấm chuột để chọn / đặt đồ, không mở người hay bảng
+        if (useDeco.getState().open) return null
         const p = mapAt(cx, cy)
         return p ? pickAt(p.x, p.y) : null
       }
@@ -140,10 +156,29 @@ export function PixelScene({ world, statusOfSlot, children }: {
         const p = useCoop.getState().cleanOpen ? mapAt(cx, cy) : null
         return p ? jobAt(p.x, p.y) ?? null : null
       }
-      app.canvas.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true })
-      app.canvas.addEventListener('pointerleave', () => { mouse.in = false })
+      app.canvas.addEventListener('pointermove', (e) => {
+        mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true
+        const p = useDeco.getState().open ? mapAt(e.clientX, e.clientY) : null
+        if (p) decoMove(p.x, p.y)
+      })
+      app.canvas.addEventListener('pointerleave', () => { mouse.in = false; decoLeave() })
+      app.canvas.addEventListener('pointerdown', (e) => {
+        const p = e.button === 0 && useDeco.getState().open ? mapAt(e.clientX, e.clientY) : null
+        if (p) decoDown(p.x, p.y)
+      })
+      const onUp = (e: PointerEvent) => {
+        const p = e.button === 0 && useDeco.getState().open ? mapAt(e.clientX, e.clientY) : null
+        if (p) decoUp(p.x, p.y)
+      }
+      window.addEventListener('pointerup', onUp)
+      offUp = () => window.removeEventListener('pointerup', onUp)
       app.canvas.addEventListener('click', (e) => {
         if (e.button !== 0) return
+        if (useDeco.getState().open) {
+          const p = mapAt(e.clientX, e.clientY)
+          if (p) decoClick(p.x, p.y)
+          return
+        }
         const id = pickClient(e.clientX, e.clientY)
         if (id) return activate(id)
         const job = jobClient(e.clientX, e.clientY)
@@ -238,7 +273,10 @@ export function PixelScene({ world, statusOfSlot, children }: {
         view.x += (px(player.x) - view.x) * ease
         view.y += (py(player.z) - 12 - view.y) * ease
         const halfW = sw / z / 2, halfH = sh / z / 2
-        const cx = MAP_W <= halfW * 2 ? MAP_W / 2 : Math.min(MAP_W - halfW, Math.max(halfW, view.x))
+        // Đang trang trí: bảng cửa hàng che bên trái, dời khung nhìn sang phải nửa bề rộng bảng (trượt mượt)
+        camShift += ((useDeco.getState().open ? DECO_PANEL / 2 : 0) - camShift) * Math.min(1, dt * 8)
+        const sh2 = camShift / z
+        const cx = MAP_W <= halfW * 2 - 2 * sh2 ? MAP_W / 2 - sh2 : Math.min(MAP_W - halfW, Math.max(halfW - 2 * sh2, view.x - sh2))
         const cy = MAP_H <= halfH * 2 ? MAP_H / 2 : Math.min(MAP_H - halfH, Math.max(halfH, view.y))
         root.scale.set(z)
         root.position.set(Math.round((sw / 2 - cx * z) * res) / res, Math.round((sh / 2 - cy * z) * res) / res)
@@ -246,6 +284,12 @@ export function PixelScene({ world, statusOfSlot, children }: {
         // ── Người trong văn phòng (agent, ứng viên), đạo diễn đời sống ──
         for (const f of ticks) f(dt, t)
         lighting.update(t)
+        // Tường cao mờ đi khi có người phía sau, cửa tự mở khi có người tới gần
+        if (office.current) {
+          const people = [{ x: px(player.x), y: py(player.z) }]
+          for (const a of agentPos.values()) people.push({ x: px(a.x), y: py(a.z) })
+          updateWalls(office.current.walls, people, dt)
+        }
 
         // ── Chuột: thứ đang được rê lên (người, bạn, bảng) ──
         const hv = mouse.in ? pickClient(mouse.x, mouse.y) : null
@@ -287,10 +331,15 @@ export function PixelScene({ world, statusOfSlot, children }: {
         const boardD = wallDist(BOARD)
         const board = boardD < BOARD_DIST && (!best || boardD - 0.8 < bd)
         if (board) best = null
-        const key = board ? '#board' : best
+        // Bảng vinh danh (nếu đã mua, treo trên tường bắc)
+        const fm = office.current?.fame
+        const fameD = fm ? wallDist({ x: wx(fm.x), z: BOARD.z, w: 3 }) : Infinity
+        const fame = !board && fameD < BOARD_DIST && (!best || fameD - 0.8 < bd)
+        if (fame) best = null
+        const key = board ? '#board' : fame ? '#fame' : best
         if (key !== lastNear) {
           lastNear = key
-          useCoop.getState().setNear(best, board)
+          useCoop.getState().setNear(best, board, fame)
         }
       })
       setPhase('ready')
@@ -302,6 +351,7 @@ export function PixelScene({ world, statusOfSlot, children }: {
 
     return () => {
       dead = true
+      offUp?.()
       Object.assign(stage, { app: null, root: null, sorted: null, top: null, fx: null, overlay: null, hover: null })
       hits.delete('player')
       useCoop.getState().setHover(null)
@@ -310,6 +360,7 @@ export function PixelScene({ world, statusOfSlot, children }: {
       office.current = null
       dirt.current = null
       cleanHover.id = null
+      decoCtx.view = null
       light.current = null
       try { app.destroy(true, { children: true }) } catch { /* chưa init xong */ }
     }
@@ -333,7 +384,7 @@ export function PixelScene({ world, statusOfSlot, children }: {
       // Chỉ gỡ đồ của văn phòng cũ: người, bong bóng, mũi tên đánh dấu, bụi bẩn cũng nằm trong các lớp này
       for (const c of [old.floor, old.top, ...old.sorted]) { c.removeFromParent(); c.destroy({ children: true }) }
     }
-    const v = buildOffice(world)
+    const v = buildOffice(world, useOffice.getState().office)
     // Sàn văn phòng nằm dưới cùng: lớp bụi bẩn (thêm sau) luôn phủ lên trên
     L.floor.addChildAt(v.floor, 0)
     L.top.addChildAt(v.top, 0)
@@ -343,6 +394,12 @@ export function PixelScene({ world, statusOfSlot, children }: {
     // Bảng treo tường bấm chuột được; người đứng trước bảng thì ưu tiên người
     const r = v.boards.kanban
     hits.set('#board', { x0: r.x, y0: r.y, x1: r.x + r.w, y1: r.y + r.h, z: -1e9 })
+    if (v.fame) {
+      const f = v.fame.rect
+      hits.set('#fame', { x0: f.x, y0: f.y, x1: f.x + f.w, y1: f.y + f.h, z: -1e9 })
+    } else hits.delete('#fame')
+    decoCtx.world = world
+    decoCtx.view = v
     redrawBoards()
   }, [phase, world])
 
@@ -372,15 +429,21 @@ export function PixelScene({ world, statusOfSlot, children }: {
     }
   }, [phase, officeState, officeReady])
 
-  // ── Bảng ticket trên tường: vẽ lại khi dữ liệu đổi ──
+  // ── Bảng ticket, bảng vinh danh trên tường: vẽ lại khi dữ liệu đổi ──
   const issues = useCoop((s) => s.issues)
+  const agentsNow = useCoop((s) => s.agents)
+  const stats = useExp((s) => s.stats)
   function redrawBoards() {
     const v = office.current
     if (!v) return
     const g = groupIssues(useCoop.getState().issues)
     drawKanban(v.kanban, COLUMNS.map((c) => ({ color: c.color, n: g[c.id].length })))
+    if (v.fame) {
+      const top = ranking(useCoop.getState().agents, useExp.getState().stats, 'total').slice(0, 3)
+      drawFame(v.fame.g, top.map((r) => ({ color: FAME_COLORS[hashOf(r.agent.id) % FAME_COLORS.length], exp: r.exp })))
+    }
   }
-  useEffect(redrawBoards, [issues])
+  useEffect(redrawBoards, [issues, agentsNow, stats])
 
   // ── Công cụ cho dev ──
   useEffect(() => {
@@ -397,6 +460,7 @@ export function PixelScene({ world, statusOfSlot, children }: {
       </div>
       {phase === 'ready' && children}
       {phase === 'ready' && <CleanOverlay />}
+      {phase === 'ready' && <DecoOverlay />}
       {phase === 'missing' && <MissingAssets />}
       {phase === 'error' && (
         <div className="panel center-card">

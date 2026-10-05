@@ -1,4 +1,6 @@
 import { AnimatedSprite, Container, Graphics, NineSliceSprite, Sprite, TilingSprite, type Texture } from 'pixi.js'
+import { itemById } from '../data/catalog'
+import type { OfficeState } from '../data/officeState'
 import type { AgentStatus } from '../data/types'
 import {
   BOARD, DESK_D, DESK_W, FURNITURE, OFFICE, WINDOWS, deskCenter, forward,
@@ -6,6 +8,8 @@ import {
 } from '../world/layout'
 import { cut, frames, sprite, stitch, type SpriteName } from './assets'
 import { CAP, MAP_H, MAP_W, PPM, WALL_FACE, px, py } from './geom'
+import { FAME_INNER, itemView } from './catalogArt'
+import { buildWalls, type WallView } from './walls'
 
 /*
  * Dựng văn phòng pixel từ bố cục ở world/layout.ts: một phòng lớn trống, cửa sổ và bảng ticket trên tường bắc,
@@ -15,18 +19,18 @@ import { CAP, MAP_H, MAP_W, PPM, WALL_FACE, px, py } from './geom'
  * - `top`: tường nam (luôn nằm trên cùng)
  */
 
-const OUTLINE = 0x2b2633
+export const OUTLINE = 0x2b2633
 const GOLD = 0xf2c14e
 /** Màu mặt bần của bảng LimeZu */
 const CORK = 0xbe7149
-const CAP_FILL = 0xece8f1
-const CAP_SHADE = 0xc5bfd2
+export const CAP_FILL = 0xece8f1
+export const CAP_SHADE = 0xc5bfd2
 const OUTSIDE = 0x1c1a26
 
 /** Gạch sàn: một ô 16×16 không có bóng tường (ô giữa hàng dưới của một khối 3×2 trong Room_Builder_Floors) */
 const FLOOR: [number, number, number, number] = [16, 400, 16, 16]
 /** Mặt tường bắc (vùng 48×32 trong Room_Builder_Walls) */
-const WALL: [number, number, number, number] = [16, 352, 16, 32]
+export const WALL: [number, number, number, number] = [16, 352, 16, 32]
 
 /** Bàn cao bao nhiêu pixel (mặt trước bàn) */
 const DESK_LIFT = 9
@@ -54,6 +58,12 @@ export interface OfficeView {
   lights: Light[]
   /** Khung bảng ticket trên tường (pixel gốc), để bấm chuột */
   boards: { kanban: Rect }
+  /** Vách tự xây, cửa (làm mờ / mở cửa mỗi khung hình) */
+  walls: WallView
+  /** uid đồ đã mua → khung bấm chuột (pixel gốc), để chọn khi trang trí */
+  itemHits: Map<string, Rect>
+  /** Bảng vinh danh (nếu đã mua): nội dung vẽ lại khi EXP đổi, khung để bấm / đứng gần bấm E */
+  fame: { g: Graphics; rect: Rect; x: number } | null
 }
 
 export interface Rect { x: number; y: number; w: number; h: number }
@@ -69,18 +79,18 @@ export interface Light {
   clip?: { x: number; y: number; w: number; h: number }
 }
 
-const sortAt = <T extends Container>(o: T, baseY: number): T => {
+export const sortAt = <T extends Container>(o: T, baseY: number): T => {
   o.zIndex = Math.round(baseY)
   return o
 }
 
-function tiled(tex: Texture, x: number, y: number, w: number, h: number) {
+export function tiled(tex: Texture, x: number, y: number, w: number, h: number) {
   const t = new TilingSprite({ texture: tex, width: Math.round(w), height: Math.round(h) })
   t.position.set(Math.round(x), Math.round(y))
   return t
 }
 
-function spr(name: SpriteName, cx: number, bottom: number, flip = false) {
+export function spr(name: SpriteName, cx: number, bottom: number, flip = false) {
   const s = new Sprite(sprite(name))
   s.anchor.set(0.5, 1)
   s.position.set(Math.round(cx), Math.round(bottom))
@@ -89,7 +99,7 @@ function spr(name: SpriteName, cx: number, bottom: number, flip = false) {
 }
 
 /** Hộp có viền tối kiểu LimeZu */
-function box(g: Graphics, x: number, y: number, w: number, h: number, fill: number, outline = OUTLINE) {
+export function box(g: Graphics, x: number, y: number, w: number, h: number, fill: number, outline = OUTLINE) {
   g.rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)).fill(outline)
   g.rect(Math.round(x) + 1, Math.round(y) + 1, Math.round(w) - 2, Math.round(h) - 2).fill(fill)
 }
@@ -148,7 +158,7 @@ function buildOuterWalls(floor: Container, top: Container) {
 // ───────────────────────── Đồ treo tường bắc ─────────────────────────
 
 /** Đồ treo tường (cửa sổ, tranh, bảng) hạ xuống giữa mặt tường cao 3 ô */
-const WALL_SHIFT = 10
+export const WALL_SHIFT = 10
 const onWall = (s: Sprite, x: number, fromTop: number) => {
   s.anchor.set(0.5, 0)
   s.position.set(Math.round(px(x)), wallTop() + WALL_SHIFT + fromTop)
@@ -210,6 +220,21 @@ function wallBoard(floor: Container, frame: 'corkboard' | 'chalkWall', inner?: n
 }
 
 let kanbanBox = { w: 0, h: 0 }
+
+const MEDAL = [0xf2c14e, 0xc9ced8, 0xd08a4e]
+
+/** Bảng vinh danh: 3 agent nhiều EXP nhất, mỗi người một dòng (huy chương, thanh EXP theo màu áo) */
+export function drawFame(g: Graphics, top: { color: number; exp: number }[]) {
+  g.clear()
+  const max = Math.max(1, ...top.map((t) => t.exp))
+  const { w } = FAME_INNER
+  top.slice(0, 3).forEach((t, k) => {
+    const y = k * 5
+    g.rect(0, y, 3, 3).fill(MEDAL[k])
+    g.rect(5, y, 3, 3).fill(t.color)
+    g.rect(10, y + 1, Math.max(2, Math.round(((w - 12) * t.exp) / max)), 1).fill({ color: 0xf4f1e8, alpha: 0.85 })
+  })
+}
 
 /** Bảng ticket: 5 cột, mỗi ticket một mẩu giấy màu (tối đa 8 mẩu mỗi cột) */
 export function drawKanban(g: Graphics, counts: { color: string; n: number }[]) {
@@ -366,7 +391,14 @@ function buildDesk(s: DeskSlot, tier: number, sorted: Container[], screens: Scre
   const desk = new Container()
   desk.addChild(top, g)
   for (const d of deco) desk.addChild(d)
-  lights.push({ x: scr.x + scr.w / 2, y: scr.y + scr.h / 2, r: 14, kind: 'screen' })
+  // Bàn dọc phía tây người ngồi (bạn đã xoay bàn): lật gương cả bàn quanh tâm bàn
+  const west = side && f.x < 0
+  if (west) {
+    desk.scale.x = -1
+    desk.x = 2 * Math.round(px(c.x))
+  }
+  const sx = west ? 2 * Math.round(px(c.x)) - (scr.x + scr.w / 2) : scr.x + scr.w / 2
+  lights.push({ x: sx, y: scr.y + scr.h / 2, r: 14, kind: 'screen' })
   const live = liveScreen(s.id, scr, phase)
   desk.addChild(live.g)
   screens.push(live)
@@ -378,7 +410,7 @@ function buildDesk(s: DeskSlot, tier: number, sorted: Container[], screens: Scre
   const seatX = px(s.seat.x), seatY = py(s.seat.z)
   const tint = CHAIR_TINT[tier] ?? 0xffffff
   if (side) {
-    const ch = spr('chairFront', seatX - 2, seatY + 2)
+    const ch = spr('chairFront', seatX + (f.x < 0 ? 2 : -2), seatY + 2)
     ch.tint = tint
     sorted.push(sortAt(ch, seatY - 2))
   } else if (f.z > 0) {
@@ -392,7 +424,7 @@ function buildDesk(s: DeskSlot, tier: number, sorted: Container[], screens: Scre
   }
 }
 
-// ───────────────────────── Đồ đạc (dùng lại cho đồ mua ở cửa hàng, đợt sau) ─────────────────────────
+// ───────────────────────── Đồ cố định của phòng (FURNITURE trong layout.ts; đồ mua ở cửa hàng vẽ ở catalogArt.ts) ─────────────────────────
 
 export function rug(f: Furniture) {
   const blue = f.color === '#7a8fb8' || f.color === '#4f9d94'
@@ -518,7 +550,7 @@ export function furniture(f: Furniture): Container | null {
   }
 }
 
-export function buildOffice(world: World): OfficeView {
+export function buildOffice(world: World, office: OfficeState): OfficeView {
   const floor = new Container()
   const top = new Container()
   const sorted: Container[] = []
@@ -544,5 +576,25 @@ export function buildOffice(world: World): OfficeView {
     if (f.kind === 'door') lights.push({ x: px(f.x), y: py(f.z) - 12, r: 1.5 * PPM, kind: 'lamp' })
   }
 
-  return { floor, sorted, top, screens, kanban: kb.content, sun, panes, stars, lights, boards: { kanban: kb.rect } }
+  // Đồ mua ở cửa hàng: thảm nằm dưới cùng (ngay trên sàn), đồ treo trên tường bắc, đồ đứng xếp lớp cùng người
+  const rugs = new Container()
+  const hung = new Container()
+  floor.addChild(rugs, hung)
+  const itemHits = new Map<string, Rect>()
+  let fame: OfficeView['fame'] = null
+  for (const p of office.items) {
+    const i = itemById.get(p.item)
+    if (!i || p.stored || i.mount === 'door') continue
+    const fg = i.id === 'fame' ? new Graphics() : undefined
+    const v = itemView(i, p.c, p.r, p.rot, fg)
+    if (v.layer === 'floor') (i.mount === 'rug' ? rugs : hung).addChild(v.node)
+    else sorted.push(v.node)
+    if (v.light) lights.push(v.light)
+    itemHits.set(p.uid, v.hit)
+    if (fg) fame = { g: fg, rect: v.hit, x: v.hit.x + v.hit.w / 2 }
+  }
+  const walls = buildWalls(office)
+  sorted.push(...walls.sorted)
+
+  return { floor, sorted, top, screens, kanban: kb.content, sun, panes, stars, lights, boards: { kanban: kb.rect }, walls, itemHits, fame }
 }

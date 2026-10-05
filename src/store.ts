@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { input } from './runtime'
 import type { NoteDraft, NoteKind } from './data/notify'
+import { useDeco } from './ui/decoStore'
 import { STATUS_CYCLE, type Agent, type Ask, type ChatInfo, type Company, type Issue } from './data/types'
 
 interface Toast { id: number; text: string }
@@ -87,6 +88,8 @@ interface CoopState {
   closeWardrobe: () => void
   toggleSettings: () => void
   toggleClean: () => void
+  /** Chế độ trang trí (phím T): cửa hàng, đặt / dời đồ, xây vách, dời bàn. Trạng thái chi tiết ở src/ui/decoStore.ts */
+  toggleDeco: () => void
   pickClean: (id: string | null) => void
   /** Esc: đóng lớp đang mở trên cùng. Trả về false nếu không có gì để đóng. */
   closeTop: () => boolean
@@ -208,12 +211,20 @@ export const useCoop = create<CoopState>((set, get) => ({
   // Bảng cài đặt nhỏ, không che màn hình: vẫn đi lại được khi đang mở
   toggleSettings: () => {
     if (!get().settingsOpen && document.pointerLockElement) document.exitPointerLock()
+    if (useDeco.getState().open) useDeco.getState().toggle()
     set((s) => ({ settingsOpen: !s.settingsOpen, wardrobeId: null, cleanOpen: false, cleanPick: null }))
   },
   // Như cài đặt: bảng nhỏ bên cạnh, vẫn đi lại được
   toggleClean: () => {
     if (!get().cleanOpen && document.pointerLockElement) document.exitPointerLock()
+    if (useDeco.getState().open) useDeco.getState().toggle()
     set((s) => ({ cleanOpen: !s.cleanOpen, cleanPick: null, settingsOpen: false }))
+  },
+  // Như dọn dẹp: bảng cửa hàng bên trái, vẫn đi lại được để xem các góc phòng
+  toggleDeco: () => {
+    if (document.pointerLockElement) document.exitPointerLock()
+    set({ cleanOpen: false, cleanPick: null, settingsOpen: false })
+    useDeco.getState().toggle()
   },
   pickClean: (id) => set({ cleanPick: id }),
   closeTop: () => {
@@ -223,6 +234,7 @@ export const useCoop = create<CoopState>((set, get) => ({
     else if (s.wardrobeId) set({ wardrobeId: null })
     else if (s.inboxOpen) set({ inboxOpen: false })
     else if (s.settingsOpen) set({ settingsOpen: false })
+    else if (useDeco.getState().back()) { /* bỏ chỗ đặt thử / món đang cầm / đóng chế độ trang trí */ }
     else if (s.cleanOpen) set({ cleanOpen: false })
     else if (s.focusId) set({ focusId: null })
     else if (s.boardOpen) set({ boardOpen: false })

@@ -1,4 +1,5 @@
-import { JOBS, isClean, type OfficeState } from '../data/officeState'
+import { itemById } from '../data/catalog'
+import { CELL, JOBS, cellX, isClean, type OfficeState } from '../data/officeState'
 import { snapFree } from '../world/nav'
 import { BOARD, OFFICE, WINDOWS, type Activity, type Vec2, type World } from '../world/layout'
 
@@ -50,6 +51,13 @@ export function officeSpots(world: World, office: OfficeState): Spot[] {
   WINDOWS.forEach((x, i) => out.push({ id: `win${i}`, ...at({ x, z: OFFICE.minZ + 0.75 }), yaw: N, act: 'window', area: 'window' }))
   // Bảng ticket
   for (const dx of [-0.8, 0.8]) out.push({ id: `kanban${dx < 0 ? 'L' : 'R'}`, ...at({ x: BOARD.x + dx, z: BOARD.z + 1.25 }), yaw: N, act: 'kanban', area: 'kanban' })
+  // Bảng vinh danh (nếu đã mua): đứng xem xếp hạng
+  for (const p of office.items) {
+    const i = itemById.get(p.item)
+    if (i?.id !== 'fame' || p.stored) continue
+    const cx = cellX(p.c) + (i.w * CELL) / 2
+    for (const dx of [-0.8, 0.8]) out.push({ id: `fame${dx < 0 ? 'L' : 'R'}`, ...at({ x: cx + dx, z: BOARD.z + 1.25 }), yaw: N, act: 'fame', area: 'fame' })
+  }
   // Góc tán gẫu: hai chỗ đứng đối mặt, ở khoảng trống hai bên phòng
   ;[[-9.6, -3.6], [9.6, -3.6], [-9.6, 3.4], [9.6, 3.4]].forEach(([x, z], i) => {
     out.push({ id: `chat${i}a`, ...at({ x: x - 0.55, z }), yaw: E, act: 'chat', area: `chat${i}` })

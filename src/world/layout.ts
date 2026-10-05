@@ -1,10 +1,14 @@
+import { footprint, itemById } from '../data/catalog'
+import { cellsOf, deskCells } from '../data/decor'
+import { CELL, cellKey, cellX, cellZ, type OfficeState } from '../data/officeState'
 import type { Agent } from '../data/types'
-import { buildNav, type Nav } from './nav'
+import { buildNav, flood, snapFree, cellIndex, type Nav } from './nav'
 
 /*
  * Sơ đồ văn phòng (nhìn từ trên, bắc = -z): một phòng lớn trống, chưa có vách ngăn.
  * Lúc đầu chỉ có bàn làm việc của agent (xếp thành cụm 4 chỗ), bảng ticket và cửa sổ trên tường bắc, cửa vào ở tường nam.
- * Phòng phủ bụi; bạn trả Xu để dọn (src/data/officeState.ts), rồi (đợt sau) mua đồ, xây vách.
+ * Phòng phủ bụi; bạn trả Xu để dọn (src/data/officeState.ts), rồi mua đồ, xây vách, dời bàn (src/data/decor.ts).
+ * Đồ, vách, bàn đã dời đều thành hộp va chạm và chặn lối đi của agent.
  *
  *   x: -13.5 ................ 0 ................ 13.5
  *   z=-8  ┌──── cửa sổ ─ bảng ─── cửa sổ ─ cửa sổ ───── cửa sổ ┐
@@ -13,63 +17,12 @@ import { buildNav, type Nav } from './nav'
  *   z=7   └────────────────────── cửa vào ────────────────────┘
  */
 
-export interface Vec2 { x: number; z: number }
-
-/** Hộp va chạm theo trục. h = chiều cao; cam = chặn camera (tường đặc). */
-export interface AABB { minX: number; maxX: number; minZ: number; maxZ: number; h: number; cam?: boolean }
-
-export interface DeskSlot {
-  id: string
-  /** side = bàn phụ của agent con, nối dài dãy bàn của agent cha */
-  zone: 'open' | 'side'
-  seat: Vec2
-  /** Hướng agent nhìn khi ngồi (bàn nằm phía trước). forward = (sin yaw, cos yaw) */
-  yaw: number
-}
-
-/** Việc agent làm khi dừng ở một chỗ (quyết định dáng, đồ cầm tay, câu nói) */
-export type Activity =
-  | 'coffee' | 'fridge' | 'water' | 'window' | 'tv' | 'foos' | 'books' | 'sofa' | 'beanbag' | 'stool' | 'meeting' | 'kanban' | 'fame'
-  // Phòng trống: đứng tán gẫu, đứng nhìn chỗ bụi bẩn
-  | 'chat' | 'dust'
-
-/** 27 × 15 m */
-export const OFFICE = { minX: -13.5, maxX: 13.5, minZ: -8, maxZ: 7, wallH: 3.2, wallT: 0.3 }
-export const SPAWN: Vec2 = { x: 0, z: 5.2 }
-
-/** Sảnh chờ bên phải cửa vào: ứng viên đứng chờ bạn duyệt hồ sơ, mặt nhìn vào văn phòng. */
-export const LOBBY: (Vec2 & { yaw: number })[] = [
-  { x: 3.0, z: 5.7, yaw: Math.PI - 0.2 },
-  { x: 5.2, z: 5.7, yaw: Math.PI + 0.25 },
-  { x: 3.1, z: 4.85, yaw: Math.PI - 0.2 },
-  { x: 5.1, z: 4.85, yaw: Math.PI + 0.25 },
-]
-
-/**
- * Bảng ticket treo ở tường bắc (mặt bảng nhìn về hướng nam, +z).
- * Bản pixel nhìn từ trên xuống nghiêng về phía bắc: chỉ thấy được mặt tường bắc.
- */
-export const BOARD = { x: -4.6, y: 1.55, z: OFFICE.minZ + OFFICE.wallT / 2 + 0.04, w: 3.0, h: 1.6 }
-
-/** Cửa sổ trên tường bắc (toạ độ x tâm, mét) */
-export const WINDOWS = [-10.5, -1.5, 1.5, 10.5]
-
-/** Khoảng cách từ ghế tới tâm bàn */
-export const SEAT_TO_DESK = 0.83
-export const DESK_W = 1.4
-export const DESK_D = 0.75
-
-export const forward = (yaw: number): Vec2 => ({ x: Math.sin(yaw), z: Math.cos(yaw) })
-
-export function box(cx: number, cz: number, w: number, d: number, h: number, cam = false): AABB {
-  return { minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, h, cam }
-}
-
-const turned = (yaw = 0) => Math.abs(Math.sin(yaw)) > 0.5
+export * from './room'
+import { BOARD, DESK_D, DESK_W, OFFICE, SPAWN, box, deskCenter, turned, type AABB, type DeskSlot, type Vec2 } from './room'
 
 // ───────────────────────── Đồ đạc ─────────────────────────
 
-/** Các loại đồ LimeZu đã vẽ được (src/pixel/office.ts). Phòng trống chỉ có cửa vào; đồ khác mua ở cửa hàng (đợt sau). */
+/** Các loại đồ cố định của phòng (src/pixel/office.ts). Phòng trống chỉ có cửa vào; đồ mua ở cửa hàng nằm ở src/data/catalog.ts. */
 export type FurnitureKind =
   | 'plant' | 'plantSmall' | 'bookshelf' | 'sofa' | 'coffeeTable' | 'foosball' | 'counter'
   | 'coffeeMachine' | 'fridge' | 'highTable' | 'stool' | 'meetingTable' | 'meetingChair'
@@ -150,6 +103,13 @@ export interface World {
   pods: Vec2[]
   /** Lưới tìm đường cho agent */
   nav: Nav
+  /** Ô (lưới đặt đồ 0,5 m, khoá cellKey) bàn làm việc đang chiếm: không đặt đồ / vách lên được */
+  deskCells: Set<string>
+}
+
+/** Phần trạng thái văn phòng làm đổi bố cục (đồ đang đặt, vách, bàn đã dời); bụi, Xu thì không */
+export function layoutKey(o: OfficeState) {
+  return JSON.stringify([o.items.filter((p) => !p.stored).map((p) => [p.uid, p.c, p.r, p.rot]), o.walls, o.desks])
 }
 
 /**
@@ -158,7 +118,7 @@ export interface World {
  * Agent con (báo cáo cho một thành viên) ngồi bàn phụ ngay cạnh bàn agent cha; cha giữ nguyên chỗ.
  * Ứng viên chưa được duyệt không có bàn (đứng ở sảnh).
  */
-export function buildWorld(all: Agent[]): World {
+export function buildWorld(all: Agent[], office?: OfficeState): World {
   const agents = all.filter((a) => !a.candidate)
   const children = new Map<string | null, Agent[]>()
   for (const a of agents) {
@@ -203,17 +163,24 @@ export function buildWorld(all: Agent[]): World {
   const free = openSlots.filter((s) => !used.has(s))
   homeless.slice(0, free.length).forEach((a, i) => seatOf.set(a.id, free[i]))
 
-  const slots = [...openSlots, ...sideSlots]
-  const colliders = buildColliders(slots)
-  return { slots, seatOf, colliders, pods, nav: buildNav(OFFICE, colliders) }
+  // Bàn bạn đã dời: giữ id chỗ ngồi, đổi vị trí ghế và hướng
+  const moved = (sl: DeskSlot): DeskSlot => {
+    const p = office?.desks[sl.id]
+    return p ? { ...sl, seat: { x: p.x, z: p.z }, yaw: p.yaw } : sl
+  }
+  const slots = [...openSlots, ...sideSlots].map(moved)
+  const byId = new Map(slots.map((sl) => [sl.id, sl]))
+  for (const [id, sl] of seatOf) seatOf.set(id, byId.get(sl.id) ?? sl)
+  const colliders = buildColliders(slots, office)
+  const dc = new Set<string>()
+  for (const sl of slots) for (const [c, r] of deskCells({ x: sl.seat.x, z: sl.seat.z, yaw: sl.yaw })) dc.add(cellKey(c, r))
+  return { slots, seatOf, colliders, pods, nav: buildNav(OFFICE, colliders), deskCells: dc }
 }
 
-export function deskCenter(s: DeskSlot): Vec2 {
-  const f = forward(s.yaw)
-  return { x: s.seat.x + f.x * SEAT_TO_DESK, z: s.seat.z + f.z * SEAT_TO_DESK }
-}
+/** Vách cao bao nhiêu (m) để chặn đường / camera */
+const WALL_H = { low: 1.0, glass: 1.2, tall: OFFICE.wallH }
 
-function buildColliders(slots: DeskSlot[]): AABB[] {
+function buildColliders(slots: DeskSlot[], office?: OfficeState): AABB[] {
   const { minX, maxX, minZ, maxZ, wallH, wallT } = OFFICE
   const w = maxX - minX, d = maxZ - minZ
   const out: AABB[] = [
@@ -234,7 +201,39 @@ function buildColliders(slots: DeskSlot[]): AABB[] {
     const [dw, dd] = turned(s.yaw) ? [DESK_D, DESK_W] : [DESK_W, DESK_D]
     out.push(box(c.x, c.z, dw, dd, 0.75))
   }
+  if (!office) return out
+  // Đồ mua ở cửa hàng: hộp theo các ô nó chiếm (thu vào một chút cho agent lách qua khe giữa hai món)
+  const doors = new Set<string>()
+  for (const p of office.items) {
+    const i = itemById.get(p.item)
+    if (!i || p.stored) continue
+    if (i.mount === 'door') { for (const [c, r] of cellsOf(i, p.c, p.r, p.rot)) doors.add(cellKey(c, r)); continue }
+    if (i.mount !== 'floor' || i.h <= 0) continue
+    const { w, d } = footprint(i, p.rot)
+    const x0 = cellX(p.c), z0 = cellZ(p.r)
+    out.push({ minX: x0 + 0.06, maxX: x0 + w * CELL - 0.06, minZ: z0 + 0.06, maxZ: z0 + d * CELL - 0.06, h: i.h })
+  }
+  // Vách: mỗi ô một hộp đầy (ô có cửa thì đi qua được)
+  for (const [k, kind] of Object.entries(office.walls)) {
+    if (doors.has(k)) continue
+    const [c, r] = k.split(',').map(Number)
+    out.push({ minX: cellX(c), maxX: cellX(c) + CELL, minZ: cellZ(r), maxZ: cellZ(r) + CELL, h: WALL_H[kind], cam: kind === 'tall' })
+  }
   return out
+}
+
+/**
+ * Còn lối đi từ cửa vào tới mọi bàn làm việc và bảng ticket không. Trả về lý do nếu bị chặn kín
+ * (để không cho đặt đồ / xây vách nhốt agent).
+ */
+export function blockedReason(w: World): string | null {
+  const n = w.nav
+  const seen = flood(n, SPAWN)
+  for (const sl of w.slots) {
+    if (!seen[cellIndex(n, snapFree(n, sl.seat))]) return 'Chặn mất lối tới một bàn làm việc'
+  }
+  if (!seen[cellIndex(n, snapFree(n, { x: BOARD.x, z: BOARD.z + 1.2 }))]) return 'Chặn mất lối tới bảng ticket'
+  return null
 }
 
 /** Đẩy hình tròn (x,z,r) ra khỏi các hộp. Sửa trực tiếp p. */

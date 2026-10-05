@@ -214,10 +214,11 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 | **E** | Đứng gần agent: mở màn hình của agent (tab **Chat** và **Log**). Đứng trước bảng ticket: xem bảng to. Bấm lại E để quay ra |
 | C | Tủ đồ: đổi ngoại hình của bạn, hoặc của agent đang đứng gần |
 | B | Dọn dẹp: trả Xu dọn chỗ bẩn (xem dưới) |
+| T | Trang trí: cửa hàng, đặt / dời đồ, xây vách, dời bàn (xem dưới). Trong lúc trang trí: **R** xoay, **Enter** mua, **Esc** bỏ |
 | Q | Danh sách việc chờ bạn duyệt / trả lời |
 | M | Bật/tắt nhạc lofi |
 | Esc | Đóng màn hình đang mở |
-| Nút 🔊 🎵 🎨 🧹 ⚙️ dưới logo | Âm thanh, nhạc, tủ đồ, dọn dẹp, cài đặt (âm lượng, xem thử giờ) |
+| Nút 🔊 🎵 🎨 🧹 🛋️ ⚙️ dưới logo | Âm thanh, nhạc, tủ đồ, dọn dẹp, trang trí, cài đặt (âm lượng, xem thử giờ) |
 
 ### Xu và dọn dẹp văn phòng
 
@@ -225,7 +226,17 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 - **Xu** là tiền chung của văn phòng (số dưới logo). Agent làm xong ticket trên board thì quỹ có Xu: ưu tiên thấp 10, vừa 15, cao 25, khẩn 40; agent cấp càng cao càng được nhiều (mỗi cấp +10%). Ticket đã xong từ trước cũng được tính.
 - Bấm **B** (hoặc nút 🧹): mỗi chỗ bẩn hiện giá. Sàn chia 5 × 3 mảng, mảng càng xa cửa càng đắt; tường bắc, từng cửa sổ, bảng ticket dọn riêng. Bấm một chỗ rồi bấm **Dọn** trong bảng bên trái.
 - Xu và chỗ đã dọn lưu trong Coopverse trên máy này (thư mục `.coopverse`, app desktop: thư mục dữ liệu của app), không gửi gì sang Paperclip. Bản demo lưu trong trình duyệt, có nút "Làm bẩn lại".
-- Sắp có: cửa hàng đồ trang trí, tự xây vách chia phòng.
+
+### Trang trí văn phòng
+
+- Bấm **T** (hoặc nút 🛋️): bảng cửa hàng mở bên trái, gần 50 món chia 5 nhóm: cây và đồ nhỏ (chậu cây, đèn, kệ sách, thảm…), treo tường (tranh, đồng hồ, TV, **bảng vinh danh**), nghỉ ngơi và bếp (sofa, ghế bành, bàn trà, tủ bếp, quầy cà phê…), giải trí (máy game, bóng bàn, bi-a, mèo văn phòng), xây vách.
+- Chọn một món: bóng mờ của món chạy theo chuột. Khung xanh là đặt được, khung đỏ kèm lý do là không. Bấm để đặt thử, rồi bấm **✓ Mua** (hoặc Enter); chưa bấm ✓ thì chưa mất Xu. **R** xoay: sofa, ghế bành xoay đủ 4 hướng, món khác lật trái/phải.
+- Đồ chỉ đặt trên mảng sàn đã dọn; đồ treo tường cần tường bắc đã dọn. Cửa vào và sảnh chờ ứng viên luôn để trống (tô đỏ nhạt). Không cho đặt đồ chặn kín lối tới bàn làm việc hay bảng ticket.
+- Bấm vào món đã đặt: xoay, dời (miễn phí), cất vào kho (miễn phí, lấy ra đặt lại lúc nào cũng được) hoặc bán lại được nửa giá.
+- Bấm vào bàn làm việc: xoay, dời đi chỗ khác. Bàn của mỗi agent miễn phí; agent tự đi tới chỗ mới.
+- Tab 🧱: giữ chuột kéo một đường thẳng để xây vách, thả ra rồi bấm ✓. Vách thấp, vách kính luôn thấy người; tường cao như tường thật, tự mờ đi khi có người đứng phía sau. Mua **cửa kính** rồi lắp vào 2 ô vách liền nhau (cửa tự mở khi có người tới gần). Công cụ **Dỡ vách** trả lại nửa giá.
+- Mua bảng vinh danh rồi treo lên tường thì mới xem được bảng xếp hạng EXP (bấm vào bảng, hoặc đứng trước bảng bấm E).
+- Đồ, vách, chỗ bàn lưu cùng chỗ với Xu (server Coopverse kiểm lại số dư và chỗ đặt). Sắp có: agent dùng được đồ (ngồi sofa, pha cà phê…), đồ để trên bàn.
 
 ### Chat với agent
 

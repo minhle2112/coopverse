@@ -1,4 +1,5 @@
-import { OFFICE, WINDOWS } from '../world/layout'
+import type { WallKind } from './catalog'
+import { OFFICE, WINDOWS } from '../world/room'
 
 /**
  * Trạng thái văn phòng của một công ty (riêng của Coopverse, không phải của Paperclip): chỗ nào đã dọn,
@@ -6,26 +7,52 @@ import { OFFICE, WINDOWS } from '../world/layout'
  * Không phụ thuộc React: server dùng chung để kiểm giá và số dư.
  *
  * Văn phòng lúc đầu: một phòng lớn trống, phủ bụi. Sàn chia 5 × 3 mảng; tường bắc, từng cửa sổ và bảng ticket
- * dọn riêng. Mảng càng xa cửa vào càng đắt.
+ * dọn riêng. Mảng càng xa cửa vào càng đắt. Dọn xong thì mua đồ (src/data/catalog.ts), xây vách, dời bàn
+ * (luật ở src/data/decor.ts).
  */
 
 export interface Spend {
   id: string
   at: number
-  kind: 'clean'
-  /** Việc đã trả tiền (id trong JOBS) */
+  /** clean: dọn · buy: mua đồ · sell: bán lại (xu âm) · wall: xây vách · unwall: dỡ vách (xu âm) */
+  kind: 'clean' | 'buy' | 'sell' | 'wall' | 'unwall'
+  /** Việc dọn (id trong JOBS) hoặc món đồ (id trong ITEMS) */
   ref: string
   xu: number
 }
+
+/** Một món đã mua: đang đặt trong phòng, hoặc cất trong kho */
+export interface Placed {
+  uid: string
+  item: string
+  /** Ô góc trên-trái (lưới 0,5 m). Đồ treo tường: c = cột trên tường bắc, r = 0 */
+  c: number
+  r: number
+  /** Hướng (xem Turn trong catalog.ts) */
+  rot: number
+  at: number
+  stored?: boolean
+}
+
+/** Chỗ ngồi đã dời: vị trí ghế (mét) và hướng nhìn */
+export interface DeskPos { x: number; z: number; yaw: number }
 
 export interface OfficeState {
   v: 1
   /** id việc dọn → lúc dọn xong */
   cleaned: Record<string, number>
   spent: Spend[]
+  items: Placed[]
+  /** "c,r" → loại vách */
+  walls: Record<string, WallKind>
+  /** id chỗ ngồi (DeskSlot.id) → chỗ mới */
+  desks: Record<string, DeskPos>
 }
 
-export const emptyOffice = (): OfficeState => ({ v: 1, cleaned: {}, spent: [] })
+export const emptyOffice = (): OfficeState => ({ v: 1, cleaned: {}, spent: [], items: [], walls: {}, desks: {} })
+
+/** Đọc từ file / bộ nhớ trình duyệt: thiếu trường (file của đợt trước) thì lấy mặc định */
+export const normOffice = (raw: Partial<OfficeState> | null | undefined): OfficeState => ({ ...emptyOffice(), ...(raw ?? {}), v: 1 })
 
 export const spentXu = (o: OfficeState) => o.spent.reduce((s, x) => s + x.xu, 0)
 
@@ -90,6 +117,19 @@ export function patchAt(x: number, z: number): CleanJob | undefined {
 }
 
 export const isClean = (o: OfficeState, id: string) => o.cleaned[id] !== undefined
+
+// ───────────────────────── Lưới đặt đồ ─────────────────────────
+
+/** Ô 0,5 m = một ô 16 px của LimeZu */
+export const CELL = 0.5
+export const COLS = Math.round((OFFICE.maxX - OFFICE.minX) / CELL)
+export const ROWS = Math.round((OFFICE.maxZ - OFFICE.minZ) / CELL)
+export const cellKey = (c: number, r: number) => `${c},${r}`
+/** Mép trái / trên của ô (mét) */
+export const cellX = (c: number) => OFFICE.minX + c * CELL
+export const cellZ = (r: number) => OFFICE.minZ + r * CELL
+export const colOf = (x: number) => Math.floor((x - OFFICE.minX) / CELL)
+export const rowOf = (z: number) => Math.floor((z - OFFICE.minZ) / CELL)
 
 /** Đã dọn sạch hết chưa */
 export const allClean = (o: OfficeState) => JOBS.every((j) => isClean(o, j.id))

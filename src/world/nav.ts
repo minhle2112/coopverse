@@ -42,7 +42,29 @@ export function buildNav(bounds: { minX: number; maxX: number; minZ: number; max
 /** Bản đồ đường đi đang dùng (App dựng lại khi bố cục đổi) */
 export const navRef: { current: Nav | null } = { current: null }
 
-const cellOf = (n: Nav, p: Vec2) => {
+export const cellIndex = (n: Nav, p: Vec2) => cellOf(n, p)
+
+/** Những ô đi tới được từ điểm `from` (loang 4 hướng): 1 = tới được */
+export function flood(n: Nav, from: Vec2): Uint8Array {
+  const seen = new Uint8Array(n.cols * n.rows)
+  const s = nearestFree(n, cellOf(n, from))
+  if (s < 0) return seen
+  const q = [s]
+  seen[s] = 1
+  while (q.length) {
+    const k = q.pop()!
+    const i = k % n.cols, j = Math.floor(k / n.cols)
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ni = i + di, nj = j + dj
+      if (ni < 0 || nj < 0 || ni >= n.cols || nj >= n.rows) continue
+      const nk = nj * n.cols + ni
+      if (n.free[nk] && !seen[nk]) { seen[nk] = 1; q.push(nk) }
+    }
+  }
+  return seen
+}
+
+function cellOf(n: Nav, p: Vec2) {
   const i = Math.min(n.cols - 1, Math.max(0, Math.floor((p.x - n.x0) / n.cell)))
   const j = Math.min(n.rows - 1, Math.max(0, Math.floor((p.z - n.z0) / n.cell)))
   return j * n.cols + i

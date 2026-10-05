@@ -3,6 +3,7 @@ import { uiTick, unlockAudio } from '../audio/engine'
 import { desktop } from '../desktop'
 import { useSettings } from '../settings'
 import { useCoop } from '../store'
+import { useDeco } from './decoStore'
 import { fmtHour, periodOf, sceneHour, sunElevation } from '../world/time'
 
 /** Giờ đang hiển thị trong văn phòng, cập nhật mỗi 10 giây (hoặc ngay khi kéo thanh xem thử). */
@@ -47,6 +48,8 @@ export function Toolbar() {
   const settingsOpen = useCoop((s) => s.settingsOpen)
   const toggleClean = useCoop((s) => s.toggleClean)
   const cleanOpen = useCoop((s) => s.cleanOpen)
+  const toggleDeco = useCoop((s) => s.toggleDeco)
+  const decoOpen = useDeco((s) => s.open)
   const tap = (fn: () => void) => () => { unlockAudio(); fn(); uiTick() }
   return (
     <div className="toolbar">
@@ -61,6 +64,9 @@ export function Toolbar() {
       </button>
       <button className={`tb-btn${cleanOpen ? ' on' : ''}`} onClick={tap(toggleClean)} title="Dọn dẹp văn phòng (phím B)" aria-label="Dọn dẹp" aria-expanded={cleanOpen} aria-keyshortcuts="B">
         <span aria-hidden>🧹</span>
+      </button>
+      <button className={`tb-btn${decoOpen ? ' on' : ''}`} onClick={tap(toggleDeco)} title="Trang trí: cửa hàng, đặt đồ, xây vách (phím T)" aria-label="Trang trí" aria-expanded={decoOpen} aria-keyshortcuts="T">
+        <span aria-hidden>🛋️</span>
       </button>
       <button className={`tb-btn${settingsOpen ? ' on' : ''}`} onClick={tap(toggleSettings)} title="Cài đặt" aria-label="Cài đặt" aria-expanded={settingsOpen}>
         <span aria-hidden>⚙️</span>

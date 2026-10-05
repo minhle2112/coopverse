@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { JOBS, isClean, type OfficeState } from '../data/officeState'
+import { footprint, itemById } from '../data/catalog'
+import { CELL, JOBS, cellX, cellZ, isClean, type OfficeState } from '../data/officeState'
 import { useOffice } from '../data/officeSync'
 import { STATUS_COLOR } from '../data/types'
 import { agentPos, player } from '../runtime'
@@ -31,6 +32,20 @@ function drawStatic(ctx: CanvasRenderingContext2D, world: World, office: OfficeS
     const w = side ? DESK_D : DESK_W
     const d = side ? DESK_W : DESK_D
     ctx.fillRect(sx(c.x - w / 2), sz(c.z - d / 2), w * PX, d * PX)
+  }
+
+  // Đồ đã mua (thảm nhạt hơn), vách tự xây
+  for (const p of office.items) {
+    const i = itemById.get(p.item)
+    if (!i || p.stored || i.mount === 'wall' || i.mount === 'door') continue
+    const { w, d } = footprint(i, p.rot)
+    ctx.fillStyle = i.mount === 'rug' ? 'rgba(190, 120, 90, 0.35)' : '#7d8aa6'
+    ctx.fillRect(sx(cellX(p.c)), sz(cellZ(p.r)), w * CELL * PX, d * CELL * PX)
+  }
+  for (const [k, kind] of Object.entries(office.walls)) {
+    const [c, r] = k.split(',').map(Number)
+    ctx.fillStyle = kind === 'glass' ? '#8fc4e8' : kind === 'low' ? '#c9c3d6' : '#eceaf2'
+    ctx.fillRect(sx(cellX(c)), sz(cellZ(r)), CELL * PX, CELL * PX)
   }
 
   // Bảng ticket trên tường nam

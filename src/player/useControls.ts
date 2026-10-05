@@ -1,7 +1,9 @@
 import { useEffect, type RefObject } from 'react'
 import { input } from '../runtime'
 import { useSettings } from '../settings'
+import { confirmPending, decoRotate } from '../pixel/Decorate'
 import { useCoop } from '../store'
+import { useDeco } from '../ui/decoStore'
 
 const BLOCK_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 
@@ -59,6 +61,19 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
       // B: chế độ dọn dẹp (trả Xu dọn chỗ bẩn)
       if (shortcut && e.code === 'KeyB' && !focused()) {
         useCoop.getState().toggleClean()
+        return
+      }
+      // T: chế độ trang trí (cửa hàng, đặt đồ, xây vách) · R: xoay món đang cầm / đang chọn · Enter: mua chỗ đặt thử
+      if (shortcut && e.code === 'KeyT' && !focused()) {
+        useCoop.getState().toggleDeco()
+        return
+      }
+      if (shortcut && useDeco.getState().open && e.code === 'KeyR') {
+        decoRotate()
+        return
+      }
+      if (shortcut && useDeco.getState().pending && (e.code === 'Enter' || e.code === 'NumpadEnter')) {
+        void confirmPending()
         return
       }
       if (focused() || e.ctrlKey || e.metaKey) return

@@ -67,7 +67,7 @@ export function CleanupPanel() {
       </div>
       <p className="set-hint">
         {!ready ? 'Đang đọc văn phòng…' : allClean(office)
-          ? 'Văn phòng sạch bong! Đợt sau: cửa hàng đồ trang trí.'
+          ? 'Văn phòng sạch bong! Bấm T (nút 🛋️) để mua đồ trang trí.'
           : `Đã sạch ${done}/${JOBS.length} chỗ (sàn ${floorsDone}/${floors.length} mảng). Bấm chỗ có khung trên bản đồ để chọn.`}
       </p>
 

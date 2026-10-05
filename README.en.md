@@ -216,10 +216,11 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 | **E** | Near an agent: open its screen (**Chat** and **Log** tabs). In front of the ticket board: view it full size. Press E again to step back |
 | C | Wardrobe: restyle yourself or the nearby agent |
 | B | Cleaning: pay Xu to clean dirty spots (see below) |
+| T | Decorating: shop, place / move items, build walls, move desks (see below). While decorating: **R** rotates, **Enter** buys, **Esc** cancels |
 | Q | Things waiting for your approval / answer |
 | M | Toggle lofi music |
 | Esc | Close whatever screen is open |
-| 🔊 🎵 🎨 🧹 ⚙️ under the logo | Sound, music, wardrobe, cleaning, settings (volume, time preview) |
+| 🔊 🎵 🎨 🧹 🛋️ ⚙️ under the logo | Sound, music, wardrobe, cleaning, decorating, settings (volume, time preview) |
 
 ### Xu and cleaning the office
 
@@ -227,7 +228,17 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 - **Xu** is the office's shared money (shown under the logo). Each ticket an agent finishes on the board adds Xu: low 10, medium 15, high 25, critical 40 priority; higher-level agents earn more (+10% per level). Tickets finished before this feature count too.
 - Press **B** (or 🧹): every dirty spot shows its price. The floor is split into 5 × 3 patches, farther from the door costs more; the north wall, each window and the ticket board are cleaned separately. Click a spot, then **Dọn** (Clean) in the left panel.
 - Xu and cleaned spots are stored by Coopverse on this machine (the `.coopverse` folder, or the desktop app's data folder), nothing is sent to Paperclip. The demo stores them in the browser and has a "Làm bẩn lại" (make dirty again) button.
-- Coming next: a shop for decorations, and building your own walls.
+
+### Decorating the office
+
+- Press **T** (or 🛋️): the shop opens on the left with about 50 items in 5 groups: plants and small items (pots, lamps, bookshelves, rugs…), wall items (paintings, clock, TV, **fame board**), lounge and kitchen (sofa, armchairs, coffee table, kitchen counters, coffee bar…), fun (arcade machines, ping-pong, pool table, an office cat), and walls.
+- Pick an item and a ghost follows the mouse. A green box means it fits; a red box shows why not. Click to place a preview, then **✓ Mua** (Buy) or Enter; no Xu is spent until you confirm. **R** rotates: the sofa and armchairs turn all 4 ways, other items mirror.
+- Items go only on cleaned floor patches; wall items need the north wall cleaned. The entrance and the candidates' lobby always stay free (tinted red). Nothing may wall off the path to a desk or the ticket board.
+- Click a placed item to rotate it, move it (free), put it in storage (free, place it again any time) or sell it back for half price.
+- Click a desk to rotate or move it. Every agent's desk is free; the agent walks to the new spot.
+- 🧱 tab: hold the mouse and drag a straight line to build a wall, release, then ✓. Low and glass walls never hide anyone; tall walls look like real walls and fade when someone stands behind them. Buy a **glass door** and fit it into 2 adjacent wall cells (it opens when someone comes near). **Dỡ vách** (remove walls) refunds half.
+- The EXP ranking is shown on the fame board: buy it, hang it on the wall, then click it (or stand in front and press E).
+- Items, walls and desk spots are stored with the Xu (the Coopverse server re-checks the balance and placement). Coming next: agents using items (sitting on the sofa, making coffee…) and items on desks.
 
 ### Chatting with an agent
 

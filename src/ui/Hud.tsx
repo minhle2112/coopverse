@@ -7,6 +7,8 @@ import type { World } from '../world/layout'
 import { useExp } from '../data/exp'
 import { desktop } from '../desktop'
 import { CleanupPanel, XuBadge } from './Cleanup'
+import { useDeco } from './decoStore'
+import { ShopPanel } from './Shop'
 import { FameView } from './FameView'
 import { AskSheet, Inbox } from './Inbox'
 import { KanbanView } from './KanbanView'
@@ -147,6 +149,7 @@ export function Hud({ world }: { world: World }) {
   const boardOpen = useCoop((s) => s.boardOpen)
   const fameOpen = useCoop((s) => s.fameOpen)
   const cleanOpen = useCoop((s) => s.cleanOpen)
+  const decoOpen = useDeco((s) => s.open)
   const expStats = useExp((s) => s.stats)
   const wardrobeId = useCoop((s) => s.wardrobeId)
   const settingsOpen = useCoop((s) => s.settingsOpen)
@@ -192,6 +195,7 @@ export function Hud({ world }: { world: World }) {
         <Inbox />
         {settingsOpen && <SettingsPanel />}
         {cleanOpen && <CleanupPanel />}
+        {decoOpen && <ShopPanel />}
         <Notes />
       </div>
 
@@ -263,16 +267,28 @@ export function Hud({ world }: { world: World }) {
       )}
 
       <div className="help">
+        {decoOpen ? (
+          // Đang trang trí: chỉ các phím của chế độ này
+          <div className="help-keys">
+            <span>Bấm chuột: đặt thử / chọn món</span>
+            <span><kbd>R</kbd> xoay</span>
+            <span><kbd>Enter</kbd> mua</span>
+            <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi xem góc khác</span>
+            <span><kbd>Esc</kbd> bỏ / thoát</span>
+          </div>
+        ) : (
         <div className="help-keys">
           <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi</span>
           <span><kbd>Shift</kbd> chạy</span>
           <span><kbd>E</kbd> hoặc bấm chuột: mở CLI agent / bảng ticket</span>
           <span><kbd>Q</kbd> việc chờ duyệt</span>
           <span><kbd>B</kbd> dọn dẹp</span>
+          <span><kbd>T</kbd> trang trí</span>
           <span><kbd>C</kbd> tủ đồ</span>
           <span><kbd>M</kbd> nhạc</span>
           <span><kbd>Esc</kbd> đóng</span>
         </div>
+        )}
       </div>
 
       <Minimap world={world} />

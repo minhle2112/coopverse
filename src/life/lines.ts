@@ -100,6 +100,10 @@ export const CLEANED: Record<'floor' | 'wall' | 'window' | 'board', string[]> = 
   board: ['Bảng sạch rồi, dễ đọc ghê', 'Giờ mới thấy rõ ticket 📌'],
 }
 
+/** Bạn vừa mua đồ mới: agent đứng gần khen (`{x}` = tên món) */
+export const BOUGHT = ['Ồ, {x} mới kìa! 😍', 'Văn phòng xịn dần lên rồi', '{x} đẹp ghê', 'Ai chọn {x} vậy, có gu ghê', 'Giờ mới ra dáng văn phòng 😄']
+export const BUILT = ['Có vách rồi, riêng tư ghê', 'Ô, phòng mới hả?', 'Xây gì đây ta? 🤔']
+
 export const ACT_EMOTE: Record<Activity, string> = {
   coffee: '☕', fridge: '🧃', water: '💧', window: '🌤️', tv: '📺', foos: '🏓', books: '📖',
   sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌', fame: '🏆', chat: '💬', dust: '🤧',
