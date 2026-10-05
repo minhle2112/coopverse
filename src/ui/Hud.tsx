@@ -11,7 +11,8 @@ import { KanbanView } from './KanbanView'
 import { Minimap } from './Minimap'
 import { Clock, SettingsPanel, Toolbar } from './Settings'
 import { Terminal } from './Terminal'
-import { Wardrobe } from './Wardrobe'
+import { Avatar, Wardrobe } from '../pixel/Wardrobe'
+import { partsOf, usePixelLooks } from '../pixel/look'
 
 function Toast() {
   const toast = useCoop((s) => s.toast)
@@ -134,6 +135,14 @@ export function Hud({ world }: { world: World }) {
   const company = useCoop((s) => s.company)
   const asks = useCoop((s) => s.asks)
   const askId = useCoop((s) => s.askId)
+  // Danh sách nhân sự gọn (một dòng mỗi người, chi tiết khi rê chuột) hoặc đầy đủ; nhớ trên trình duyệt
+  const [compact, setCompact] = useState(() => { try { return localStorage.getItem('coopverse.rosterFull') !== '1' } catch { return true } })
+  const toggleRoster = () => {
+    setCompact((c) => {
+      try { localStorage.setItem('coopverse.rosterFull', c ? '1' : '0') } catch { /* chỉ giữ trong phiên */ }
+      return !c
+    })
+  }
   const near = agents.find((a) => a.id === nearId)
   const focused = agents.find((a) => a.id === focusId)
   const viewing = !!focusId || boardOpen || fameOpen || !!wardrobeId || !!askId
@@ -144,6 +153,9 @@ export function Hud({ world }: { world: World }) {
   useEffect(() => {
     document.body.classList.toggle('focus-mode', viewing)
   }, [viewing])
+  // Ảnh nhỏ trong danh sách nhân sự cập nhật khi chỉnh tủ đồ
+  usePixelLooks((s) => s.custom)
+  const leadIds = new Set(agents.filter((a) => !a.candidate).map((a) => a.reportsTo).filter(Boolean))
   const working = agents.filter((a) => a.status === 'running').length
   const staff = agents.filter((a) => !a.candidate).length
   const demo = conn === 'demo'
@@ -163,10 +175,13 @@ export function Hud({ world }: { world: World }) {
         <Notes />
       </div>
 
-      <div className="panel roster">
+      <div className={`panel roster${compact ? ' compact' : ''}`}>
         <div className="roster-head">
           <span>Nhân sự</span>
           <span className="roster-count">{working}/{staff} đang làm</span>
+          <button className="roster-toggle" onClick={toggleRoster} title={compact ? 'Hiện chi tiết việc đang làm' : 'Thu gọn danh sách'} aria-expanded={!compact}>
+            {compact ? '▸' : '▾'}
+          </button>
         </div>
         {agents.map((a) => (
           <button
@@ -175,10 +190,13 @@ export function Hud({ world }: { world: World }) {
             onClick={() => (demo ? cycleStatus(a.id) : pingAgent(a.id))}
             title={demo ? 'Demo: bấm để đổi trạng thái' : 'Bấm để đánh dấu trên bản đồ'}
           >
-            <span className={`np-dot${a.candidate ? ' dot-cand' : ''}`} style={{ background: a.candidate ? undefined : STATUS_COLOR[a.status] }} />
+            <span className="roster-av">
+              <Avatar parts={partsOf(a.id, a.name, leadIds.has(a.id))} scale={1} />
+              <span className={`np-dot${a.candidate ? ' dot-cand' : ''}`} style={{ background: a.candidate ? undefined : STATUS_COLOR[a.status] }} />
+            </span>
             <span className="roster-main">
               <span className="roster-row">
-                <span className="roster-name">{!a.candidate && <span className="lv-chip" title="Cấp">Lv {expStats[a.id]?.level ?? 1}</span>}{a.name}{waitingOn(a.id) > 0 && <span className="roster-ask" title="Đang chờ bạn duyệt / trả lời"> 🙋</span>}</span>
+                <span className="roster-name">{!a.candidate && <span className="lv-chip" title="Cấp">Lv {expStats[a.id]?.level ?? 1}</span>}{a.name}{waitingOn(a.id) > 0 && <span className="roster-ask" title="Đang chờ bạn duyệt / trả lời"> 🙋</span>}{!a.candidate && a.status === 'error' && <span className="roster-err" title="Lỗi">!</span>}</span>
                 <span className="roster-status">{a.candidate ? 'Ứng viên' : STATUS_LABEL[a.status]}</span>
               </span>
               {a.status === 'running' && a.task && <span className="roster-task">{a.task}</span>}

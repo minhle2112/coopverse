@@ -27,9 +27,6 @@ export interface Parts {
   acc?: string | null
 }
 
-/** Bạn (người chơi): bộ phận nhân vật cố định cho bản đầu */
-export const PLAYER_PARTS: Parts = { body: 1, eyes: 1, outfit: [5, 1], hair: [3, 3] }
-
 export type Anim = 'idle' | 'walk' | 'sit' | 'phone' | 'read'
 
 const ROW: Record<Anim, number> = { idle: 1, walk: 2, sit: 4, phone: 6, read: 7 }
@@ -51,7 +48,35 @@ export const partsKey = (p: Parts) => partFiles(p).join('|')
 /** Sheet đã ghép của một nhân vật, cắt sẵn từng khung */
 export class CharSheet {
   private cache = new Map<string, Texture>()
+  private sil: Texture | null = null
   constructor(readonly base: Texture) {}
+
+  /**
+   * Bóng trắng của nhân vật (cùng khung với frame()): vẽ lệch 1 px phía sau làm viền sáng,
+   * để tóc tối / xám không chìm vào lưng ghế đen.
+   */
+  silhouette(anim: Anim, dir: Dir, i: number): Texture {
+    if (!this.sil) {
+      const src = this.base.source.resource as HTMLCanvasElement
+      const c = document.createElement('canvas')
+      c.width = src.width
+      c.height = src.height
+      const g = c.getContext('2d')!
+      g.drawImage(src, 0, 0)
+      g.globalCompositeOperation = 'source-in'
+      g.fillStyle = '#ffffff'
+      g.fillRect(0, 0, c.width, c.height)
+      this.sil = Texture.from(c)
+    }
+    const f = this.frame(anim, dir, i).frame
+    const key = `sil:${f.x}:${f.y}`
+    let t = this.cache.get(key)
+    if (!t) {
+      t = new Texture({ source: this.sil.source, frame: new Rectangle(f.x, f.y, f.width, f.height) })
+      this.cache.set(key, t)
+    }
+    return t
+  }
 
   frame(anim: Anim, dir: Dir, i: number): Texture {
     let col: number

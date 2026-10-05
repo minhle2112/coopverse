@@ -3,6 +3,7 @@ import { deskTier, useExp } from './data/exp'
 import { startExpSync } from './data/expSync'
 import { startSync } from './data/sync'
 import type { AgentStatus } from './data/types'
+import { PixelAgents } from './pixel/Agents'
 import { PixelScene } from './pixel/Scene'
 import { useControls } from './player/useControls'
 import { useCoop } from './store'
@@ -44,7 +45,9 @@ export default function App() {
   return (
     <>
       <div ref={stage} className="stage-wrap">
-        <PixelScene world={world} tierOfSlot={tierOfSlot} tierKey={tierKey} statusOfSlot={statusOfSlot} />
+        <PixelScene world={world} tierOfSlot={tierOfSlot} tierKey={tierKey} statusOfSlot={statusOfSlot}>
+          <PixelAgents world={world} />
+        </PixelScene>
       </div>
       <Hud world={world} />
     </>

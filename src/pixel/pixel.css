@@ -1,0 +1,220 @@
+/*
+ * Giao diện bản pixel: chữ VT323 (có dấu tiếng Việt), khung vuông viền đôi kiểu game pixel, bảng tên và bong bóng thoại.
+ * Nạp sau styles.css, chỉ ghi đè phần nhìn.
+ */
+
+:root {
+  --panel: #262336;
+  --panel-border: #5d5878;
+  --px-dark: #100e18;
+  --px-edge: #6f6990;
+  --px-paper: #fff6e3;
+  --px-ink: #2a2135;
+  /* VT323 có chiều cao chữ thường nhỏ: phóng to cho dễ đọc ngang các cỡ chữ cũ */
+  font-family: 'VT323', 'Segoe UI', monospace;
+  font-size-adjust: 0.56;
+}
+
+.hud, .hud *, .px-overlay, .px-overlay *, .center-card, .center-card * {
+  font-family: 'VT323', 'Segoe UI', monospace !important;
+  letter-spacing: 0.02em;
+}
+/* Nội dung dài (CLI, markdown, ô nhập) vẫn là chữ pixel nhưng giữ khoảng dòng thoáng */
+.hud .md, .hud .t-body, .hud textarea, .hud .chat-text { line-height: 1.3; }
+
+/* Góc vuông, không mờ nền: kiểu khung game pixel */
+.hud [class], .center-card, .center-card [class] { border-radius: 0 !important; }
+.hud .panel, .hud .prompt, .hud .toast, .hud .note, .hud .tb-btn, .hud .inbox, .hud .ask-card, .hud .ask-sheet-box,
+.hud .term, .hud .board, .hud .fame, .hud .wardrobe, .hud .settings, .hud .minimap, .hud .help, .center-card,
+.hud .t-modal, .hud .t-dialog {
+  backdrop-filter: none !important;
+  border: 2px solid var(--px-edge) !important;
+  box-shadow: 0 0 0 2px var(--px-dark), 4px 4px 0 2px rgba(0, 0, 0, 0.35) !important;
+}
+.hud .panel, .hud .inbox, .hud .settings, .hud .help, .hud .prompt, .hud .toast { background: var(--panel); }
+.hud kbd {
+  border-radius: 0 !important;
+  border: 2px solid var(--px-dark);
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.25) !important;
+  padding: 0 5px;
+}
+.hud button { border-radius: 0 !important; }
+.brand-title { letter-spacing: 0.12em !important; font-size: 26px !important; text-shadow: 2px 2px 0 var(--px-dark); }
+
+/* ───────── Lớp phủ trên canvas: lời nói, bảng tên ───────── */
+.pixel-stage { overflow: hidden; }
+.px-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+.focus-mode .px-overlay { display: none; }
+.px-anchor { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
+
+/* Phía trên đầu: xếp từ dưới lên */
+.px-over {
+  position: absolute; left: 0; bottom: 2px; transform: translateX(-50%);
+  display: flex; flex-direction: column-reverse; align-items: center; gap: 3px;
+}
+.px-say {
+  position: relative; max-width: 230px; width: max-content; padding: 2px 7px 3px; margin-bottom: 5px;
+  background: var(--px-paper); color: var(--px-ink); border: 2px solid var(--px-ink);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3); font-size: 19px; line-height: 1.15; text-align: center;
+  animation: px-pop 0.18s steps(3) both;
+}
+/* Đuôi bong bóng: 2 bậc pixel */
+.px-say::after {
+  content: ''; position: absolute; left: 50%; bottom: -6px; width: 6px; height: 4px; margin-left: -3px;
+  background: var(--px-paper); border: 2px solid var(--px-ink); border-top: 0;
+}
+.px-say.real { border-color: #2f7d74; }
+.px-say.real::after { border-color: #2f7d74; }
+.px-emoji {
+  padding: 0 3px; font-size: 15px; line-height: 1.3; background: var(--px-paper); border: 2px solid var(--px-ink);
+  animation: px-pop 0.18s steps(3) both;
+}
+.px-lvup, .px-xp {
+  font-size: 20px; line-height: 1; text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000;
+  animation: px-rise 2.4s steps(24) both; white-space: nowrap;
+}
+.px-lvup { color: #ffe066; }
+.px-xp { color: #8fe388; font-size: 17px; }
+
+/* Bảng tên dưới chân */
+.px-under { position: absolute; left: 0; top: 0; transform: translateX(-50%); }
+.px-plate {
+  padding: 0 5px 1px 4px; background: rgba(16, 14, 24, 0.82); color: #f4efe0; border: 1px solid rgba(0, 0, 0, 0.7);
+  border-left: 4px solid #888; font-size: 17px; line-height: 1.15; white-space: nowrap; text-align: center;
+}
+.px-plate.near { background: rgba(16, 14, 24, 0.94); border-color: var(--accent); border-width: 2px 2px 2px 5px; font-size: 18px; }
+.px-lead { color: #ffd95e; }
+/* Người đang ngồi bàn: ẩn bảng tên (rê chuột / đứng gần / đánh dấu mới hiện) */
+.px-anchor.seated .px-plate:not(.near) { display: none; }
+.px-plate.gold .px-name { color: #ffd95e; }
+.px-plate.cand { border: 1px dashed #ffcf5a; }
+.px-plate-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.px-dot { width: 5px; height: 5px; flex: none; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.px-lv { color: var(--accent); }
+.px-demo { color: #9a93b8; font-size: 12px; }
+.px-rank { color: #d2b8ff; font-size: 16px; }
+.px-sub { color: #d0cae6; font-size: 16px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; margin: 0 auto; }
+.px-sub.ask { color: #ffcf5a; }
+
+@keyframes px-pop { from { transform: scale(0.4); } to { transform: scale(1); } }
+@keyframes px-rise {
+  0% { transform: translateY(6px); opacity: 0; }
+  12% { transform: translateY(0); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(-18px); opacity: 0; }
+}
+
+/* Thu nhỏ: ẩn bảng tên (trừ người đang đứng gần bạn) */
+.px-anchor.far .px-plate:not(.near) { display: none; }
+
+/* ───────── Tủ đồ pixel ───────── */
+.hud .px-preview {
+  position: relative; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  background: repeating-conic-gradient(#2f2c42 0% 25%, #2a2739 0% 50%) 0 0 / 24px 24px; cursor: default;
+}
+.hud .px-preview canvas { position: static; image-rendering: pixelated; }
+.px-turn { display: flex; gap: 8px; }
+.px-step { display: inline-flex; align-items: center; gap: 6px; }
+.px-step-v { min-width: 110px; text-align: center; font-size: 18px; }
+.px-avatar { image-rendering: pixelated; flex: none; margin: -6px 0 -4px; }
+.hud .wd-person { align-items: center; }
+
+/* Danh sách nhân sự: ảnh nhỏ pixel + chấm trạng thái ở góc */
+.roster-av { position: relative; flex: none; width: 16px; height: 24px; overflow: hidden; align-self: center; }
+.roster-av .px-avatar { margin: -8px 0 0; display: block; }
+.roster-av .np-dot { position: absolute; right: -1px; bottom: 1px; width: 6px; height: 6px; margin: 0; box-shadow: 0 0 0 1px #100e18; }
+
+/* ───────── Bảng lớn (CLI, bảng ticket, bảng vàng, duyệt, tủ đồ): cùng khung pixel ───────── */
+.hud .term, .hud .board, .hud .fame, .hud .wardrobe, .hud .ask-sheet-box, .hud .inbox {
+  border: 2px solid var(--px-edge) !important; border-radius: 0 !important;
+  box-shadow: 0 0 0 4px var(--px-dark), 0 0 0 6px #3d3856, 8px 8px 0 6px rgba(0, 0, 0, 0.4) !important;
+  /* Chữ pixel trong bảng lớn: to hơn cho dễ đọc */
+  font-size-adjust: 0.66;
+}
+.hud .term { background: #141221; }
+.hud .term-bar, .hud .ask-sheet-bar { background: #34304a; border-bottom: 2px solid var(--px-dark); }
+.hud .term-dots { display: none; }
+.hud .term-title { font-size: 18px; letter-spacing: 0.04em; }
+.hud .term-foot { background: #1c1a2b; border-top: 2px solid var(--px-dark); }
+.hud .t-meta, .hud .t-plain, .hud .t-out, .hud .t-glyph, .hud .t-hint { color: #aab2c6; }
+.hud .t-tool .t-body { color: #b6c0d2; }
+.hud .ask-card { background: #1c1a2b; border: 2px solid #4b4666; border-left: 5px solid #f2d044; }
+.hud .t-dialog { background: #262336; border: 2px solid var(--px-edge); box-shadow: 0 0 0 3px var(--px-dark), 6px 6px 0 3px rgba(0, 0, 0, 0.4); }
+
+/* Nút kiểu pixel: viền đen, gờ sáng trên-trái, bóng dưới-phải; bấm xuống thì lún */
+.hud .t-btn, .hud .wd-chip, .hud .term-close, .hud .tb-btn {
+  border: 2px solid var(--px-dark) !important; background: #3d3856; color: #f4efe0;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.14), inset -2px -2px 0 rgba(0, 0, 0, 0.3) !important;
+  font-size: 17px !important;
+}
+.hud .t-btn:hover:not(:disabled), .hud .wd-chip:hover, .hud .term-close:hover { background: #4b4568; }
+.hud .t-btn:active:not(:disabled), .hud .wd-chip:active { box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.35) !important; transform: translateY(1px); }
+.hud .t-primary.t-btn-wake { background: #3a9d4f; color: #fff; padding-left: 18px; padding-right: 18px; }
+.hud .t-primary.t-btn-wake:hover:not(:disabled) { background: #47b25d; }
+.hud .t-btn-reject { color: #ffb0a6; }
+.hud .wd-chip.on { background: var(--accent); color: #1d2230; }
+
+/* Thẻ ticket: giấy sáng, viền pixel */
+.hud .card { border-radius: 0; border: 2px solid #2a2135; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25); }
+
+/* CLI / chat: gọn hơn (không cần tỉ lệ màn hình 3D), chữ điều khiển cỡ đọc được */
+.hud .term { width: min(76vw, 1040px); aspect-ratio: auto; height: min(74vh, 620px); }
+.hud .term-tabs > *, .hud .chat-compose textarea, .hud .chat-send, .hud .term-sub, .hud .chat-meta, .hud .t-hint { font-size: 17px !important; }
+.hud .chat-compose textarea { background: #100e18; border: 2px solid #4b4666; border-radius: 0; color: #f4efe0; }
+.hud .chat-compose textarea:focus { border-color: var(--accent); outline: none; }
+
+/* Các thành phần cũ dùng thuộc tính gộp `font:` (đặt lại font-size-adjust): ép lại cho mọi phần tử con */
+.hud *, .px-overlay *, .center-card * { font-size-adjust: 0.56 !important; }
+.hud .term *, .hud .board *, .hud .fame *, .hud .wardrobe *, .hud .ask-sheet-box *, .hud .inbox * { font-size-adjust: 0.66 !important; }
+.hud .ask-card, .hud .ask-card *, .hud .card, .hud .card *, .hud .t-body, .hud .fame-row * { line-height: 1.25; }
+.hud .px-fame-av { background: #3d3856 !important; overflow: hidden; display: flex; align-items: flex-start; justify-content: center; }
+.hud .px-fame-av .px-avatar { margin: -14px 0 0; }
+
+/* ───────── Vòng 3 ───────── */
+/* Lời nói bị đẩy lên vì chồng nhau: tên người nói + đường nối bậc thang xuống đầu họ */
+.px-anchor.pushed .px-say::before { content: attr(data-who) ':'; display: block; color: #2f7d74; font-size: 16px; }
+.px-anchor.pushed .px-over::after {
+  content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: var(--lead, 0px); margin-left: -1px;
+  background: repeating-linear-gradient(#2a2135 0 4px, transparent 4px 6px);
+}
+
+/* Lời nhắc bấm E: lên giữa phía trên, không đè bảng tên quanh nhân vật */
+.hud .prompt { bottom: auto; top: 16px; }
+
+/* Danh sách nhân sự gọn: một dòng mỗi người; rê chuột vào một dòng mới hiện việc đang làm */
+.roster-head { align-items: center !important; gap: 8px; }
+.roster-head > span:first-child { flex: 1; }
+.roster-toggle { border: 2px solid var(--px-dark); background: #3d3856; color: #f4efe0; cursor: pointer; padding: 0 6px; font-size: 16px; line-height: 1.1; }
+.hud .roster.compact { width: 220px; }
+.hud .roster.compact .roster-task, .hud .roster.compact .roster-hint { display: none; }
+.hud .roster.compact .roster-item:hover .roster-task, .hud .roster.compact .roster-item:focus-visible .roster-task { display: block; }
+.hud .roster-name, .hud .roster-item { font-size: 17px !important; }
+.hud .roster-status { font-size: 15px !important; }
+.hud .roster-task { font-size: 15px !important; color: #c3bfd8; }
+
+/* Thẻ ticket: người làm và thời gian mỗi thứ một dòng */
+.hud .card-foot { flex-direction: column; gap: 1px; font-size: 15px; }
+.hud .card .muted, .hud .board .card-foot .muted { color: #4d5566; }
+/* Bảng vàng: tiến độ cấp to hơn */
+.hud .fame-progress, .hud .fame-counts { font-size: 15px; color: #c3bfd8; }
+.hud .fame-quote { font-size: 15px; }
+/* Phiếu duyệt: cột nhãn rộng hơn */
+.hud .ask-row { grid-template-columns: 140px 1fr; font-size: 16px; }
+/* Ô nhập: chữ gợi ý sáng hơn */
+.hud textarea::placeholder, .hud input::placeholder { color: #9d97b8; opacity: 1; }
+.hud .card-title { font-size: 16px; }
+.hud .card-top { font-size: 14px; }
+.hud .roster-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hud .roster.compact .roster-status { display: none; }
+.hud .roster.compact .roster-item:hover .roster-status { display: inline; }
+.hud .roster-row { min-width: 0; }
+
+/* ───────── Sau vòng 3 ───────── */
+.px-anchor.pushed .px-over::after { left: calc(50% + var(--shift, 0px)); }
+/* Bảng tên cạnh người ngồi bàn quay mặt ra (không đè mặt bàn + màn hình hàng dưới) */
+.px-anchor.beside .px-under { transform: none; }
+.px-anchor.beside .px-plate { text-align: left; }
+.px-anchor.beside .px-plate-row { justify-content: flex-start; }
+.hud .roster.compact { width: 244px; }
+.roster-err { display: inline-block; margin-left: 4px; padding: 0 4px; background: #e0574f; color: #fff; font-weight: 700; animation: px-blink 0.8s steps(1) infinite; }
+@keyframes px-blink { 50% { opacity: 0.35; } }

@@ -97,7 +97,7 @@ export function resetToSeat(a: LifeActor, slot: DeskSlot) {
 
 /**
  * Chọn chỗ tiếp theo cho agent rảnh và giữ chỗ đó. Ưu tiên khu đang có đồng nghiệp (để tụ tập nói chuyện),
- * và chỗ bi lắc còn lại khi đã có người đứng một bên.
+ * và chỗ bóng bàn còn lại khi đã có người đứng một bên.
  */
 export function chooseSpot(self: LifeActor, exclude?: string | null): string {
   const crowd = new Map<string, number>()

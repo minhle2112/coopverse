@@ -64,7 +64,7 @@ const settled = (a: LifeActor) => a.where !== 'walk' && clock.t - a.arrivedAt > 
 const standing = (a: LifeActor) => (a.where === 'spot' && GRAPH.nodes[a.node!].sit === undefined) || a.where === 'visit'
 const lead = (ag: Agent, agents: Agent[]) => agents.some((x) => x.reportsTo === ag.id)
 
-/** Hai agent đủ gần để nói chuyện: cùng khu (sofa, bi lắc, pantry...) hoặc sát nhau */
+/** Hai agent đủ gần để nói chuyện: cùng khu (sofa, bóng bàn, pantry...) hoặc sát nhau */
 function closeEnough(a: LifeActor, b: LifeActor) {
   const d = Math.hypot(a.x - b.x, a.z - b.z)
   const sameArea = a.where === 'spot' && b.where === 'spot' && GRAPH.nodes[a.node!].area === GRAPH.nodes[b.node!].area

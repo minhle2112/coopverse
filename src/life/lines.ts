@@ -29,7 +29,7 @@ const AT: Record<Activity, string[]> = {
   water: ['Uống nước cho tỉnh', 'Nhớ uống đủ 2 lít nha', 'Nước mát ghê'],
   window: ['Trời hôm nay đẹp ghê', 'Ngắm xe chạy cho đỡ mỏi mắt', 'Chiều nay chắc mưa…', 'Nghỉ mắt 20 giây theo luật 20-20-20'],
   tv: ['Ai bật TV phòng họp vậy?', 'Chiếu lại slide họp hôm qua à?', 'TV này nét thật'],
-  foos: ['Gooool! ⚽', 'Ván này tôi thắng chắc', 'Không được xoay 360 nha!', 'Thủ môn ngủ gật rồi kìa', 'Ăn gian nha!'],
+  foos: ['Bóng chạm lưới rồi!', 'Ván này tôi thắng chắc', 'Cú cắt bóng đẹp đó!', 'Giao bóng lại đi', 'Ăn gian nha!'],
   books: ['Cuốn này hay nè', 'Đọc vài trang lấy cảm hứng', 'Sách SEO 2019… hơi cũ rồi', 'Ai mượn cuốn Copywriting chưa trả?'],
   sofa: ['Ngả lưng 5 phút thôi…', 'Sofa này êm thật', 'Nghỉ chút rồi chiến tiếp'],
   beanbag: ['Ghế lười đúng là lười thật', 'Ngồi xuống là không muốn đứng dậy', 'Cho tôi 5 phút…'],
@@ -92,13 +92,13 @@ export const PRAISED = ['Cảm ơn sếp nhiều! 🥰', 'Được sếp khen l�
 export const LEVEL_UP = (level: number, title: string) => [`Lên cấp ${level} rồi! 🎉`, `Yeah! Giờ em là ${title} 😎`, `Cấp ${level}! Bàn mới đâu sếp ơi 😆`]
 
 export const ACT_EMOTE: Record<Activity, string> = {
-  coffee: '☕', fridge: '🧃', water: '💧', window: '🌤️', tv: '📺', foos: '⚽', books: '📖',
+  coffee: '☕', fridge: '🧃', water: '💧', window: '🌤️', tv: '📺', foos: '🏓', books: '📖',
   sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌', fame: '🏆',
 }
 
 const DIALOGUES: Dialogue[] = [
   [[0, fun('Trưa nay ăn gì?')], [1, fun('Cơm tấm đầu hẻm đi!')], [0, fun('Chốt!')]],
-  [[0, fun('Làm ván bi lắc không?')], [1, fun('Thua thì bao cà phê nha')], [0, fun('Ok, chơi luôn')]],
+  [[0, fun('Làm ván bóng bàn không?')], [1, fun('Thua thì bao cà phê nha')], [0, fun('Ok, chơi luôn')]],
   [[0, fun('Cuối tuần làm gì?')], [1, fun('Ngủ bù thôi')], [0, fun('Chuẩn bài!')]],
   [[0, fun('Ai để cốc ở bàn họp vậy?')], [1, fun('Không phải tôi nha 😅')]],
   [[0, fun('Mạng hôm nay lag ghê')], [1, fun('Chắc ai đang tải game')], [0, fun('Nghi lắm…')]],

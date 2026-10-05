@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Application, Container, Sprite } from 'pixi.js'
 import { ranking, useExp } from '../data/exp'
 import { COLUMNS, groupIssues } from '../data/kanban'
@@ -8,9 +8,13 @@ import { agentPos, input, player } from '../runtime'
 import { useCoop } from '../store'
 import { BOARD, FAME, resolveCircle, type World } from '../world/layout'
 import { assetsReady, loadSheets } from './assets'
-import { PLAYER_PARTS, charSheet, frameAt, type CharSheet } from './chars'
-import { MAP_H, MAP_W, dirOf, px, py, type Dir } from './geom'
+import { PLAYER_ID } from '../characters/look'
+import { charSheet, frameAt, type CharSheet } from './chars'
+import { partsOf, usePixelLooks } from './look'
+import { stage, ticks } from './stage'
+import { MAP_H, MAP_W, dirOf, px, py, wx, wz, type Dir } from './geom'
 import { buildOffice, drawFame, drawKanban, type OfficeView } from './office'
+import { installDevHooks } from './devhooks'
 import { view } from './view'
 
 const RADIUS = 0.28
@@ -35,13 +39,18 @@ type Phase = 'loading' | 'missing' | 'ready' | 'error'
  * Văn phòng pixel (PixiJS): sàn, tường, đồ đạc, bàn làm việc, bạn đi lại bằng WASD.
  * Phóng to theo bội số nguyên của pixel màn hình thật để hình luôn sắc nét.
  */
-export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
+export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot, children }: {
   world: World
   tierOfSlot: Map<string, number>
   tierKey: string
   statusOfSlot: Map<string, AgentStatus>
+  /** Người trong văn phòng: chỉ dựng khi sân khấu đã sẵn sàng */
+  children?: ReactNode
 }) {
   const host = useRef<HTMLDivElement>(null)
+  const overlay = useRef<HTMLDivElement>(null)
+  /** Sheet nhân vật của bạn, đổi khi chỉnh trong tủ đồ */
+  const playerSheet = useRef<CharSheet | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')
   const [err, setErr] = useState('')
   const appRef = useRef<Application | null>(null)
@@ -57,7 +66,6 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
     let dead = false
     const app = new Application()
     let playerSprite: Sprite | null = null
-    let sheet: CharSheet | null = null
     let facing: Dir = 'up'
     let lastNear: string | null = null
     let t = 0
@@ -83,8 +91,26 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
       }
       el.appendChild(app.canvas)
       app.canvas.style.imageRendering = 'pixelated'
+      // Rê chuột lên một người: hiện bảng tên (người ngồi bàn mặc định chỉ có bong bóng trạng thái)
+      app.canvas.addEventListener('pointermove', (e) => {
+        const r = stage.root
+        if (!r) return
+        const rect = app.canvas.getBoundingClientRect()
+        const mx = wx((e.clientX - rect.left - r.position.x) / r.scale.x)
+        const mz = wz((e.clientY - rect.top - r.position.y) / r.scale.y)
+        let best: string | null = null
+        let bd = Infinity
+        for (const [id, a] of agentPos) {
+          // Hình người vẽ từ chân lên ~0,8 m phía trên (theo chiều màn hình)
+          const dx = Math.abs(mx - a.x), up = a.z - mz
+          if (dx < 0.35 && up > -0.15 && up < 0.95 && dx + Math.abs(up - 0.4) < bd) { bd = dx + Math.abs(up - 0.4); best = id }
+        }
+        stage.hover = best
+        app.canvas.style.cursor = best ? 'pointer' : ''
+      })
+      app.canvas.addEventListener('pointerleave', () => { stage.hover = null })
       await loadSheets()
-      sheet = await charSheet(PLAYER_PARTS)
+      playerSheet.current = await charSheet(partsOf(PLAYER_ID, 'Bạn', false))
       if (dead) return
 
       const root = new Container()
@@ -96,8 +122,9 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
       app.stage.addChild(root)
       layers.current = { root, floor, sorted, top }
       appRef.current = app
+      Object.assign(stage, { app, root, sorted, top, overlay: overlay.current })
 
-      playerSprite = new Sprite(sheet.frame('idle', 'up', 0))
+      playerSprite = new Sprite(playerSheet.current.frame('idle', 'up', 0))
       playerSprite.anchor.set(0.5, 1)
       sorted.addChild(playerSprite)
       view.x = px(player.x)
@@ -134,6 +161,7 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
         player.x = p.x
         player.z = p.z
 
+        const sheet = playerSheet.current
         if (playerSprite && sheet) {
           const anim = len > 0 ? 'walk' : 'idle'
           playerSprite.texture = sheet.frame(anim, facing, frameAt(anim, running ? t * 1.5 : t))
@@ -148,7 +176,9 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
         const zDev = Math.max(1, auto + view.zoomBias)
         const z = zDev / res
         view.zoom = zDev
-        const ease = 1 - Math.exp(-8 * dt)
+        // Dịch chuyển tức thời (dev / tìm agent): nhảy luôn, không trượt
+        const ease = Number.isFinite(view.x) ? 1 - Math.exp(-8 * dt) : 1
+        if (!Number.isFinite(view.x)) { view.x = px(player.x); view.y = py(player.z) - 12 }
         view.x += (px(player.x) - view.x) * ease
         view.y += (py(player.z) - 12 - view.y) * ease
         const halfW = sw / z / 2, halfH = sh / z / 2
@@ -156,6 +186,9 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
         const cy = MAP_H <= halfH * 2 ? MAP_H / 2 : Math.min(MAP_H - halfH, Math.max(halfH, view.y))
         root.scale.set(z)
         root.position.set(Math.round((sw / 2 - cx * z) * res) / res, Math.round((sh / 2 - cy * z) * res) / res)
+
+        // ── Người trong văn phòng (agent, ứng viên), đạo diễn đời sống ──
+        for (const f of ticks) f(dt, t)
 
         // ── Màn hình máy tính: vẽ lại ~8 lần mỗi giây ──
         screenAcc += dt
@@ -191,6 +224,7 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
 
     return () => {
       dead = true
+      Object.assign(stage, { app: null, root: null, sorted: null, top: null, overlay: null })
       appRef.current = null
       layers.current = null
       office.current = null
@@ -198,19 +232,27 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
     }
   }, [])
 
+  // ── Tủ đồ: đổi bộ đồ của bạn ──
+  const playerLook = usePixelLooks((s) => s.custom[PLAYER_ID])
+  useEffect(() => {
+    if (phase !== 'ready') return
+    let live = true
+    charSheet(partsOf(PLAYER_ID, 'Bạn', false)).then((s) => { if (live) playerSheet.current = s })
+    return () => { live = false }
+  }, [phase, playerLook])
+
   // ── Dựng (lại) văn phòng khi sơ đồ chỗ ngồi hoặc bậc bàn đổi ──
   useEffect(() => {
     const L = layers.current
     if (phase !== 'ready' || !L) return
     const old = office.current
     if (old) {
-      L.floor.removeChildren().forEach((c) => c.destroy({ children: true }))
-      L.top.removeChildren().forEach((c) => c.destroy({ children: true }))
-      for (const c of old.sorted) { L.sorted.removeChild(c); c.destroy({ children: true }) }
+      // Chỉ gỡ đồ của văn phòng cũ: người, bong bóng, mũi tên đánh dấu cũng nằm trong các lớp này
+      for (const c of [old.floor, old.top, ...old.sorted]) { c.removeFromParent(); c.destroy({ children: true }) }
     }
     const v = buildOffice(world, tierOfSlot)
     L.floor.addChild(v.floor)
-    L.top.addChild(v.top)
+    L.top.addChildAt(v.top, 0)
     for (const c of v.sorted) L.sorted.addChild(c)
     office.current = v
     redrawBoards()
@@ -238,10 +280,13 @@ export function PixelScene({ world, tierOfSlot, tierKey, statusOfSlot }: {
     if (!import.meta.env.DEV || phase !== 'ready') return
     const w = window as unknown as { __pixel?: unknown }
     w.__pixel = { app: appRef.current, view, layers: layers.current, office: () => office.current, player }
+    return appRef.current ? installDevHooks(appRef.current) : undefined
   }, [phase])
 
   return (
     <div id="stage" ref={host} className="pixel-stage">
+      <div ref={overlay} className="px-overlay" />
+      {phase === 'ready' && children}
       {phase === 'missing' && <MissingAssets />}
       {phase === 'error' && (
         <div className="panel center-card">

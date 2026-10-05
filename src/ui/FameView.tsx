@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { lookOf, useLooks } from '../characters/look'
+import { partsOf, usePixelLooks } from '../pixel/look'
+import { Avatar } from '../pixel/Wardrobe'
 import { DESK_PERKS, EXP, deskTier, levelProgress, ranking, titleOf, useExp, weekStart, type RankBy } from '../data/exp'
 import { kudosOf } from '../data/expSync'
 import type { Agent } from '../data/types'
@@ -17,7 +18,7 @@ export function FameView() {
   const stats = useExp((s) => s.stats)
   const ledger = useExp((s) => s.ledger)
   const ready = useExp((s) => s.ready)
-  useLooks((s) => s.custom)
+  usePixelLooks((s) => s.custom)
   const [by, setBy] = useState<RankBy>('week')
   const [kudosFor, setKudosFor] = useState<Agent | null>(null)
   const rows = ranking(agents, stats, by)
@@ -57,13 +58,12 @@ export function FameView() {
             return (
               <div key={r.agent.id} className={`fame-row${i < 3 && r.exp > 0 ? ` top top${i + 1}` : ''}`}>
                 <span className="fame-rank">{i + 1}</span>
-                <span className="fame-av" style={{ background: lookOf(r.agent.id, r.agent.name, leads.has(r.agent.id)).shirt }}>
-                  {r.agent.name.slice(0, 1).toUpperCase()}
+                <span className="fame-av px-fame-av">
+                  <Avatar parts={partsOf(r.agent.id, r.agent.name, leads.has(r.agent.id))} scale={2} />
                 </span>
                 <span className="fame-who">
                   <span className="fame-name">
                     {r.agent.name}
-                    {r.agent.demo && <span className="np-demo">demo</span>}
                   </span>
                   <span className="fame-title">
                     <span className="lv-chip">Lv {lv}</span> {titleOf(lv)} · <span className="muted">{DESK_PERKS[deskTier(lv)]}</span>
