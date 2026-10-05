@@ -18,7 +18,7 @@ import { buildNav, flood, snapFree, cellIndex, type Nav } from './nav'
  */
 
 export * from './room'
-import { BOARD, DESK_D, DESK_W, DOOR_X, OFFICE, SPAWN, box, deskCenter, turned, type AABB, type DeskSlot, type Vec2 } from './room'
+import { BLOCKS, BOARD, DESK_D, DESK_W, DOOR_X, OFFICE, SPAWN, box, deskCenter, turned, type AABB, type DeskSlot, type Vec2 } from './room'
 
 // ───────────────────────── Đồ đạc ─────────────────────────
 
@@ -188,6 +188,7 @@ function buildColliders(slots: DeskSlot[], office?: OfficeState): AABB[] {
     box(0, maxZ, w + wallT, wallT, wallH, true),
     box(minX, 0, wallT, d + wallT, wallH, true),
     box(maxX, 0, wallT, d + wallT, wallH, true),
+    ...BLOCKS,
   ]
   for (const f of FURNITURE) {
     const s = SIZE[f.kind]

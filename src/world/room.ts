@@ -57,6 +57,15 @@ export const WINDOWS = M.windows.map((w) => mx(w.x + w.w / 2))
 /** Cửa ra vào ở tường nam (toạ độ x tâm, mét) */
 export const DOOR_X = mx(M.door.x + M.door.w / 2)
 
+/**
+ * Vùng chặn cố định vẽ trong layer Collision của bản đồ (cột, quầy xây sẵn...): không đi qua, không đặt đồ / xây vách lên.
+ * Không ghi chiều cao thì cao như tường, chặn cả camera bản 3D.
+ */
+export const BLOCKS: AABB[] = M.blocks.map((b) => {
+  const h = b.height ?? OFFICE.wallH
+  return { minX: mx(b.x), maxX: mx(b.x + b.w), minZ: mz(b.y), maxZ: mz(b.y + b.h), h, cam: h >= OFFICE.wallH }
+})
+
 /** Khoảng cách từ ghế tới tâm bàn */
 export const SEAT_TO_DESK = 0.83
 export const DESK_W = 1.4

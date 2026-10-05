@@ -1,5 +1,5 @@
-// Sinh src/world/mapMarkers.ts từ layer "Markers" của maps/office.tmj (vẽ bằng Tiled).
-// room.ts lấy vị trí cửa sổ, bảng ticket, cửa, chỗ xuất hiện, sảnh chờ từ file sinh ra này, nên trang lẫn server
+// Sinh src/world/mapMarkers.ts từ layer "Markers" và "Collision" của maps/office.tmj (vẽ bằng Tiled).
+// room.ts lấy vị trí cửa sổ, bảng ticket, cửa, chỗ xuất hiện, sảnh chờ, vùng chặn từ file sinh ra này, nên trang lẫn server
 // (Node, không đọc được .tmj) dùng chung một nguồn. Vite tự chạy lại khi map đổi (vite.config.ts); tay: `npm run map`.
 // `--check`: chỉ kiểm file sinh ra có khớp map không (thoát 1 nếu lệch), dùng khi build.
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -33,6 +33,18 @@ export function render() {
     if (o.point || !o.width || !o.height) throw new Error(`maps/office.tmj: mốc "${o.name}" phải là hình chữ nhật`)
     return { x: o.x, y: o.y, w: o.width, h: o.height }
   }
+  // Vùng chặn: hình chữ nhật trong layer Collision (không có layer = không chặn gì).
+  // Thuộc tính tuỳ chọn "height" (số, mét): cao bao nhiêu; không ghi = cao như tường (chặn cả camera)
+  const coll = map.layers.find((l) => l.name === 'Collision')
+  if (coll && coll.type !== 'objectgroup') throw new Error('maps/office.tmj: layer Collision phải là layer object')
+  const block = (o) => {
+    if (o.rotation) throw new Error(`maps/office.tmj: vùng chặn "${o.name || o.id}" không được xoay`)
+    if (o.point || o.ellipse || o.polygon || o.polyline || o.gid || !o.width || !o.height)
+      throw new Error(`maps/office.tmj: vùng chặn "${o.name || o.id}" phải là hình chữ nhật`)
+    const height = o.properties?.find((p) => p.name === 'height')?.value
+    if (height !== undefined && !(typeof height === 'number' && height > 0)) throw new Error(`maps/office.tmj: vùng chặn "${o.name || o.id}": height phải là số mét > 0`)
+    return { x: o.x, y: o.y, w: o.width, h: o.height, ...(height !== undefined ? { height } : {}) }
+  }
   const point = (o) => {
     if (!o.point) throw new Error(`maps/office.tmj: mốc "${o.name}" phải là điểm`)
     return { x: o.x, y: o.y }
@@ -45,14 +57,22 @@ export function render() {
     door: rect(one('door')),
     spawn: point(one('spawn')),
     lobby: many('lobby').map(point),
+    blocks: (coll?.objects ?? []).map(block),
   }
   const r = (v) => Math.round(v * 1000) / 1000
   const fmt = (o) => `{ ${Object.entries(o).map(([k, v]) => `${k}: ${r(v)}`).join(', ')} }`
   return [
-    '// FILE SINH TỰ ĐỘNG từ layer "Markers" của maps/office.tmj (scripts/map-markers.mjs). Đừng sửa tay: sửa map trong Tiled.',
+    '// FILE SINH TỰ ĐỘNG từ layer "Markers" và "Collision" của maps/office.tmj (scripts/map-markers.mjs). Đừng sửa tay: sửa map trong Tiled.',
     '// Đơn vị: pixel của map, gốc ở góc tây bắc map.',
     '',
-    'export const MAP_MARKERS = {',
+    'export interface MapRect { x: number; y: number; w: number; h: number }',
+    'export interface MapPoint { x: number; y: number }',
+    '/** Vùng chặn (layer Collision): height = cao bao nhiêu mét, không ghi = cao như tường */',
+    'export interface MapBlock extends MapRect { height?: number }',
+    '',
+    'export const MAP_MARKERS: {',
+    '  tile: number; room: MapRect; windows: MapRect[]; kanban: MapRect; door: MapRect; spawn: MapPoint; lobby: MapPoint[]; blocks: MapBlock[]',
+    '} = {',
     `  tile: ${data.tile},`,
     `  room: ${fmt(data.room)},`,
     `  windows: [${data.windows.map(fmt).join(', ')}],`,
@@ -60,7 +80,8 @@ export function render() {
     `  door: ${fmt(data.door)},`,
     `  spawn: ${fmt(data.spawn)},`,
     `  lobby: [${data.lobby.map(fmt).join(', ')}],`,
-    '} as const',
+    data.blocks.length ? ['  blocks: [', ...data.blocks.map((b) => `    ${fmt(b)},`), '  ],'].join('\n') : '  blocks: [],',
+    '}',
     '',
   ].join('\n')
 }

@@ -11,7 +11,7 @@
  "tileheight": 16,
  "tilewidth": 16,
  "backgroundcolor": "#1c1a26",
- "nextlayerid": 7,
+ "nextlayerid": 8,
  "nextobjectid": 13,
  "layers": [
   {
@@ -9878,6 +9878,18 @@
     0,
     0
    ]
+  },
+  {
+   "id": 7,
+   "name": "Collision",
+   "type": "objectgroup",
+   "draworder": "topdown",
+   "color": "#e04040",
+   "opacity": 0.6,
+   "visible": true,
+   "x": 0,
+   "y": 0,
+   "objects": []
   },
   {
    "id": 4,

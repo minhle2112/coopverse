@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Container, Graphics, Sprite } from 'pixi.js'
 import { DESK_ITEMS, WALLS, footprint, itemById, lowerName, nextRot, resale, wallPrice, type DeskItem, type Item } from '../data/catalog'
 import {
-  RESERVED, apply, canDesk, canPlace, canUnwall, canWall, cellsOf, costOf, deskCells, doorRot, reserved, type Action, type Cell, type Check, type PlaceOpts,
+  RESERVED, apply, canDesk, canPlace, canUnwall, canWall, cellsOf, costOf, deskCells, doorRot, fixedBlock, reserved, type Action, type Cell, type Check, type PlaceOpts,
 } from '../data/decor'
 import {
   CELL, COLS, ROWS, cellKey, cellX, cellZ, colOf, isClean, patchAt, rowOf, type OfficeState, type Placed,
@@ -15,7 +15,7 @@ import { fmtXu } from '../data/xu'
 import { useCoop } from '../store'
 import { useDeco, type Pending } from '../ui/decoStore'
 import { blockedReason, buildWorld, type World } from '../world/layout'
-import { forward } from '../world/room'
+import { BLOCKS, forward } from '../world/room'
 import { deskThumb, footRect, itemView, wallRect } from './catalogArt'
 import { PPM, px, py, wx, wz } from './geom'
 import type { OfficeView, Rect } from './office'
@@ -357,11 +357,13 @@ function setTint(o: Container, color: number) {
   for (const ch of o.children) setTint(ch, color)
 }
 
-/** Khu luôn để trống: sọc đỏ chéo + viền nét đứt + nhãn */
+/** Khu luôn để trống và vùng chặn cố định của bản đồ: sọc đỏ chéo + viền nét đứt */
 function drawReserved(g: Graphics) {
-  for (const z of RESERVED) {
-    const x0 = Math.round(px(cellX(z.c0))), y0 = Math.round(py(cellZ(z.r0)))
-    const w = (z.c1 - z.c0 + 1) * 16, h = (z.r1 - z.r0 + 1) * 16
+  const rects = [
+    ...RESERVED.map((z) => [Math.round(px(cellX(z.c0))), Math.round(py(cellZ(z.r0))), (z.c1 - z.c0 + 1) * 16, (z.r1 - z.r0 + 1) * 16]),
+    ...BLOCKS.map((b) => [Math.round(px(b.minX)), Math.round(py(b.minZ)), Math.round((b.maxX - b.minX) * PPM), Math.round((b.maxZ - b.minZ) * PPM)]),
+  ]
+  for (const [x0, y0, w, h] of rects) {
     g.rect(x0, y0, w, h).fill({ color: BAD, alpha: 0.12 })
     for (let k = -h; k < w; k += 6) for (let j = 0; j < h; j++) { const x = k + j; if (x >= 0 && x < w && (j % 2 === 0)) g.rect(x0 + x, y0 + h - 1 - j, 1, 1).fill({ color: BAD, alpha: 0.35 }) }
     for (let k = 0; k < w; k += 4) { g.rect(x0 + k, y0, 2, 1).fill({ color: BAD, alpha: 0.8 }) }
@@ -376,7 +378,7 @@ function drawGrid(g: Graphics, o: OfficeState) {
     for (let c = 0; c < COLS; c++) {
       const x = Math.round(px(cellX(c))), y = Math.round(py(cellZ(r)))
       const p = patchAt(cellX(c) + CELL / 2, cellZ(r) + CELL / 2)
-      if (reserved(c, r)) continue
+      if (reserved(c, r) || fixedBlock(c, r)) continue
       else if (!p || !isClean(o, p.id)) {
         g.rect(x, y, 16, 16).fill({ color: 0x000000, alpha: 0.16 })
       } else {

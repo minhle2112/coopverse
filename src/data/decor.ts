@@ -3,7 +3,7 @@ import {
   COLS, ROWS, CELL, cellKey, cellX, cellZ, colOf, isClean, jobById, patchAt, rowOf,
   type DeskPos, type OfficeState, type Placed, type Spend,
 } from './officeState'
-import { BOARD, DESK_D, DESK_W, DOOR_X, LOBBY, OFFICE, SPAWN, WINDOWS, deskCenter, turned } from '../world/room'
+import { BLOCKS, BOARD, DESK_D, DESK_W, DOOR_X, LOBBY, OFFICE, SPAWN, WINDOWS, deskCenter, turned } from '../world/room'
 
 /**
  * Luật trang trí văn phòng, dùng chung cho server (kiểm trước khi trừ Xu) và trang (khung xanh / đỏ khi đặt thử):
@@ -29,6 +29,12 @@ export const RESERVED: Zone[] = [
   zone(Math.min(...LOBBY.map((p) => p.x)) - 0.5, Math.max(...LOBBY.map((p) => p.x)) + 0.5, Math.min(...LOBBY.map((p) => p.z)) - 0.5, OFFICE.maxZ),
 ]
 export const reserved = (c: number, r: number) => RESERVED.some((z) => c >= z.c0 && c <= z.c1 && r >= z.r0 && r <= z.r1)
+
+/** Ô chạm vùng chặn cố định của bản đồ (layer Collision trong maps/office.tmj) */
+export const fixedBlock = (c: number, r: number) => {
+  const x0 = cellX(c), z0 = cellZ(r), e = 1e-6
+  return BLOCKS.some((b) => x0 + CELL > b.minX + e && x0 < b.maxX - e && z0 + CELL > b.minZ + e && z0 < b.maxZ - e)
+}
 
 const inGrid = (c: number, r: number) => c >= 0 && r >= 0 && c < COLS && r < ROWS
 
@@ -127,6 +133,7 @@ export function canPlace(o: OfficeState, i: Item, c: number, r: number, rot: num
     return ok
   }
   if (cells.some(([cc, rr]) => reserved(cc, rr))) return no('Để trống lối vào và sảnh chờ')
+  if (cells.some(([cc, rr]) => fixedBlock(cc, rr))) return no('Vướng chỗ cố định của văn phòng')
   if (cells.some(([cc, rr]) => !cleanCell(o, cc, rr))) return no('Dọn sàn chỗ này trước đã')
   if (cells.some(([cc, rr]) => o.walls[cellKey(cc, rr)])) return no('Vướng vách')
   const mine = i.mount === 'rug' ? occ.rug : occ.floor
@@ -143,6 +150,7 @@ export function canWall(o: OfficeState, cells: Cell[], kind: WallKind, opts: Pla
     const k = cellKey(c, r)
     if (!inGrid(c, r)) return no('Ra ngoài phòng')
     if (reserved(c, r)) return no('Để trống lối vào và sảnh chờ')
+    if (fixedBlock(c, r)) return no('Vướng chỗ cố định của văn phòng')
     if (!cleanCell(o, c, r)) return no('Dọn sàn chỗ này trước đã')
     if (o.walls[k] && o.walls[k] !== kind) return no('Đã có vách loại khác: dỡ ra trước')
     if (occ.floor.has(k) || occ.rug.has(k)) return no('Vướng đồ: dời đi trước')
@@ -175,6 +183,7 @@ export function canDesk(o: OfficeState, p: DeskPos, opts: PlaceOpts = {}): Check
     const k = cellKey(c, r)
     if (!inGrid(c, r)) return no('Ra ngoài phòng')
     if (reserved(c, r)) return no('Để trống lối vào và sảnh chờ')
+    if (fixedBlock(c, r)) return no('Vướng chỗ cố định của văn phòng')
     if (o.walls[k] || occ.floor.has(k)) return no('Vướng đồ hoặc vách')
     if (opts.blocked?.(c, r)) return no('Vướng bàn khác')
   }
