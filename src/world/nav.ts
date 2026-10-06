@@ -2,7 +2,7 @@ import type { AABB, Vec2 } from './layout'
 
 /**
  * Tìm đường cho agent trên lưới ô 25 cm phủ cả văn phòng. Ô bị chặn = tâm ô nằm trong (hoặc sát hơn bán kính người)
- * một hộp va chạm: tường, bàn, đồ đạc. Dựng lại mỗi khi bố cục đổi (bàn mới, đồ, vách bạn tự đặt).
+ * một hộp va chạm: tường, bàn, đồ đạc. Dựng lại mỗi khi bố cục đổi (bàn mới, đồ, phòng mới mở).
  * Đường đi: A* 8 hướng (không cắt góc), rồi nắn thẳng những đoạn nhìn thấy nhau để agent không đi zíc zắc.
  */
 

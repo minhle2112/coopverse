@@ -7,7 +7,7 @@ import type { Dir } from './geom'
  * Mỗi lớp là một sheet 16×32 mỗi khung, cùng bố cục, nên chồng lên nhau là ra một nhân vật hoàn chỉnh.
  *
  * Bố cục sheet (hàng = động tác, mỗi hàng cao 32 px):
- *   1 đứng yên · 2 đi bộ: 6 khung mỗi hướng, theo thứ tự phải, lên, trái, xuống
+ *   1 đứng yên · 2 đi bộ: 6 khung mỗi hướng, theo thứ tự phải, lên, trái, xuống · 3 nằm ngủ: 6 khung chỉ có đầu (thở)
  *   4 ngồi: 6 khung quay phải, 6 khung quay trái · 6 cầm điện thoại · 7 đọc sách
  */
 
@@ -27,9 +27,9 @@ export interface Parts {
   acc?: string | null
 }
 
-export type Anim = 'idle' | 'walk' | 'sit' | 'phone' | 'read'
+export type Anim = 'idle' | 'walk' | 'sit' | 'phone' | 'read' | 'sleep'
 
-const ROW: Record<Anim, number> = { idle: 1, walk: 2, sit: 4, phone: 6, read: 7 }
+const ROW: Record<Anim, number> = { idle: 1, walk: 2, sleep: 3, sit: 4, phone: 6, read: 7 }
 const DIR_OFF: Record<Dir, number> = { right: 0, up: 6, left: 12, down: 18 }
 const GEN = '2_Characters/Character_Generator'
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -117,7 +117,7 @@ export function charSheet(p: Parts): Promise<CharSheet> {
 }
 
 /** Số khung mỗi giây của từng động tác */
-export const FPS: Record<Anim, number> = { idle: 5, walk: 10, sit: 4, phone: 6, read: 4 }
+export const FPS: Record<Anim, number> = { idle: 5, walk: 10, sit: 4, phone: 6, read: 4, sleep: 1.5 }
 
 /** Khung thứ mấy tại thời điểm t (giây). Điện thoại / đọc sách lặp đoạn giữa sau lần đầu. */
 export function frameAt(anim: Anim, t: number, phase = 0): number {

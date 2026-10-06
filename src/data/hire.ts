@@ -1,9 +1,11 @@
 import type { Agent } from './types'
 
-/** Mỗi agent tối đa bao nhiêu agent con (luật trong AGENTS.md; Coopverse chỉ cảnh báo, bạn vẫn duyệt được) */
-export const MAX_SUBS = 2
+/**
+ * Sơ đồ tổ chức chỉ có hai tầng: Lead (không báo cáo cho ai trong công ty) và thành viên của Lead.
+ * Không có agent con: thành viên không đề xuất thuê thêm phụ tá, chỉ Lead thuê người cho nhóm.
+ */
 
-/** Cấp trong sơ đồ tổ chức: 0 = gốc (Lead / không báo cáo cho ai trong công ty), 1 = thành viên, 2+ = agent con. */
+/** Cấp trong sơ đồ tổ chức: 0 = gốc (Lead / không báo cáo cho ai trong công ty), 1 = thành viên, 2+ = báo cáo cho một thành viên. */
 export function depthOf(agents: Agent[], id: string | null | undefined): number {
   const seen = new Set<string>()
   let cur = agents.find((a) => a.id === id)
@@ -18,9 +20,13 @@ export function depthOf(agents: Agent[], id: string | null | undefined): number 
   return d
 }
 
-/** Agent con đang làm (đã được duyệt, chưa nghỉ) của một agent */
-export const subsOf = (agents: Agent[], id: string) =>
-  agents.filter((a) => a.reportsTo === id && !a.candidate && a.status !== 'terminated')
+/** Lead (★): agent gốc (không báo cáo cho ai trong công ty) có ít nhất một thành viên. Ứng viên chưa duyệt không tính. */
+export function leadIdsOf(agents: Agent[]): Set<string> {
+  const staff = agents.filter((a) => !a.candidate)
+  const ids = new Set(staff.map((a) => a.id))
+  const roots = new Set(staff.filter((a) => !a.reportsTo || !ids.has(a.reportsTo)).map((a) => a.id))
+  return new Set(staff.flatMap((a) => (a.reportsTo && roots.has(a.reportsTo) ? [a.reportsTo] : [])))
+}
 
 export interface HireWarning { level: 'red' | 'warn'; text: string }
 
@@ -36,8 +42,8 @@ export function candidateCanHire(agents: Agent[], payload: Record<string, unknow
 }
 
 /**
- * Kiểm phiếu thuê theo luật đã thống nhất: tối đa 2 agent con mỗi agent, agent con không thuê tiếp,
- * agent con không được quyền thuê, model rẻ. Lead gốc thuê thành viên cho nhóm thì không giới hạn.
+ * Kiểm phiếu thuê: chỉ Lead đề xuất thuê, người mới báo cáo cho Lead (không có agent con) và không được quyền thuê tiếp,
+ * model rẻ. Coopverse chỉ cảnh báo, bạn vẫn duyệt được.
  */
 export function hireWarnings(agents: Agent[], requesterId: string | null, payload: Record<string, unknown>): HireWarning[] {
   const out: HireWarning[] = []
@@ -48,22 +54,15 @@ export function hireWarnings(agents: Agent[], requesterId: string | null, payloa
   const newDepth = reportsTo ? depthOf(agents, reportsTo) + 1 : 0
 
   if (who) {
-    const d = depthOf(agents, who.id)
-    if (d >= 2) out.push({ level: 'red', text: `${who.name} là agent con. Theo luật, agent con không được thuê thêm.` })
-    else if (d === 1) {
-      const subs = subsOf(agents, who.id)
-      if (subs.length >= MAX_SUBS) {
-        out.push({ level: 'red', text: `${who.name} đã có ${subs.length} agent con (${subs.map((a) => a.name).join(', ')}). Giới hạn là ${MAX_SUBS}.` })
-      }
-    }
+    if (depthOf(agents, who.id) >= 1) out.push({ level: 'red', text: `${who.name} là thành viên. Chỉ Lead được thuê người cho nhóm, thành viên không đề xuất thêm phụ tá.` })
     if (reportsTo && reportsTo !== who.id) {
       out.push({ level: 'warn', text: `Agent mới báo cáo cho ${name(reportsTo) ?? 'người khác'}, không phải ${who.name}.` })
     }
   }
   if (!reportsTo) out.push({ level: 'warn', text: 'Agent mới không báo cáo cho ai, sẽ thành một Lead riêng.' })
-
-  if (newDepth >= 2 && candidateCanHire(agents, payload) !== false) {
-    out.push({ level: 'red', text: 'Agent con này sẽ có quyền thuê tiếp (phiếu không tắt canCreateAgents).' })
+  if (newDepth >= 2) out.push({ level: 'red', text: `Agent mới báo cáo cho thành viên ${name(reportsTo) ?? ''}. Không còn agent con: người mới phải báo cáo cho Lead.` })
+  if (newDepth >= 1 && candidateCanHire(agents, payload) !== false) {
+    out.push({ level: 'red', text: 'Thành viên mới sẽ có quyền thuê người (phiếu không tắt canCreateAgents).' })
   }
 
   const model = String((payload.adapterConfig as { model?: unknown } | undefined)?.model ?? '')

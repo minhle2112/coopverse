@@ -1,6 +1,4 @@
 import { create } from 'zustand'
-import type { WallKind } from '../data/catalog'
-import type { Cell } from '../data/decor'
 
 /**
  * Chế độ trang trí (phím T / nút sofa): đang cầm món gì, chọn món nào, chỗ đặt thử đang chờ bấm ✓.
@@ -14,14 +12,9 @@ export type Draft =
   | { kind: 'move'; uid: string; item: string; rot: number }
   /** Bàn làm việc của một chỗ ngồi */
   | { kind: 'desk'; slot: string; yaw: number }
-  | { kind: 'wall'; wall: WallKind }
-  | { kind: 'erase' }
 
 /** Chỗ đặt thử đang chờ bạn bấm ✓ (mua) hoặc ✕ (bỏ) */
-export type Pending =
-  | { kind: 'item'; item: string; c: number; r: number; rot: number }
-  | { kind: 'wall'; wall: WallKind; cells: Cell[] }
-  | { kind: 'erase'; cells: Cell[] }
+export type Pending = { kind: 'item'; item: string; c: number; r: number; rot: number }
 
 interface DecoState {
   open: boolean

@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { footprint, itemById } from '../data/catalog'
-import { CELL, JOBS, cellX, cellZ, isClean, type OfficeState } from '../data/officeState'
+import { CELL, COLS, ROWS, cellX, cellZ, type OfficeState } from '../data/officeState'
 import { useOffice } from '../data/officeSync'
 import { STATUS_COLOR } from '../data/types'
 import { agentPos, player } from '../runtime'
 import { useCoop } from '../store'
-import { BOARD, DESK_D, DESK_W, OFFICE, deskCenter, type World } from '../world/layout'
+import { BOARD, DESK_D, DESK_W, DOOR_X, OFFICE, deskCenter, type World } from '../world/layout'
+import { ROOMS, building, isOpen, isOutside } from '../world/rooms'
 
 const PX = 7 // điểm ảnh mỗi mét
 const W = (OFFICE.maxX - OFFICE.minX) * PX
@@ -18,12 +19,15 @@ function drawStatic(ctx: CanvasRenderingContext2D, world: World, office: OfficeS
   ctx.fillStyle = '#2b3242'
   ctx.fillRect(0, 0, W, H)
 
-  // Mảng sàn còn bẩn: sẫm màu bụi
-  for (const j of JOBS) {
-    if (j.kind !== 'floor' || !j.rect || isClean(office, j.id)) continue
-    ctx.fillStyle = 'rgba(120, 100, 70, 0.32)'
-    ctx.fillRect(sx(j.rect.minX), sz(j.rect.minZ), (j.rect.maxX - j.rect.minX) * PX, (j.rect.maxZ - j.rect.minZ) * PX)
+  // Phòng còn khoá: tối hẳn
+  for (const r of ROOMS) {
+    if (isOpen(office, r.id)) continue
+    ctx.fillStyle = 'rgba(8, 7, 14, 0.7)'
+    for (const b of r.rects) ctx.fillRect(sx(cellX(b.c0)), sz(cellZ(b.r0)), (b.c1 - b.c0 + 1) * CELL * PX, (b.r1 - b.r0 + 1) * CELL * PX)
   }
+  // Ngoài nhà (nhà không vuông): nền tối
+  ctx.fillStyle = '#14161d'
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (isOutside(c, r)) ctx.fillRect(sx(cellX(c)), sz(cellZ(r)), CELL * PX, CELL * PX)
 
   ctx.fillStyle = '#9b7a55'
   for (const s of world.slots) {
@@ -34,17 +38,18 @@ function drawStatic(ctx: CanvasRenderingContext2D, world: World, office: OfficeS
     ctx.fillRect(sx(c.x - w / 2), sz(c.z - d / 2), w * PX, d * PX)
   }
 
-  // Đồ đã mua (thảm nhạt hơn), vách tự xây
+  // Đồ đã mua (thảm nhạt hơn)
   for (const p of office.items) {
     const i = itemById.get(p.item)
-    if (!i || p.stored || i.mount === 'wall' || i.mount === 'door') continue
+    if (!i || p.stored || i.mount === 'wall') continue
     const { w, d } = footprint(i, p.rot)
     ctx.fillStyle = i.mount === 'rug' ? 'rgba(190, 120, 90, 0.35)' : '#7d8aa6'
     ctx.fillRect(sx(cellX(p.c)), sz(cellZ(p.r)), w * CELL * PX, d * CELL * PX)
   }
-  for (const [k, kind] of Object.entries(office.walls)) {
+  // Tường giữa các phòng, vách trong phòng (cửa giữa hai phòng đã mở thì để trống)
+  for (const [k, kind] of building(office).walls) {
     const [c, r] = k.split(',').map(Number)
-    ctx.fillStyle = kind === 'glass' ? '#8fc4e8' : kind === 'low' ? '#c9c3d6' : '#eceaf2'
+    ctx.fillStyle = kind === 'low' ? '#c9c3d6' : '#eceaf2'
     ctx.fillRect(sx(cellX(c)), sz(cellZ(r)), CELL * PX, CELL * PX)
   }
 
@@ -57,7 +62,7 @@ function drawStatic(ctx: CanvasRenderingContext2D, world: World, office: OfficeS
   ctx.strokeRect(1, 1, W - 2, H - 2)
   // Cửa vào ở tường nam
   ctx.fillStyle = '#c4553f'
-  ctx.fillRect(sx(-0.75), H - 3, 1.5 * PX, 3)
+  ctx.fillRect(sx(DOOR_X - 0.75), H - 3, 1.5 * PX, 3)
 }
 
 /** Bản đồ nhỏ góc dưới phải: bắc ở trên, chấm màu theo trạng thái, mũi tên là bạn. */

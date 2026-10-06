@@ -1,26 +1,26 @@
-import type { WallKind } from './catalog'
-import { OFFICE, WINDOWS } from '../world/room'
+import { OFFICE } from '../world/room'
 
 /**
- * Trạng thái văn phòng của một công ty (riêng của Coopverse, không phải của Paperclip): chỗ nào đã dọn,
+ * Trạng thái văn phòng của một công ty (riêng của Coopverse, không phải của Paperclip): phòng nào đã mở,
  * đã tiêu bao nhiêu Xu vào việc gì. Lưu thành file cạnh sổ EXP (server/coopData.ts); bản demo lưu trong trình duyệt.
  * Không phụ thuộc React: server dùng chung để kiểm giá và số dư.
  *
- * Văn phòng lúc đầu: một phòng lớn trống, phủ bụi. Sàn chia 5 × 3 mảng; tường bắc, từng cửa sổ và bảng ticket
- * dọn riêng. Mảng càng xa cửa vào càng đắt. Dọn xong thì mua đồ (src/data/catalog.ts), xây vách, dời bàn
- * (luật ở src/data/decor.ts).
+ * Văn phòng lúc đầu: văn phòng chung (bàn agent, bảng ticket) và sảnh, sạch sẵn. Các phòng khác khoá,
+ * trả Xu để mở (src/world/rooms.ts). Rồi mua đồ (src/data/catalog.ts), dời bàn (luật ở src/data/decor.ts).
+ * Tường, vách, cửa là của toà nhà (src/data/house.json, trang thiết kế nhà), người chơi không xây.
  */
 
 export interface Spend {
   id: string
   at: number
   /**
-   * clean: dọn · buy: mua đồ · sell: bán lại (xu âm) · wall: xây vách · unwall: dỡ vách (xu âm)
+   * room: mở phòng · buy: mua đồ · sell: bán lại (xu âm)
+   * · wall / unwall: xây / dỡ vách (xu âm), chỉ còn trong sổ cũ: nay vách vẽ ở trang thiết kế nhà
    * · deskBuy / deskSell: đồ để bàn của một agent (ref = "agentId:món")
    * · gift: Xu thêm để thử, chỉ có ở bản demo (xu âm; server không bao giờ tạo khoản này)
    */
-  kind: 'clean' | 'buy' | 'sell' | 'wall' | 'unwall' | 'deskBuy' | 'deskSell' | 'gift'
-  /** Việc dọn (id trong JOBS), món đồ (id trong ITEMS), hoặc "agentId:món" (đồ để bàn) */
+  kind: 'room' | 'buy' | 'sell' | 'wall' | 'unwall' | 'deskBuy' | 'deskSell' | 'gift'
+  /** Phòng (id trong rooms.ts), món đồ (id trong ITEMS), hoặc "agentId:món" (đồ để bàn) */
   ref: string
   xu: number
 }
@@ -36,93 +36,62 @@ export interface Placed {
   rot: number
   at: number
   stored?: boolean
+  /** Đồ có sẵn khi mở phòng (không mua): bán không được Xu */
+  kit?: boolean
 }
 
 /** Chỗ ngồi đã dời: vị trí ghế (mét) và hướng nhìn */
 export interface DeskPos { x: number; z: number; yaw: number }
 
 export interface OfficeState {
-  v: 1
-  /** id việc dọn → lúc dọn xong */
-  cleaned: Record<string, number>
+  v: 2
+  /** id phòng đã mở bằng Xu → lúc mở (phòng có sẵn từ đầu không nằm ở đây) */
+  rooms: Record<string, number>
   spent: Spend[]
   items: Placed[]
-  /** "c,r" → loại vách */
-  walls: Record<string, WallKind>
   /** id chỗ ngồi (DeskSlot.id) → chỗ mới */
   desks: Record<string, DeskPos>
   /** agentId → đồ để bàn đã mua (id trong DESK_ITEMS): đi theo agent khi đổi chỗ */
   deskItems: Record<string, string[]>
+  /** Đồ có sẵn (kit) của phòng mở sẵn đã đặt vào rồi, khoá "phòng:món:cột:hàng": bán / cất đi thì không tự đặt lại */
+  kits?: string[]
 }
 
-export const emptyOffice = (): OfficeState => ({ v: 1, cleaned: {}, spent: [], items: [], walls: {}, desks: {}, deskItems: {} })
+export const emptyOffice = (): OfficeState => ({ v: 2, rooms: {}, spent: [], items: [], desks: {}, deskItems: {} })
 
-/** Đọc từ file / bộ nhớ trình duyệt: thiếu trường (file của đợt trước) thì lấy mặc định */
-export const normOffice = (raw: Partial<OfficeState> | null | undefined): OfficeState => ({ ...emptyOffice(), ...(raw ?? {}), v: 1 })
+/** Giá vách tự xây và cửa kính lắp trên vách (đợt trước, nay đã bỏ): để trả lại Xu */
+const OLD_WALL_XU: Record<string, number> = { low: 4, glass: 7, tall: 10 }
+const OLD_DOOR_XU = 100
 
-export const spentXu = (o: OfficeState) => o.spent.reduce((s, x) => s + x.xu, 0)
-
-export interface Rect { minX: number; maxX: number; minZ: number; maxZ: number }
-
-export interface CleanJob {
-  id: string
-  kind: 'floor' | 'wall' | 'window' | 'board'
-  label: string
-  price: number
-  /** Mảng sàn (mét) */
-  rect?: Rect
-  /** Cửa sổ: toạ độ x tâm (mét) */
-  x?: number
-}
-
-export const PATCH_COLS = 5
-export const PATCH_ROWS = 3
-const COL = ['góc trái', 'bên trái', 'chính giữa', 'bên phải', 'góc phải']
-const ROW = ['sát tường', 'giữa phòng', 'gần cửa']
-
-const pw = (OFFICE.maxX - OFFICE.minX) / PATCH_COLS
-const ph = (OFFICE.maxZ - OFFICE.minZ) / PATCH_ROWS
-/** Cửa vào ở giữa tường nam: mảng chứa cửa */
-const DOOR_COL = Math.floor((0 - OFFICE.minX) / pw)
-const DOOR_ROW = PATCH_ROWS - 1
-
-export const patchId = (c: number, r: number) => `floor-${c}-${r}`
-
-function floorJobs(): CleanJob[] {
-  const out: CleanJob[] = []
-  for (let r = 0; r < PATCH_ROWS; r++) {
-    for (let c = 0; c < PATCH_COLS; c++) {
-      // Số bước (theo mảng) từ cửa vào: mảng ở cửa 30 Xu, mỗi bước thêm 25
-      const d = Math.abs(c - DOOR_COL) + (DOOR_ROW - r)
-      out.push({
-        id: patchId(c, r),
-        kind: 'floor',
-        label: `Sàn ${ROW[r]}, ${COL[c]}`,
-        price: 30 + 25 * d,
-        rect: { minX: OFFICE.minX + c * pw, maxX: OFFICE.minX + (c + 1) * pw, minZ: OFFICE.minZ + r * ph, maxZ: OFFICE.minZ + (r + 1) * ph },
-      })
+/**
+ * Đọc từ file / bộ nhớ trình duyệt: thiếu trường (file của đợt trước) thì lấy mặc định.
+ * File bản 1 (một phòng lớn phủ bụi, lưới ô khác hẳn): trả lại Xu đã dọn bụi và đã xây vách, đồ cất hết vào kho
+ * (lấy ra đặt lại miễn phí), bàn về chỗ cũ. Đồ để bàn giữ nguyên.
+ * File có vách / cửa kính người chơi tự xây (đợt trước): dỡ hết, trả lại đủ Xu đã trả.
+ */
+export function normOffice(raw: (Partial<Omit<OfficeState, 'v'>> & { v?: number; walls?: Record<string, string> }) | null | undefined): OfficeState {
+  const o: OfficeState & { walls?: unknown; cleaned?: unknown } = { ...emptyOffice(), ...(raw ?? {}), v: 2 }
+  if (raw && raw.v !== 2) {
+    o.spent = (raw.spent ?? []).filter((x) => !['clean', 'wall', 'unwall'].includes(x.kind))
+    o.items = (raw.items ?? []).map((p) => ({ ...p, stored: true }))
+    o.desks = {}
+    o.rooms = {}
+  } else {
+    const at = Date.now()
+    const wallXu = Object.values(raw?.walls ?? {}).reduce((s, k) => s + (OLD_WALL_XU[k] ?? 0), 0)
+    if (wallXu) o.spent = [...o.spent, { id: `old-walls-${at}`, at, kind: 'unwall', ref: 'wall', xu: -wallXu }]
+    const doors = o.items.filter((p) => p.item === 'door')
+    if (doors.length) {
+      o.items = o.items.filter((p) => p.item !== 'door')
+      o.spent = [...o.spent, { id: `old-doors-${at}`, at, kind: 'sell', ref: 'door', xu: -doors.length * OLD_DOOR_XU }]
     }
   }
-  return out
+  delete o.walls
+  delete o.cleaned
+  return o
 }
 
-export const JOBS: CleanJob[] = [
-  { id: 'board', kind: 'board', label: 'Bảng ticket', price: 20 },
-  ...floorJobs(),
-  ...WINDOWS.map((x, i): CleanJob => ({ id: `window-${i}`, kind: 'window', label: `Cửa sổ ${i + 1}`, price: 40, x })),
-  { id: 'wall', kind: 'wall', label: 'Tường bắc (vết ố, mạng nhện)', price: 150 },
-]
-
-export const jobById = new Map(JOBS.map((j) => [j.id, j]))
-
-/** Mảng sàn chứa điểm (x, z) */
-export function patchAt(x: number, z: number): CleanJob | undefined {
-  const c = Math.floor((x - OFFICE.minX) / pw), r = Math.floor((z - OFFICE.minZ) / ph)
-  if (c < 0 || c >= PATCH_COLS || r < 0 || r >= PATCH_ROWS) return undefined
-  return jobById.get(patchId(c, r))
-}
-
-export const isClean = (o: OfficeState, id: string) => o.cleaned[id] !== undefined
+export const spentXu = (o: OfficeState) => o.spent.reduce((s, x) => s + x.xu, 0)
 
 // ───────────────────────── Lưới đặt đồ ─────────────────────────
 
@@ -136,6 +105,3 @@ export const cellX = (c: number) => OFFICE.minX + c * CELL
 export const cellZ = (r: number) => OFFICE.minZ + r * CELL
 export const colOf = (x: number) => Math.floor((x - OFFICE.minX) / CELL)
 export const rowOf = (z: number) => Math.floor((z - OFFICE.minZ) / CELL)
-
-/** Đã dọn sạch hết chưa */
-export const allClean = (o: OfficeState) => JOBS.every((j) => isClean(o, j.id))

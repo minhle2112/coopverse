@@ -1,10 +1,11 @@
 import { titleOf } from '../data/exp'
+import { leadIdsOf } from '../data/hire'
 import type { Agent, AskKind } from '../data/types'
 import { player } from '../runtime'
 import { useCoop } from '../store'
-import type { CleanJob } from '../data/officeState'
+import type { Room } from '../world/rooms'
 import { actors, type LifeActor } from './actors'
-import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, BOUGHT, BUILT, CLEANED, EXCUSE, GIFT, LEVEL_UP, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
+import { ACT_EMOTE, ASK_APPROVAL, ASK_DENIED, ASK_QUESTION, ASK_THANKS, BOUGHT, EXCUSE, ROOM_OPENED, GIFT, LEVEL_UP, dialogue, greet, muse, onStatus, visitTalk, type Dialogue, type Line, type World } from './lines'
 import { spotById } from './spots'
 import { clock, emote, expireLife, isSpeaking, readTime, say, useLife } from './store'
 
@@ -64,7 +65,7 @@ const spotOf = (a: LifeActor) => (a.where === 'spot' ? spotById(a.spot) : undefi
 const actOf = (a: LifeActor) => spotOf(a)?.act ?? null
 const settled = (a: LifeActor) => a.where !== 'walk' && clock.t - a.arrivedAt > 1.5
 const standing = (a: LifeActor) => (a.where === 'spot' && spotOf(a)?.sit === undefined) || a.where === 'visit'
-const lead = (ag: Agent, agents: Agent[]) => agents.some((x) => x.reportsTo === ag.id)
+const lead = (ag: Agent, agents: Agent[]) => leadIdsOf(agents).has(ag.id)
 
 /** Hai agent đủ gần để nói chuyện: cùng khu (góc tán gẫu, cửa sổ...) hoặc sát nhau */
 function closeEnough(a: LifeActor, b: LifeActor) {
@@ -174,7 +175,7 @@ export function lifeTick(dt: number) {
     if (ag.status !== 'idle' || !settled(a) || a.talkUntil > t || t < a.visitCd || a.cmd || a.where === 'visit') continue
     if (!lead(ag, agents) || Math.random() > 0.02) continue
     a.visitCd = t + rand(70, 140)
-    const team = agents.filter((m) => m.reportsTo === ag.id && m.status === 'running' && actors.get(m.id)?.slot.zone === 'open')
+    const team = agents.filter((m) => m.reportsTo === ag.id && m.status === 'running')
     if (!team.length) continue
     a.cmd = { kind: 'visit', target: team[Math.floor(Math.random() * team.length)].id }
   }
@@ -261,26 +262,22 @@ export function leveledUp(agentId: string, level: number) {
   say(a.id, pick(LEVEL_UP(level, titleOf(level))))
 }
 
-/**
- * Bạn vừa trả Xu dọn một chỗ: vài agent ở gần đó (mảng sàn) hoặc trong phòng (tường, cửa sổ, bảng) mừng rỡ.
- */
-export function cleaned(job: CleanJob) {
-  const r = job.rect
-  const inside = (a: LifeActor) => !r || (a.x > r.minX - 1 && a.x < r.maxX + 1 && a.z > r.minZ - 1 && a.z < r.maxZ + 1)
-  const list = [...actors.values()].filter(inside).sort(() => Math.random() - 0.5)
-  list.slice(0, 3).forEach((a, i) => {
-    if (a.where !== 'seat') celebrate(a, '✨', 2.6)
-    else emote(a.id, '✨', 2.4)
-    if (i < 2) say(a.id, pick(CLEANED[job.kind]))
+/** Bạn vừa mở một phòng: vài agent mừng rỡ, rủ nhau sang xem */
+export function roomOpened(room: Room) {
+  const list = [...actors.values()].sort(() => Math.random() - 0.5)
+  list.slice(0, 4).forEach((a, i) => {
+    if (a.where !== 'seat') celebrate(a, '🎉', 2.6)
+    else emote(a.id, '🎉', 2.4)
+    if (i < 2) say(a.id, pick(ROOM_OPENED).replace('{x}', room.name.toLowerCase()))
   })
 }
 
-/** Bạn vừa mua món mới / xây vách ở quanh (x, z): agent đứng gần quay ra khen */
-export function decorated(name: string | null, x: number, z: number) {
+/** Bạn vừa mua món mới ở quanh (x, z): agent đứng gần quay ra khen */
+export function decorated(name: string, x: number, z: number) {
   const list = [...actors.values()].filter((a) => Math.hypot(a.x - x, a.z - z) < 4.5).sort(() => Math.random() - 0.5)
   list.slice(0, 2).forEach((a, i) => {
-    emote(a.id, name ? '😍' : '🤔', 2.4)
-    if (i === 0) say(a.id, name ? pick(BOUGHT).replace('{x}', name) : pick(BUILT))
+    emote(a.id, '😍', 2.4)
+    if (i === 0) say(a.id, pick(BOUGHT).replace('{x}', name))
   })
 }
 

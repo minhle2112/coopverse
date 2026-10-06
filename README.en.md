@@ -85,8 +85,8 @@ paperclipai run
 
 1. Open http://localhost:3100. On first run Paperclip walks you through creating a **company**.
 2. Add agents under **Agents** (name, role, adapter such as Claude Code).
-   - Coopverse seats agents by the org chart. An agent that others **report to** (*Reports to* field) is a **Lead** and sits first; everyone else sits grouped by Lead. Sub-agents (reporting to a member) get a side desk next to their parent.
-   - The office has 16 main desks (4 clusters × 4) plus side desks for sub-agents. Agents without a seat still appear in the Staff list (CLI works) but not on the map.
+   - Coopverse seats agents by the org chart. An agent that reports to no one and has others **reporting to it** (*Reports to* field) is a **Lead** (★): it sits at the Lead's own desk if the house design has one, otherwise first in the pods; everyone else sits grouped by Lead. There are no sub-agents: only a Lead proposes hires, and the approval card is flagged red when a member asks to hire a helper or the new agent would report to a member.
+   - The office has 16 desks (4 clusters × 4), plus the Lead's desks if any. Agents without a seat still appear in the Staff list (CLI works) but not on the map.
 3. **Enable Agent Chat** to chat from Coopverse: **Settings → Experimental → Agent Chat**. It is instance-wide, not per company.
 
 ![Enable Agent Chat](docs/images/paperclip-agent-chat.png)
@@ -215,34 +215,35 @@ To update after `git pull`: `uninstall`, then run the `install` command again.
 | Click a name in the Staff list | Open that agent's screen (demo: right-click to change its status) |
 | **E** | Near an agent: open its screen (**Chat** and **Log** tabs, plus a **Review** tab, opened first, when it is waiting on you). In front of the ticket board: view it full size. Near a sofa, chair, arcade machine, coffee bar…: sit down / use it (walk away to get up). Press E again to step back |
 | C | Wardrobe: restyle yourself or the nearby agent |
-| B | Cleaning: pay Xu to clean dirty spots (see below) |
-| T | Decorating: shop, place / move items, build walls, move desks (see below). While decorating: **R** rotates, **Enter** buys, **Esc** cancels |
+| B | Rooms: pay Xu to unlock a locked room (see below) |
+| T | Decorating: shop, place / move items, move desks (see below). While decorating: **R** rotates, **Enter** buys, **Esc** cancels |
 | Q | Things waiting for your approval / answer |
 | M | Toggle lofi music |
 | Esc | Close whatever screen is open |
-| 🔊 🎵 🎨 🧹 🛋️ ⚙️ under the logo | Sound, music, wardrobe, cleaning, decorating, settings (volume, time preview) |
+| 🔊 🎵 🎨 🔑 🛋️ ⚙️ under the logo | Sound, music, wardrobe, rooms, decorating, settings (volume, time preview) |
 
-### Xu and cleaning the office
+### Xu and unlocking rooms
 
-- The office starts as one big empty room with only the agents' desks, the ticket board and windows. Everything is dusty: stains, cobwebs, old cardboard boxes, loose paper, rats.
+- The building has 6 rooms: the open office (agents' desks, ticket board), the lobby (entrance, waiting candidates), meeting room, boss's office, pantry and lounge. At first only the open office and the lobby are open, already clean; the other rooms are locked (dark, walled off).
 - **Xu** is the office's shared money (shown under the logo). Each ticket an agent finishes on the board adds Xu: low 10, medium 15, high 25, critical 40 priority; higher-level agents earn more (+10% per level). Tickets finished before this feature count too.
-- Press **B** (or 🧹): every dirty spot shows its price. The floor is split into 5 × 3 patches, farther from the door costs more; the north wall, each window and the ticket board are cleaned separately. Click a spot, then **Dọn** (Clean) in the left panel.
-- Xu and cleaned spots are stored by Coopverse on this machine (the `.coopverse` folder, or the desktop app's data folder), nothing is sent to Paperclip. The demo stores them in the browser and has a "Làm bẩn lại" (make dirty again) button.
+- Press **B** (or 🔑), or click a dark room on the map: the Rooms panel shows the price. Only a room with a door to an open room can be unlocked (pantry and meeting room first, then lounge and boss's office). Each room costs more than the last: 300 → 500 → 700 → 1,000 Xu. A new room comes with a few matching items (meeting table with 4 chairs and a whiteboard; coffee bar, fridge and kitchen; sofa and coffee table; bookshelf and a seating corner); they can be moved or stored but sell for 0 Xu.
+- Xu and unlocked rooms are stored by Coopverse on this machine (the `.coopverse` folder, or the desktop app's data folder), nothing is sent to Paperclip. An office saved by the old version (one big dusty room) is converted: Xu spent on cleaning and walls is refunded, bought items go to storage (place them again for free), desks go back to their default spots. The demo stores them in the browser and has a "Làm lại từ đầu" (start over) button.
 
 ### Decorating the office
 
-- Press **T** (or 🛋️): the shop opens on the left with about 50 items in 5 groups: plants and small items (pots, lamps, bookshelves, rugs…), wall items (paintings, clock, TV, **fame board**), lounge and kitchen (sofa, armchairs, coffee table, kitchen counters, coffee bar…), fun (arcade machines, ping-pong, pool table, an office cat), and walls.
+- Press **T** (or 🛋️): the shop opens on the left with about 50 items in 5 groups: plants and small items (pots, lamps, bookshelves, rugs…), wall items (paintings, clock, TV, **fame board**), lounge and kitchen (sofa, armchairs, coffee table, kitchen counters, coffee bar…), fun (arcade machines, ping-pong, pool table, an office cat), and bedroom (beds).
 - Pick an item and a ghost follows the mouse. A green box means it fits; a red box shows why not. Click to place a preview, then **✓ Mua** (Buy) or Enter; no Xu is spent until you confirm. **R** rotates: the sofa and armchairs turn all 4 ways, other items mirror.
-- Items go only on cleaned floor patches; wall items need the north wall cleaned. The entrance and the candidates' lobby always stay free (tinted red). Nothing may wall off the path to a desk or the ticket board.
+- Items go only in unlocked rooms; wall items hang on the north wall of the open office, meeting room or boss's office. The entrance and the candidates' lobby always stay free (tinted red). Nothing may wall off the path to a desk or the ticket board.
 - Click a placed item to rotate it, move it (free), put it in storage (free, place it again any time) or sell it back for half price.
-- Click a desk to rotate or move it. Every agent's desk is free; the agent walks to the new spot.
+- Click a desk to rotate or move it, or **↺ Back to its spot** (a moved desk goes back to its place in the pod / the Lead's desk). Every agent's desk is free; the agent walks to the new spot. A moved desk belongs to the seat, not the person: when the org chart changes (a new hire, a Lead's own desk…) someone else may sit there.
 - **Desk items** (click a desk, bottom row): desk plant, photo frame (level 2), second monitor, desk lamp (level 3), leather chair (level 4), gold trophy with a gold trim (level 5). An item unlocks when the agent at that desk reaches the level; then you buy it with Xu. Desk items belong to the agent and move with them; sell back for half price.
-- 🧱 tab: hold the mouse and drag a straight line to build a wall, release, then ✓. Low and glass walls never hide anyone; tall walls look like real walls and fade when someone stands behind them. Buy a **glass door** and fit it into 2 adjacent wall cells (it opens when someone comes near). To remove walls, click a wall segment on the map and pick **Dỡ cả đoạn** (remove segment), or drag across part of it with the **Dỡ vách** tool; you get half back. If a door sits in it, click the door and store it first.
+- Walls, partitions and doors belong to the building (drawn in the house design page, see the dev section); you can't build or remove them in the game, only place items. Walls and glass doors built in the previous version are removed and fully refunded.
 - The EXP ranking is shown on the fame board: buy it, hang it on the wall, then click it (or stand in front and press E).
-- Idle agents use what you bought: they sit on sofas, armchairs and meeting chairs; make coffee, open the fridge, cook noodles; play the arcade; pair up for ping-pong or pool; read, watch TV, pet the cat. It only makes the office lively and does not affect work. You can use them too: stand close and press **E**.
+- Idle agents use what you bought: they sit on sofas, armchairs and meeting chairs; make coffee, open the fridge, cook noodles; play the arcade; pair up for ping-pong or pool; read, watch TV, pet the cat; nap in a bed. It only makes the office lively and does not affect work. You can use them too (except beds): stand close and press **E**.
+- If the house has an **agent lounge / bedroom** (set in the house design page, *Used as*): idle agents only hang out in those rooms, never idling at their desks or in other rooms (an idle Lead still visits members at work). Paused agents go to a free bed and sleep; with no free bed they doze at their desk. They return to their desk as soon as there is work.
 - The demo (`?demo`) has a **+500** button next to the Xu balance for trying things out (kept in the browser only; EXP and agent levels are unchanged).
 - Prices follow the real Xu earning rate (about 150 Xu on a working day): small items are affordable on day one, the most expensive (the office cat, 1,000 Xu) takes about a week of saving.
-- Items, walls, desk spots and desk items are stored with the Xu (the Coopverse server re-checks the balance, placement and agent levels).
+- Items, desk spots and desk items are stored with the Xu (the Coopverse server re-checks the balance, placement and agent levels).
 
 ### Chatting with an agent
 
@@ -322,10 +323,12 @@ src/
   life/        shared office life: the agent "brain" (brain.ts: walking, sitting, avoidance), lines, greetings, emotes
   player/      movement, camera, controls
   ui/          HUD, minimap, CLI + Chat (Terminal), ticket board, wardrobe, settings
+  cutter/      sprite cutter page (cutter.html, dev only)
 server/
   guard.ts     allow-list of Paperclip endpoints (shared by Vite and the desktop app)
-  coopData.ts  per-company EXP ledger and office state (cleaned spots, Xu spent) (/coop/)
+  coopData.ts  per-company EXP ledger and office state (unlocked rooms, Xu spent) (/coop/)
   limezu.ts    serves the LimeZu images from COOPVERSE_ASSETS at /limezu/ (127.0.0.1 only)
+  cutter.ts    API for the sprite cutter page (dev only): lists LimeZu images, reads / writes src/data/items.json and src/data/house.json
 desktop/       Windows app (Electron): main.ts, local server (server.ts), starting/stopping Paperclip
                (paperclip.ts, pc-hook.cjs), connect screen (setup/), hand-drawn icon (icon/make-icon.py)
 paperclip-plugin/
@@ -335,6 +338,8 @@ paperclip-plugin/
 
 - Stack: Vite, React 19, PixiJS 8, zustand, TypeScript. Pixel font: VT323 (OFL, includes Vietnamese).
 - Sprite coordinates inside the LimeZu packs live in `src/pixel/atlas.json` (coordinates only, no images).
+- **Decorations, the work desks / chairs and what sits on the desks** (computer, keyboard, cup, desk items agents buy) live in `src/data/items.json`: name, price, size, rotation, use (sit / stand and use…), spot on the desk and the regions cut from the LimeZu images for each direction / desk orientation. Edit them with the **sprite cutter page**: run `npm run dev`, then open `http://127.0.0.1:5179/cutter.html` (the ❔ button explains the steps). Click an object in a LimeZu image to cut it tightly, turn it into a new item or replace an existing item's art, for all 4 directions, drag pieces into place, preview with a seated figure; Save and the game reloads. Commit `items.json`; release builds bundle the images it uses.
+- **The house layout** (rooms, doors, floors, wall style, entrance, windows, ticket board, desk pods, the Lead's own desk, waiting spots, items that come with a room, the agents' lounge / bedroom, room prices) lives in `src/data/house.json`. Edit it in the **🏠 House design** tab of the cutter page: drag to draw rooms, combine several parts into L / T shaped rooms, click the wall between two rooms to add a door, draw partitions inside rooms (tall or low, with doors), pick floors / walls from the LimeZu images. The page lists problems before saving (two rooms touching without a wall, a locked room with no door to a starting room, floor walled off by partitions…). Saving regenerates `maps/office.tmj` (floors, north wall, borders, markers) and `src/world/mapMarkers.ts`; after editing `house.json` by hand run `npm run house`. The map's Collision layer is still drawn in Tiled; the other layers get overwritten. Offices that already have furniture: items that no longer fit (including ones on a new partition) go to storage, unlocked rooms that were removed are refunded. Commit `house.json` and `maps/office.tmj`.
 - Every Paperclip call lives in `src/data/paperclip.ts`.
 - Type-check and build: `npm run build` (including the desktop code: `npm run typecheck`).
 - Release files are built on a machine that has the art packs: `npm run dist:win:art` (images come from `COOPVERSE_ASSETS` or `../coopverse-assets/limezu`; only the images the app uses are copied into the app). Then upload the 2 files in `release/` to the Releases page. The images never go into the repo. GitHub Actions (`.github/workflows/desktop-release.yml`) only test-builds a version without art when a tag is pushed. On a machine with Smart App Control on, the NSIS step can fail with `spawn UNKNOWN`, because Windows blocks running unsigned files.

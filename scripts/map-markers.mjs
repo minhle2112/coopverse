@@ -1,6 +1,7 @@
-// Sinh src/world/mapMarkers.ts từ layer "Markers" và "Collision" của maps/office.tmj (vẽ bằng Tiled).
-// room.ts lấy vị trí cửa sổ, bảng ticket, cửa, chỗ xuất hiện, sảnh chờ, vùng chặn từ file sinh ra này, nên trang lẫn server
+// Sinh src/world/mapMarkers.ts từ layer "Markers" và "Collision" của maps/office.tmj.
+// room.ts lấy vị trí cửa sổ, bảng ticket, cửa, chỗ xuất hiện, sảnh chờ, cụm bàn, vùng chặn từ file sinh ra này, nên trang lẫn server
 // (Node, không đọc được .tmj) dùng chung một nguồn. Vite tự chạy lại khi map đổi (vite.config.ts); tay: `npm run map`.
+// Mốc (Markers) do trang thiết kế nhà sinh từ src/data/house.json (src/world/houseMap.mjs); vùng chặn (Collision) vẽ trong Tiled.
 // `--check`: chỉ kiểm file sinh ra có khớp map không (thoát 1 nếu lệch), dùng khi build.
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -57,12 +58,23 @@ export function render() {
     door: rect(one('door')),
     spawn: point(one('spawn')),
     lobby: many('lobby').map(point),
+    pods: many('pod').map(point),
+    // Bàn riêng của Lead (tuỳ chọn): điểm = chỗ ngồi, thuộc tính face = hướng nhìn n / s / e / w
+    leads: objs
+      .filter((x) => /^lead\d+$/.test(x.name))
+      .sort((a, b) => Number(a.name.slice(4)) - Number(b.name.slice(4)))
+      .map((o) => {
+        const face = o.properties?.find((p) => p.name === 'face')?.value ?? 's'
+        if (!['n', 's', 'e', 'w'].includes(face)) throw new Error(`maps/office.tmj: mốc "${o.name}": face phải là n / s / e / w`)
+        return { ...point(o), face }
+      }),
     blocks: (coll?.objects ?? []).map(block),
   }
   const r = (v) => Math.round(v * 1000) / 1000
-  const fmt = (o) => `{ ${Object.entries(o).map(([k, v]) => `${k}: ${r(v)}`).join(', ')} }`
+  const fmt = (o) => `{ ${Object.entries(o).map(([k, v]) => `${k}: ${typeof v === 'string' ? JSON.stringify(v) : r(v)}`).join(', ')} }`
+  const list = (key, xs) => xs.length ? [`  ${key}: [`, ...xs.map((b) => `    ${fmt(b)},`), '  ],'].join('\n') : `  ${key}: [],`
   return [
-    '// FILE SINH TỰ ĐỘNG từ layer "Markers" và "Collision" của maps/office.tmj (scripts/map-markers.mjs). Đừng sửa tay: sửa map trong Tiled.',
+    '// FILE SINH TỰ ĐỘNG từ layer "Markers" và "Collision" của maps/office.tmj (scripts/map-markers.mjs). Đừng sửa tay.',
     '// Đơn vị: pixel của map, gốc ở góc tây bắc map.',
     '',
     'export interface MapRect { x: number; y: number; w: number; h: number }',
@@ -71,7 +83,9 @@ export function render() {
     'export interface MapBlock extends MapRect { height?: number }',
     '',
     'export const MAP_MARKERS: {',
-    '  tile: number; room: MapRect; windows: MapRect[]; kanban: MapRect; door: MapRect; spawn: MapPoint; lobby: MapPoint[]; blocks: MapBlock[]',
+    '  tile: number; room: MapRect; windows: MapRect[]; kanban: MapRect; door: MapRect; spawn: MapPoint; lobby: MapPoint[]; pods: MapPoint[]',
+    "  leads: (MapPoint & { face: 'n' | 's' | 'e' | 'w' })[]",
+    '  blocks: MapBlock[]',
     '} = {',
     `  tile: ${data.tile},`,
     `  room: ${fmt(data.room)},`,
@@ -80,7 +94,9 @@ export function render() {
     `  door: ${fmt(data.door)},`,
     `  spawn: ${fmt(data.spawn)},`,
     `  lobby: [${data.lobby.map(fmt).join(', ')}],`,
-    data.blocks.length ? ['  blocks: [', ...data.blocks.map((b) => `    ${fmt(b)},`), '  ],'].join('\n') : '  blocks: [],',
+    `  pods: [${data.pods.map(fmt).join(', ')}],`,
+    `  leads: [${data.leads.map(fmt).join(', ')}],`,
+    list('blocks', data.blocks),
     '}',
     '',
   ].join('\n')

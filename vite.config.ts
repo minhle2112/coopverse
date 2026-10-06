@@ -4,6 +4,7 @@ import path from 'node:path'
 import { writeMarkers } from './scripts/map-markers.mjs'
 import { paperclipUrl } from './src/config'
 import { coopData } from './server/coopData'
+import { cutter } from './server/cutter'
 import { paperclipGuard, wsAllowed } from './server/guard'
 import { assetDir, limezu } from './server/limezu'
 
@@ -60,7 +61,9 @@ export default defineConfig(({ mode }) => {
 
   // Chỉ mở trên máy này (127.0.0.1)
   return {
-    plugins: [react(), mapMarkers(), guardPlugin(), coopData({ target, isOwnOrigin }), limezu(assetDir(env))],
+    plugins: [react(), mapMarkers(), guardPlugin(), coopData({ target, isOwnOrigin }), limezu(assetDir(env)),
+      // Trang cắt hình (chỉ dev). items.json nằm trong cây import của file này nên lưu xong Vite tự khởi động lại server
+      cutter(assetDir(env))],
     server: { host: '127.0.0.1', port: 5179, strictPort: true, proxy },
     preview: { host: '127.0.0.1', port: 5180, strictPort: true, proxy },
     build: {

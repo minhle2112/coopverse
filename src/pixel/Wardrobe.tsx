@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { uiTick } from '../audio/engine'
 import { PLAYER_ID } from '../characters/look'
+import { leadIdsOf } from '../data/hire'
 import { useCoop } from '../store'
 import { CH, CW, charSheet, frameAt, type Parts } from './chars'
 import type { Dir } from './geom'
@@ -110,7 +111,7 @@ export function Wardrobe({ id }: { id: string }) {
   const setParts = usePixelLooks((s) => s.setParts)
   const reset = usePixelLooks((s) => s.reset)
   const custom = usePixelLooks((s) => s.custom)
-  const leads = useMemo(() => new Set(agents.map((a) => a.reportsTo).filter(Boolean)), [agents])
+  const leads = useMemo(() => leadIdsOf(agents), [agents])
   const dialog = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

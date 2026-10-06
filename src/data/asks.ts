@@ -89,7 +89,7 @@ export async function resolveAsk(ask: Ask, action: AskAction): Promise<string | 
   return null
 }
 
-/** Bản demo: duyệt thì ứng viên thành nhân viên (đi từ sảnh về bàn phụ), từ chối thì rời văn phòng. */
+/** Bản demo: duyệt thì ứng viên thành nhân viên (đi từ sảnh về bàn trong cụm bàn), từ chối thì rời văn phòng. */
 function demoHire(id: string, ok: boolean) {
   const s = useCoop.getState()
   const a = s.agents.find((x) => x.id === id)

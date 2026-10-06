@@ -282,18 +282,18 @@
 .cleanup .desk-btn:disabled { opacity: 0.45; cursor: default; }
 .cleanup .set-hint { color: #cdc7e0; font-size: 14px; }
 /* Nhãn giá trên chỗ bẩn (chế độ dọn dẹp): chỉ con số, rê chuột / đang chọn mới hiện đủ "Dọn · 40 Xu" */
-.clean-tag > span {
-  position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
-  padding: 0 3px; font-size: 15px; line-height: 13px; color: #f4d35e; background: rgba(16, 14, 24, 0.82); border: 1px solid #100e18;
+.room-tag > span {
+  position: absolute; left: 0; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
+  padding: 0 4px; font-size: 15px; line-height: 13px; border: 1px solid #100e18;
 }
-.clean-tag > span i { display: none; font-style: normal; }
-.clean-tag.poor > span { color: #f3b3a8; background: rgba(110, 38, 30, 0.85); }
-.clean-tag.hv, .clean-tag.on { z-index: 6; }
-.clean-tag.hv > span i, .clean-tag.on > span i { display: inline; }
-.clean-tag.hv > span { font-size: 17px; line-height: 15px; border-color: #f4d35e; }
-.clean-tag.on > span { color: var(--px-ink); background: #f4d35e; border-color: var(--px-dark); font-size: 17px; line-height: 15px; }
-/* Chế độ dọn dẹp: ẩn bảng tên agent cho bớt rối (người đang đứng gần vẫn hiện) */
-.clean-mode .px-under:not(:has(.near)), .clean-mode .px-say { display: none; }
+.room-tag > .room-name { top: 0; color: #d9d4e6; background: rgba(16, 14, 24, 0.82); }
+/* Giá chỉ hiện khi đang mở bảng Mở phòng (phím B) hoặc rê chuột lên phòng */
+.room-tag > .room-price { top: 15px; display: none; color: #f4d35e; background: rgba(16, 14, 24, 0.82); }
+.room-tag.poor > .room-price { color: #f3b3a8; background: rgba(110, 38, 30, 0.85); }
+.room-tag.open > .room-price, .room-tag.hv > .room-price { display: block; }
+.room-tag.hv, .room-tag.on { z-index: 6; }
+.room-tag.hv > .room-name { border-color: #f4d35e; }
+.room-tag.on > .room-name { color: var(--px-ink); background: #f4d35e; border-color: var(--px-dark); }
 
 /* ── Trang trí (phím T): cửa hàng bên trái, nút ✓ / ✕ trên bản đồ ── */
 .shop { width: 320px; }
@@ -323,21 +323,6 @@
 }
 .shop-name { font-size: 13px; line-height: 1.05; text-align: center; overflow-wrap: anywhere; }
 .shop-price { font-size: 13px; color: #ffd84a; }
-.shop-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 4px 0; }
-.shop-tool {
-  display: flex; flex-direction: row; align-items: center; gap: 6px; padding: 3px 6px; cursor: pointer; font: inherit;
-  color: var(--text, #f4f1ea); background: #2a2640; border: 2px solid var(--px-dark); text-align: left;
-}
-.shop-tool span { display: flex; flex-direction: column; }
-.shop-tool small { font-size: 13px; color: #ffd84a; }
-/* Mẫu nhỏ của từng loại vách: nắp trên, mặt dưới */
-.wall-sw { flex: none; width: 16px; height: 22px; border: 1px solid #2b2633; image-rendering: pixelated; }
-.wall-sw.low { background: linear-gradient(#ece6d8 0 60%, #a98f6c 60%); }
-.wall-sw.glass { background: linear-gradient(#5a6470 0 3px, rgba(191, 227, 240, 0.55) 3px 82%, #5b6475 82%); }
-.wall-sw.tall { background: linear-gradient(#ece8f1 0 25%, #d8c7a6 25% 85%, #9b7f5a 85%); }
-.wall-sw.erase { background: repeating-linear-gradient(45deg, #e04848 0 3px, #2a2640 3px 6px); }
-.shop-tool.on { background: #4d4470; border-color: #f4d35e; }
-.shop-tool:disabled { opacity: 0.45; cursor: default; }
 .deco-bar { z-index: 7; }
 /* Mũi nhọn chỉ lên món / bàn đang chọn */
 .deco-btns.desk::before {

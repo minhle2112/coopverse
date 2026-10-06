@@ -83,8 +83,8 @@ paperclipai run
 
 1. Mở http://localhost:3100. Lần đầu Paperclip hướng dẫn tạo **công ty** đầu tiên.
 2. Vào **Agents** để thêm agent (tên, vai trò, adapter như Claude Code).
-   - Coopverse xếp chỗ ngồi theo sơ đồ tổ chức. Agent nào có người **báo cáo cho mình** (trường *Reports to*) là **Lead**, ngồi trước, các agent còn lại ngồi theo nhóm của Lead. Agent con (báo cáo cho một thành viên) ngồi bàn phụ ngay cạnh bàn agent cha.
-   - Văn phòng có 16 bàn chính (4 cụm × 4 bàn) cộng bàn phụ cho agent con. Agent không còn chỗ thì vẫn có trong danh sách Nhân sự (mở CLI được) nhưng không hiện trên bản đồ.
+   - Coopverse xếp chỗ ngồi theo sơ đồ tổ chức. Agent không báo cáo cho ai mà có người **báo cáo cho mình** (trường *Reports to*) là **Lead** (★), ngồi bàn riêng nếu trang thiết kế nhà có đặt bàn Lead, không thì ngồi trước ở cụm bàn; các agent còn lại ngồi theo nhóm của Lead. Không có agent con: chỉ Lead đề xuất thuê người, thẻ duyệt báo đỏ nếu một thành viên xin thuê phụ tá hoặc người mới báo cáo cho một thành viên.
+   - Văn phòng có 16 bàn (4 cụm × 4 bàn), cộng bàn Lead nếu có. Agent không còn chỗ thì vẫn có trong danh sách Nhân sự (mở CLI được) nhưng không hiện trên bản đồ.
 3. **Bật Agent Chat** để chat được trong Coopverse: **Settings → Experimental → Agent Chat** (bật công tắc). Tính năng này bật cho cả Paperclip, không phải bật riêng từng công ty.
 
 ![Bật Agent Chat](docs/images/paperclip-agent-chat.png)
@@ -213,34 +213,35 @@ Cập nhật plugin sau khi `git pull`: gỡ (`uninstall`) rồi cài lại bằ
 | Bấm tên ở danh sách Nhân sự | Mở màn hình của agent đó (bản demo: chuột phải để đổi trạng thái) |
 | **E** | Đứng gần agent: mở màn hình của agent (tab **Chat** và **Log**, thêm tab **Duyệt** khi agent có việc chờ bạn, và mở sẵn tab đó). Đứng trước bảng ticket: xem bảng to. Đứng gần sofa, ghế, máy game, quầy cà phê…: ngồi / dùng (đi tiếp là đứng dậy). Bấm lại E để quay ra |
 | C | Tủ đồ: đổi ngoại hình của bạn, hoặc của agent đang đứng gần |
-| B | Dọn dẹp: trả Xu dọn chỗ bẩn (xem dưới) |
-| T | Trang trí: cửa hàng, đặt / dời đồ, xây vách, dời bàn (xem dưới). Trong lúc trang trí: **R** xoay, **Enter** mua, **Esc** bỏ |
+| B | Mở phòng: trả Xu mở phòng đang khoá (xem dưới) |
+| T | Trang trí: cửa hàng, đặt / dời đồ, dời bàn (xem dưới). Trong lúc trang trí: **R** xoay, **Enter** mua, **Esc** bỏ |
 | Q | Danh sách việc chờ bạn duyệt / trả lời |
 | M | Bật/tắt nhạc lofi |
 | Esc | Đóng màn hình đang thấy trước (CLI, bảng ticket, tủ đồ), rồi tới bảng bên trái. Đang ngồi thì Esc không đứng dậy: bấm E hoặc đi tiếp |
-| Nút 🔊 🎵 🎨 🧹 🛋️ ⚙️ dưới logo | Âm thanh, nhạc, tủ đồ, dọn dẹp, trang trí, cài đặt (âm lượng, xem thử giờ) |
+| Nút 🔊 🎵 🎨 🔑 🛋️ ⚙️ dưới logo | Âm thanh, nhạc, tủ đồ, mở phòng, trang trí, cài đặt (âm lượng, xem thử giờ) |
 
-### Xu và dọn dẹp văn phòng
+### Xu và mở phòng
 
-- Văn phòng lúc đầu là một phòng lớn trống, chỉ có bàn làm việc của agent, bảng ticket, cửa sổ. Mọi thứ phủ bụi: vết ố, mạng nhện, thùng carton cũ, giấy vụn, chuột.
+- Toà nhà chia 6 phòng: văn phòng chung (bàn làm việc của agent, bảng ticket), sảnh (cửa vào, ứng viên đứng chờ), phòng họp, phòng sếp, pantry, phòng nghỉ. Lúc đầu chỉ mở văn phòng chung và sảnh, sạch sẵn; các phòng khác khoá (tối, tường kín).
 - **Xu** là tiền chung của văn phòng (số dưới logo). Agent làm xong ticket trên board thì quỹ có Xu: ưu tiên thấp 10, vừa 15, cao 25, khẩn 40; agent cấp càng cao càng được nhiều (mỗi cấp +10%). Ticket đã xong từ trước cũng được tính.
-- Bấm **B** (hoặc nút 🧹): mỗi chỗ bẩn hiện giá. Sàn chia 5 × 3 mảng, mảng càng xa cửa càng đắt; tường bắc, từng cửa sổ, bảng ticket dọn riêng. Bấm một chỗ rồi bấm **Dọn** trong bảng bên trái.
-- Xu và chỗ đã dọn lưu trong Coopverse trên máy này (thư mục `.coopverse`, app desktop: thư mục dữ liệu của app), không gửi gì sang Paperclip. Bản demo lưu trong trình duyệt, có nút "Làm bẩn lại" (bấm 2 lần: xoá luôn đồ, vách, chỗ bàn và Xu đã thêm, về như lúc đầu). Bản demo không cộng Xu khi agent làm xong việc: dùng nút +500.
+- Bấm **B** (hoặc nút 🔑), hoặc bấm thẳng vào phòng tối trên bản đồ: bảng Mở phòng hiện giá. Chỉ mở được phòng có cửa thông với phòng đã mở (pantry, phòng họp trước; phòng nghỉ, phòng sếp sau). Phòng mở sau đắt hơn: 300 → 500 → 700 → 1.000 Xu. Mở xong có sẵn vài món hợp phòng (phòng họp: bàn họp 4 ghế, bảng trắng; pantry: quầy cà phê, tủ lạnh, bếp; phòng nghỉ: sofa, bàn trà; phòng sếp: kệ sách, góc tiếp khách); đồ có sẵn dời, cất được nhưng bán không được Xu.
+- Xu và phòng đã mở lưu trong Coopverse trên máy này (thư mục `.coopverse`, app desktop: thư mục dữ liệu của app), không gửi gì sang Paperclip. Văn phòng lưu từ bản cũ (một phòng lớn phủ bụi) tự chuyển sang: trả lại Xu đã dọn bụi và đã xây vách, đồ đã mua cất vào kho (lấy ra đặt lại miễn phí), bàn về chỗ cũ. Bản demo lưu trong trình duyệt, có nút "Làm lại từ đầu" (bấm 2 lần: khoá lại các phòng, xoá luôn đồ, chỗ bàn và Xu đã thêm). Bản demo không cộng Xu khi agent làm xong việc: dùng nút +500.
 
 ### Trang trí văn phòng
 
-- Bấm **T** (hoặc nút 🛋️): bảng cửa hàng mở bên trái, gần 50 món chia 5 nhóm: cây và đồ nhỏ (chậu cây, đèn, kệ sách, thảm…), treo tường (tranh, đồng hồ, TV, **bảng vinh danh**), nghỉ ngơi và bếp (sofa, ghế bành, bàn trà, tủ bếp, quầy cà phê…), giải trí (máy game, bóng bàn, bi-a, mèo văn phòng), xây vách.
-- Chọn một món: bóng mờ của món chạy theo chuột. Khung xanh là đặt được, khung đỏ kèm lý do là không. Bấm để đặt thử, rồi bấm **✓ Mua** (hoặc Enter); chưa bấm ✓ thì chưa mất Xu. **R** xoay: sofa, ghế bành xoay đủ 4 hướng, ghế họp quay mặt / quay lưng, chậu cây, đèn, ghế băng, mèo lật trái/phải; các món khác (kệ sách, thảm, tủ lạnh…) không xoay. Cửa kính tự theo hướng của vách.
-- Đồ chỉ đặt trên mảng sàn đã dọn; đồ treo tường cần tường bắc đã dọn. Cửa vào và sảnh chờ ứng viên luôn để trống (tô đỏ nhạt). Không cho đặt đồ chặn kín lối tới bàn làm việc hay bảng ticket.
+- Bấm **T** (hoặc nút 🛋️): bảng cửa hàng mở bên trái, khoảng 50 món chia 5 nhóm: cây và đồ nhỏ (chậu cây, đèn, kệ sách, thảm…), treo tường (tranh, đồng hồ, TV, **bảng vinh danh**), nghỉ ngơi và bếp (sofa, ghế bành, bàn trà, tủ bếp, quầy cà phê…), giải trí (máy game, bóng bàn, bi-a, mèo văn phòng), phòng ngủ (giường).
+- Chọn một món: bóng mờ của món chạy theo chuột. Khung xanh là đặt được, khung đỏ kèm lý do là không. Bấm để đặt thử, rồi bấm **✓ Mua** (hoặc Enter); chưa bấm ✓ thì chưa mất Xu. **R** xoay: sofa, ghế bành xoay đủ 4 hướng, ghế họp quay mặt / quay lưng, chậu cây, đèn, ghế băng, mèo lật trái/phải; các món khác (kệ sách, thảm, tủ lạnh…) không xoay.
+- Đồ chỉ đặt trong phòng đã mở; đồ treo trên tường bắc của văn phòng chung, phòng họp, phòng sếp. Cửa vào và sảnh chờ ứng viên luôn để trống (tô đỏ nhạt). Không cho đặt đồ chặn kín lối tới bàn làm việc hay bảng ticket.
 - Bấm vào món đã đặt: xoay, dời (miễn phí), cất vào kho (miễn phí, lấy ra đặt lại lúc nào cũng được) hoặc bán lại được nửa giá. Món trong kho cũng bán thẳng được.
-- Bấm vào bàn làm việc: xoay, dời đi chỗ khác. Bàn của mỗi agent miễn phí; agent tự đi tới chỗ mới. Bàn dời được cả lên sàn chưa dọn (bàn vốn nằm sẵn trên sàn bẩn).
+- Bấm vào bàn làm việc: xoay, dời đi chỗ khác, **↺ Về chỗ cũ** (bàn đã dời: về lại chỗ trong cụm bàn / bàn Lead). Bàn của mỗi agent miễn phí; agent tự đi tới chỗ mới. Bàn dời được nhớ theo chỗ ngồi, không theo người: sơ đồ tổ chức đổi (thuê thêm, có bàn Lead riêng…) thì người khác có thể ngồi bàn đó.
 - **Đồ để bàn** (bấm vào bàn, hàng dưới): cây để bàn, khung ảnh (cấp 2), màn hình thứ hai, đèn bàn (cấp 3), ghế da (cấp 4), cúp vàng kèm viền vàng (cấp 5). Agent ngồi bàn đó đạt cấp thì món mở khoá, rồi bạn trả Xu mua. Đồ là của riêng agent, đổi chỗ thì đi theo; bán lại được nửa giá.
-- Tab 🧱: giữ chuột kéo một đường thẳng để xây vách, thả ra rồi bấm ✓. Vách thấp, vách kính luôn thấy người; tường cao như tường thật, tự mờ đi khi có người đứng phía sau. Mua **cửa kính** rồi lắp vào 2 ô vách liền nhau (cửa tự mở khi có người tới gần). Dỡ vách: bấm vào một đoạn vách trên bản đồ rồi chọn **Dỡ cả đoạn**, hoặc dùng công cụ **Dỡ vách** kéo qua từng khúc; được trả lại nửa giá. Vách có cửa thì bấm vào cửa để cất trước.
+- Tường, vách và cửa là của toà nhà (vẽ ở trang thiết kế nhà, xem phần dev), không xây / dỡ trong game: bạn chỉ đặt đồ. Văn phòng đã xây vách, lắp cửa kính ở bản trước: vách và cửa được dỡ, trả lại đủ Xu.
 - Mua bảng vinh danh rồi treo lên tường thì mới xem được bảng xếp hạng EXP (bấm vào bảng, hoặc đứng trước bảng bấm E).
-- Agent rảnh tự dùng đồ đã mua: ngồi sofa, ghế bành, ghế họp; pha cà phê, mở tủ lạnh, nấu mì; chơi máy game; hai người rủ nhau đánh bóng bàn, bi-a; đọc sách, xem TV, vuốt mèo. Chỉ cho văn phòng sinh động, không ảnh hưởng việc. Bạn cũng dùng được: đứng gần rồi bấm **E**.
+- Agent rảnh tự dùng đồ đã mua: ngồi sofa, ghế bành, ghế họp; pha cà phê, mở tủ lạnh, nấu mì; chơi máy game; hai người rủ nhau đánh bóng bàn, bi-a; đọc sách, xem TV, vuốt mèo; chợp mắt trên giường. Chỉ cho văn phòng sinh động, không ảnh hưởng việc. Bạn cũng dùng được (trừ giường): đứng gần rồi bấm **E**.
+- Nhà có **phòng nghỉ / phòng ngủ của agent** (đặt ở trang thiết kế nhà, mục *Dùng làm*): agent rảnh chỉ chơi trong các phòng đó, không ngồi chơi ở bàn hay ra phòng khác (Lead rảnh vẫn ghé bàn thành viên đang làm). Agent tạm dừng về giường trống mà ngủ; hết giường thì ngủ gục ở bàn. Có việc là về bàn ngay.
 - Bản demo (`?demo`) có nút **+500** cạnh số Xu để thử mua đồ (chỉ lưu trong trình duyệt, không đổi EXP hay cấp agent).
 - Giá tính theo tốc độ kiếm Xu thật (khoảng 150 Xu mỗi ngày có việc): đồ nhỏ mua được ngay ngày đầu, món đắt nhất (mèo văn phòng, 1.000 Xu) cần dành khoảng một tuần.
-- Đồ, vách, chỗ bàn, đồ để bàn lưu cùng chỗ với Xu (server Coopverse kiểm lại số dư, chỗ đặt và cấp agent).
+- Đồ, chỗ bàn, đồ để bàn lưu cùng chỗ với Xu (server Coopverse kiểm lại số dư, chỗ đặt và cấp agent).
 
 ### Chat với agent
 
@@ -320,10 +321,12 @@ src/
   life/        đời sống văn phòng dùng chung: "não" agent (brain.ts: đi, ngồi, né người), lời thoại, chào hỏi, biểu cảm
   player/      di chuyển, camera, điều khiển
   ui/          HUD, minimap, CLI + Chat (Terminal), bảng ticket, tủ đồ, cài đặt
+  cutter/      trang cắt hình (cutter.html, chỉ khi dev)
 server/
   guard.ts     danh sách endpoint Paperclip được phép đi qua (dùng chung cho Vite và app desktop)
-  coopData.ts  sổ EXP và văn phòng (chỗ đã dọn, Xu đã tiêu) của từng công ty (/coop/)
+  coopData.ts  sổ EXP và văn phòng (phòng đã mở, Xu đã tiêu) của từng công ty (/coop/)
   limezu.ts    phục vụ file hình LimeZu từ COOPVERSE_ASSETS ở /limezu/ (chỉ 127.0.0.1)
+  cutter.ts    API của trang cắt hình (chỉ khi dev): liệt kê ảnh LimeZu, đọc / ghi src/data/items.json và src/data/house.json
 desktop/       app Windows (Electron): main.ts, máy chủ nội bộ (server.ts), bật/tắt Paperclip (paperclip.ts,
                pc-hook.cjs), màn hình kết nối (setup/), icon vẽ tay (icon/make-icon.py)
 paperclip-plugin/
@@ -333,6 +336,8 @@ paperclip-plugin/
 
 - Stack: Vite, React 19, PixiJS 8, zustand, TypeScript. Chữ pixel: VT323 (OFL, có tiếng Việt).
 - Toạ độ từng hình trong gói LimeZu nằm ở `src/pixel/atlas.json` (chỉ toạ độ, không có hình).
+- **Đồ trang trí, bàn ghế làm việc và đồ trên bàn** (máy tính, bàn phím, cốc, đồ để bàn agent mua) nằm ở `src/data/items.json`: tên, giá, cỡ, cách xoay, công dụng (ngồi / đứng dùng…), chỗ đặt trên bàn và các vùng cắt từ ảnh LimeZu cho từng hướng / kiểu bàn. Sửa bằng **trang cắt hình**: chạy `npm run dev` rồi mở `http://127.0.0.1:5179/cutter.html` (nút ❔ trong trang có hướng dẫn). Bấm vào một món trong ảnh LimeZu là tự cắt sát, ghép thành món mới hoặc thay hình món cũ, đủ 4 hướng, kéo mảnh cho khớp, xem trước có người ngồi thử; bấm Lưu thì game tự tải lại. Nhớ commit `items.json`; bản phát hành tự kèm những ảnh file này dùng.
+- **Bố cục nhà** (các phòng, cửa, sàn, kiểu tường, cửa vào, cửa sổ, bảng ticket, cụm bàn, bàn riêng của Lead, chỗ chờ, đồ có sẵn của phòng, phòng nghỉ / phòng ngủ của agent, giá mở phòng) nằm ở `src/data/house.json`. Sửa ở mục **🏠 Thiết kế nhà** của trang cắt hình: kéo chuột vẽ phòng, ghép nhiều khúc thành phòng chữ L / T, bấm tường giữa hai phòng để đặt cửa, vẽ vách trong phòng (tường cao / vách thấp, có cửa trên vách), chọn sàn / tường từ ảnh LimeZu. Trang báo lỗi trước khi lưu (hai phòng sát nhau không có tường, phòng khoá không có cửa thông tới phòng mở sẵn, vách quây kín một khoảng sàn…). Lưu thì `maps/office.tmj` (sàn, tường bắc, viền, mốc) và `src/world/mapMarkers.ts` được sinh lại; sửa `house.json` bằng tay thì chạy `npm run house`. Layer Collision của bản đồ vẫn vẽ trong Tiled, các layer khác bị ghi đè. Văn phòng đã có đồ: món hết chỗ (kể cả đè lên vách mới) tự cất vào kho, phòng đã mở mà bị xoá thì trả lại Xu. Nhớ commit `house.json` và `maps/office.tmj`.
 - Mọi lời gọi tới Paperclip nằm trong `src/data/paperclip.ts`. Paperclip đổi API thì chỉ sửa ở đó.
 - Kiểm tra kiểu và build: `npm run build` (cả phần desktop: `npm run typecheck`).
 - File phát hành build trên máy có gói hình: `npm run dist:win:art` (lấy hình từ `COOPVERSE_ASSETS` hoặc `../coopverse-assets/limezu`, chỉ chép những hình app dùng vào trong app), rồi tải 2 file trong `release/` lên trang Releases. Hình không bao giờ vào repo. GitHub Actions (`.github/workflows/desktop-release.yml`) chỉ build thử bản không có hình khi đẩy tag. Trên máy bật Smart App Control, bước NSIS có thể hỏng (lỗi `spawn UNKNOWN`) vì Windows chặn chạy file chưa ký số.

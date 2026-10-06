@@ -1,21 +1,23 @@
 import { AnimatedSprite, Container, Graphics, NineSliceSprite, Sprite, TilingSprite, type Texture } from 'pixi.js'
-import { itemById } from '../data/catalog'
-import type { OfficeState } from '../data/officeState'
+import { DESK_ART, deskItemById, deskPlace, itemById, type DeskKind, type DeskTop, type View } from '../data/catalog'
 import type { AgentStatus } from '../data/types'
 import {
   BOARD, DESK_D, DESK_W, FURNITURE, OFFICE, WINDOWS, deskCenter, forward,
   type DeskSlot, type Furniture, type World,
 } from '../world/layout'
 import atlas from './atlas.json'
-import { frames, region, sprite, stitch, type SpriteName } from './assets'
+import { frames, region, sprite, stitch, stitchSrc, type SpriteName } from './assets'
 import { MAP_H, MAP_W, PPM, TILE, WALL_FACE, px, py } from './geom'
 import { MAP_BG, MAP_COLS, mapLayer, marker, tileAt } from './tilemap'
-import { FAME_INNER, itemView } from './catalogArt'
+import { FAME_INNER, itemView, viewNode } from './catalogArt'
 import { buildWalls, type WallView } from './walls'
+import { ROOMS, building, isOpen, roomOfCell, type Room } from '../world/rooms'
+import { HOUSE } from '../world/house'
+import { cellX, cellZ, type OfficeState } from '../data/officeState'
 
 /*
- * Dựng văn phòng pixel từ bố cục ở world/layout.ts: một phòng lớn trống, cửa sổ và bảng ticket trên tường bắc,
- * bàn của agent. Bụi bẩn vẽ riêng ở dirt.ts (dọn chỗ nào thì gỡ chỗ đó, không dựng lại cả phòng).
+ * Dựng văn phòng pixel từ bố cục ở world/layout.ts: các phòng (tường giữa phòng, vách trong phòng: walls.ts), cửa sổ và
+ * bảng ticket trên tường bắc, bàn của agent, đồ đã mua. Phòng còn khoá phủ tối (nhãn và giá: RoomMode.tsx).
  * - `floor`: sàn, tường bắc và mọi thứ treo trên đó (luôn nằm dưới nhân vật)
  * - `sorted`: đồ đạc đứng trên sàn, xếp lớp theo cạnh dưới (zIndex = y pixel của chân) cùng với nhân vật
  * - `top`: viền tường nam (luôn nằm trên cùng)
@@ -28,8 +30,10 @@ const CORK = 0xbe7149
 export const CAP_FILL = 0xece8f1
 export const CAP_SHADE = 0xc5bfd2
 
-/** Viên tường LimeZu (16×32 trong Room_Builder_Walls), cùng viên tường bắc trong bản đồ: vách cao tự xây dùng lại */
-export const WALL: [number, number, number, number] = [16, 352, 16, 32]
+/** Viên tường LimeZu (16×32 trong Room_Builder_Walls) của tường giữa các phòng và vách cao (house.json walls.tall) */
+export const WALL: [number, number, number, number] = [HOUSE.walls.tall[0] * 16, HOUSE.walls.tall[1] * 16, 16, 32]
+/** Viên tường mà vách thấp lấy dải dưới làm mặt (house.json walls.low) */
+export const LOW_WALL: [number, number, number, number] = [HOUSE.walls.low[0] * 16, HOUSE.walls.low[1] * 16, 16, 32]
 
 /** Bàn cao bao nhiêu pixel (mặt trước bàn) */
 const DESK_LIFT = 9
@@ -57,7 +61,7 @@ export interface OfficeView {
   lights: Light[]
   /** Khung bảng ticket trên tường (pixel gốc), để bấm chuột */
   boards: { kanban: Rect }
-  /** Vách tự xây, cửa (làm mờ / mở cửa mỗi khung hình) */
+  /** Tường, vách, cửa (làm mờ / mở cửa mỗi khung hình) */
   walls: WallView
   /** uid đồ đã mua → khung bấm chuột (pixel gốc), để chọn khi trang trí */
   itemHits: Map<string, Rect>
@@ -76,7 +80,7 @@ export interface Light {
   kind: 'lamp' | 'ceiling' | 'screen'
   /** Màn hình máy ở bàn này (id chỗ ngồi): chỉ hắt sáng khi máy đang bật (xem Lighting.setScreens) */
   slot?: string
-  /** Kẹp quầng sáng trong phòng (pixel gốc), để không tràn qua vách kính / tường */
+  /** Kẹp quầng sáng trong phòng (pixel gốc), để không tràn qua tường */
   clip?: { x: number; y: number; w: number; h: number }
 }
 
@@ -141,6 +145,33 @@ function buildMap(floor: Container, top: Container) {
     floor.addChild(below)
     if (above.children.length) top.addChild(above)
   }
+}
+
+/**
+ * Phần màn hình của một phòng (pixel gốc, các khung không chồng nhau): sàn, cộng mặt tường bắc phía trên (cao WALL_FACE,
+ * nằm trên hàng ô đầu), trừ hàng ô cuối khi phía nam là tường (mặt tường đó nhìn từ phòng phía nam, che mất hàng ô này).
+ * Phòng chữ L, chữ T: mỗi cột ô một dải, gộp các cột liền nhau cùng dải.
+ */
+export function roomShade(rm: Room): Rect[] {
+  const strips: Rect[] = []
+  for (let c = rm.c0; c <= rm.c1; c++) {
+    let r = rm.r0
+    while (r <= rm.r1) {
+      if (roomOfCell(c, r) !== rm) { r++; continue }
+      const ra = r
+      while (r + 1 <= rm.r1 && roomOfCell(c, r + 1) === rm) r++
+      const y = Math.round(py(cellZ(ra))) - WALL_FACE
+      // Phía nam là tường (không phải mép nhà): mặt tường che hàng cuối
+      const south = roomOfCell(c, r + 1) !== rm && r + 1 < HOUSE.size[1]
+      const bottom = Math.round(py(cellZ(r + 1))) - (south ? TILE : 0)
+      const x = Math.round(px(cellX(c)))
+      const last = strips[strips.length - 1]
+      if (last && last.x + last.w === x && last.y === y && last.h === bottom - y) last.w += TILE
+      else strips.push({ x, y, w: TILE, h: bottom - y })
+      r++
+    }
+  }
+  return strips
 }
 
 // ───────────────────────── Đồ treo tường bắc ─────────────────────────
@@ -237,24 +268,15 @@ export function drawKanban(g: Graphics, counts: { color: string; n: number }[]) 
 
 // ───────────────────────── Bàn làm việc ─────────────────────────
 
-/** Màn hình nhìn ngang (bàn quay ngang: người ngồi quay sang phải) */
-function monitorSide(g: Graphics, x: number, bottom: number) {
-  const y = Math.round(bottom - 13)
-  g.rect(x, y, 3, 10).fill(0x2b2f3a)
-  g.rect(x + 3, bottom - 3, 3, 1).fill(0x2b2f3a)
-  g.rect(x + 1, bottom - 3, 1, 3).fill(0x2b2f3a)
-  return { x: x - 1, y: y + 1, w: 1, h: 8 }
-}
-
 /**
- * Mặt bàn: bàn văn phòng LimeZu (Modern Office), giữ mép và chân bàn, lặp phần giữa cho đủ kích thước.
- * `gold`: nẹp vàng mặt trước bàn (agent đã mua cúp vàng để bàn).
+ * Mặt bàn: hình bàn trong items.json (mặc định bàn văn phòng LimeZu Modern Office), giữ mép và chân bàn,
+ * lặp phần giữa cho đủ kích thước. `gold`: nẹp vàng mặt trước bàn (agent đã mua cúp vàng để bàn).
  */
-function deskTop(x: number, y: number, w: number, d: number, gold: boolean) {
+function deskTop(art: DeskTop, x: number, y: number, w: number, d: number, gold: boolean) {
   const X = Math.round(x), Y = Math.round(y), W = Math.round(w), D = Math.round(d)
   const c = new Container()
   c.addChild(new Graphics().rect(X + 2, Y + D + DESK_LIFT - 2, W - 1, 3).fill({ color: 0x000000, alpha: 0.2 }))
-  const t = new Sprite(stitch('moDesk', W, D + DESK_LIFT, 3, 4, 4, 7))
+  const t = new Sprite(stitchSrc(art.src, W, D + DESK_LIFT, art.l, art.r, art.t, art.b))
   t.position.set(X, Y)
   c.addChild(t)
   if (gold) {
@@ -305,127 +327,72 @@ function liveScreen(slotId: string, r: { x: number; y: number; w: number; h: num
 const LEATHER = 0xb07a5a
 
 /**
- * Bàn của một chỗ ngồi + ghế, kèm đồ để bàn agent ngồi đây đã có (src/data/catalog.ts DESK_ITEMS: cây, khung ảnh,
- * màn hình thứ hai, đèn bàn, ghế da, cúp + viền vàng). Bàn trống / agent chưa mua gì: bàn cơ bản miễn phí.
- * Bàn quay về nam (người ngồi phía bắc, nhìn về camera), về bắc (người ngồi quay lưng), hoặc về đông.
+ * Bàn của một chỗ ngồi + ghế, kèm đồ trên bàn: máy tính, bàn phím, cốc và đồ để bàn agent ngồi đây đã mua
+ * (cây, khung ảnh, màn hình thứ hai, đèn bàn, ghế da, cúp + viền vàng). Hình và chỗ đặt từng món theo kiểu bàn
+ * ở `desk.things` trong items.json (trang cắt hình). Bàn trống / agent chưa mua gì: bàn cơ bản miễn phí.
+ * Bàn quay về nam (người ngồi phía bắc, nhìn về camera), về bắc (người ngồi quay lưng), hoặc về đông / tây.
  */
 function buildDesk(s: DeskSlot, own: ReadonlySet<string>, sorted: Container[], screens: Screen[], lights: Light[], phase: number) {
-  const has = (id: string) => own.has(id)
+  // Đồ để bàn đã bị bỏ khỏi items.json (trang cắt hình): agent có mua rồi cũng không còn
+  const has = (id: string) => own.has(id) && deskItemById.has(id)
   const c = deskCenter(s)
   const f = forward(s.yaw)
   const side = Math.abs(f.x) > 0.5
-  const g = new Graphics()
-  const deco: Sprite[] = []
-  let scr: { x: number; y: number; w: number; h: number }
-  let base: number
-  let top: Container
-
-  if (!side) {
-    const x = px(c.x - DESK_W / 2), y = py(c.z - DESK_D / 2) - DESK_LIFT
-    const w = DESK_W * PPM, d = DESK_D * PPM
-    base = py(c.z + DESK_D / 2)
-    top = deskTop(x, y, w, d, has('trophy'))
-    const facingCam = f.z > 0 // người ngồi phía bắc bàn, nhìn về camera
-    const cx = px(c.x)
-    // Mặt bàn rộng 45 px, hai hàng; mỗi món một chỗ cố định, không món nào lấn qua mép bàn:
-    // - hàng màn hình (xa người ngồi): đèn bàn ở góc trái, màn hình giữa (hai màn thì lệch phải), cây (hoặc cúp, bàn quay lưng) góc phải
-    // - hàng người ngồi: khung ảnh, cúp từ trái sang, bàn phím giữa (bị đẩy sang phải nếu vướng), cây ở góc phải khi hàng trên hết chỗ
-    const X0 = Math.round(x), W = Math.round(w)
-    const two = has('monitor')
-    const monRow = facingCam ? y + d - 1 : y + 16
-    const seatRow = facingCam ? y + 10 : y + d - 2
-    const monSprite = facingCam ? 'moMonBack' : 'moMonFront'
-    // Bàn quay lưng: cúp lên hàng màn hình (góc phải), hàng sát người ngồi chỉ còn khung ảnh + cây, chừa giữa cho đầu agent
-    const trophyUp = !facingCam && has('trophy')
-    const m1 = two ? (trophyUp ? X0 + 16 : X0 + 18) : trophyUp ? cx - 3 : cx
-    const m2 = trophyUp ? X0 + 30 : X0 + 34
-    const plantBack = two || !facingCam
-    deco.push(spr(monSprite, m1, monRow))
-    if (two) deco.push(spr(monSprite, m2, monRow))
-    if (facingCam) scr = { x: m1 - 2, y: Math.round(y + d - 3), w: 4, h: 1 }
-    else {
-      scr = { x: m1 - 6, y: Math.round(monRow - 13), w: 12, h: 7 }
-      if (two) screens.push(liveScreen(s.id, { x: m2 - 6, y: Math.round(monRow - 13), w: 12, h: 7 }, phase + 2.3))
-    }
-    if (has('lamp')) {
-      deco.push(spr('deskLamp', X0 + 5, monRow))
-      lights.push({ x: X0 + 5, y: monRow - 10, r: 30, kind: 'lamp' })
-    }
-    if (trophyUp) deco.push(spr('trophy', X0 + W - 7, monRow))
-    if (has('plant')) deco.push(spr('plantDesk', X0 + W - 7, plantBack ? seatRow + (facingCam ? 1 : 2) : monRow))
-    let left = X0 + 1
-    if (has('frame')) {
-      // Khung ảnh nghiêng về phía người ngồi. Bàn quay về camera: lệch phải và nâng lên khỏi đầu đèn bàn
-      if (facingCam) deco.push(spr('deskFrame', X0 + 8, seatRow - 2, true))
-      else deco.push(spr('deskFrame', X0 + 11, seatRow + 2))
-      left = X0 + (facingCam ? 13 : 16)
-    }
-    if (has('trophy') && !trophyUp) {
-      // Hạ thấp chút để không che mặt người ngồi
-      deco.push(spr('trophy', left + 6, seatRow + 2))
-      left += 12
-    }
-    // Bàn chật: bàn phím gọn lại; bàn quay lưng thì đầu agent che giữa bàn
-    const kbW = left > cx - 6 ? 8 : 12
-    const kbX = Math.max(Math.round(cx - kbW / 2), left)
-    const kbY = facingCam ? y + 3 : y + d - 6
-    // Bàn phím, cốc: chỉ khi còn chỗ trước cây
-    const plantLeft = has('plant') && plantBack ? X0 + W - 13 : X0 + W - 1
-    if (kbX + kbW <= plantLeft) g.rect(kbX, kbY, kbW, 3).fill(0xd8dbe2)
-    if (kbX + kbW + 5 <= plantLeft) g.rect(kbX + kbW + 2, kbY + (facingCam ? 1 : -1), 3, 3).fill(0xe0784f)
-  } else {
-    // Bàn dọc phía đông người ngồi
-    const x = px(c.x - DESK_D / 2), y = py(c.z - DESK_W / 2) - DESK_LIFT
-    const w = DESK_D * PPM, d = DESK_W * PPM
-    base = py(c.z + DESK_W / 2)
-    top = deskTop(x, y, w, d, has('trophy'))
-    scr = monitorSide(g, Math.round(x + w / 2), Math.round(py(c.z) - DESK_LIFT + 4))
-    g.rect(Math.round(x + 3), Math.round(py(c.z) - DESK_LIFT - 4), 3, 10).fill(0xd8dbe2)
-    if (has('monitor')) monitorSide(g, Math.round(x + w / 2), Math.round(py(c.z - 0.42) - DESK_LIFT + 4))
-    if (has('plant')) deco.push(spr('plantDesk', px(c.x), py(c.z + 0.55) - DESK_LIFT))
-    if (has('frame')) deco.push(spr('deskFrame', px(c.x) + 4, py(c.z + 0.3) - DESK_LIFT))
-    if (has('lamp')) {
-      deco.push(spr('deskLamp', px(c.x), py(c.z - 0.5) - DESK_LIFT + 1))
-      lights.push({ x: px(c.x), y: py(c.z - 0.5) - DESK_LIFT - 10, r: 30, kind: 'lamp' })
-    }
-    if (has('trophy')) deco.push(spr('trophy', px(c.x + 0.05), py(c.z + 0.25) - DESK_LIFT))
-  }
-
+  const kind: DeskKind = side ? 'side' : f.z > 0 ? 'front' : 'back'
+  // Khung mặt bàn (pixel): bàn quay ngang thì đổi chiều rộng / sâu
+  const [mw, md] = side ? [DESK_D, DESK_W] : [DESK_W, DESK_D]
+  const x = px(c.x - mw / 2), y = py(c.z - md / 2) - DESK_LIFT
+  const base = py(c.z + md / 2)
   const desk = new Container()
-  desk.addChild(top, g)
-  // Món ở hàng xa (chân cao hơn trên màn hình) vẽ trước, hàng gần vẽ đè lên
-  deco.sort((a, b) => a.y - b.y)
-  for (const d of deco) desk.addChild(d)
-  // Bàn dọc phía tây người ngồi (bạn đã xoay bàn): lật gương cả bàn quanh tâm bàn
+  desk.addChild(deskTop(side ? DESK_ART.side ?? DESK_ART.top : DESK_ART.top, x, y, mw * PPM, md * PPM, has('trophy')))
+
+  // Bàn quay ngang phía tây người ngồi (bạn đã xoay bàn): lật gương cả bàn quanh tâm bàn
   const west = side && f.x < 0
+  const mid = Math.round(px(c.x))
+  const mirror = (v: number) => (west ? 2 * mid - v : v)
+  // Món ở hàng xa (chân cao hơn trên màn hình) vẽ trước, hàng gần vẽ đè lên; màn hình sáng nằm trên cùng
+  const X = Math.round(x), Y = Math.round(y)
+  const shown = DESK_ART.things.flatMap((t, k) => {
+    const p = deskPlace(t, kind, has)
+    return p ? [{ t, k, ...p }] : []
+  })
+  shown.sort((a, b) => a.at.y - b.at.y || a.k - b.k)
+  const lit: Rect[] = []
+  for (const { t, view, at } of shown) {
+    const n = viewNode(view, !!view.flip)
+    n.position.set(X + at.x, Y + at.y)
+    desk.addChild(n)
+    const [sx, sy, sw, sh] = view.screen ?? [0, 0, 0, 0]
+    if (view.screen) lit.push({ x: X + at.x + sx, y: Y + at.y + sy, w: sw, h: sh })
+    if (t.light) lights.push({ x: mirror(X + at.x + t.light[0]), y: Y + at.y + t.light[1], r: 30, kind: 'lamp' })
+  }
   if (west) {
     desk.scale.x = -1
-    desk.x = 2 * Math.round(px(c.x))
+    desk.x = 2 * mid
   }
-  const sx = west ? 2 * Math.round(px(c.x)) - (scr.x + scr.w / 2) : scr.x + scr.w / 2
-  lights.push({ x: sx, y: scr.y + scr.h / 2, r: 14, kind: 'screen', slot: s.id })
-  const live = liveScreen(s.id, scr, phase)
-  desk.addChild(live.g)
-  screens.push(live)
-  // Màn thứ hai (đồ để bàn) đã thêm vào screens: đưa lên trên hình màn hình
-  for (const sc of screens) if (sc.slotId === s.id && sc !== live && !sc.g.parent) desk.addChild(sc.g)
+  // Màn hình đầu tiên (máy tính) hắt sáng khi máy bật; màn thứ hai chạy lệch nhịp
+  lit.forEach((r, k) => {
+    if (k === 0) lights.push({ x: mirror(r.x + r.w / 2), y: r.y + r.h / 2, r: 14, kind: 'screen', slot: s.id })
+    const live = liveScreen(s.id, r, phase + 2.3 * k)
+    desk.addChild(live.g)
+    screens.push(live)
+  })
   sorted.push(sortAt(desk, base))
 
-  // Ghế
-  const seatX = px(s.seat.x), seatY = py(s.seat.z)
-  if (side) {
-    const ch = spr('chairFront', seatX + (f.x < 0 ? 2 : -2), seatY + 2)
-    if (has('chair')) ch.tint = LEATHER
-    sorted.push(sortAt(ch, seatY - 2))
-  } else if (f.z > 0) {
-    // Ghế xoay Modern Office nhìn từ trước (sau lưng người ngồi); ghế da thì ghế cam
-    const ch = spr(has('chair') ? 'moChairFrontL' : 'moChairFront', seatX, seatY + 3)
-    sorted.push(sortAt(ch, seatY - 1))
-  } else {
-    // Ghế nhìn từ sau: lưng ghế che hông người ngồi
-    const back = spr(has('chair') ? 'moChairBackL' : 'moChairBack', seatX, seatY + 4)
-    sorted.push(sortAt(back, seatY + 1))
+  // Ghế (hình trong items.json, điểm neo ở chỗ ngồi); ghế da: bản da nếu có, không thì nhuộm nâu bản thường
+  const seatX = Math.round(px(s.seat.x)), seatY = Math.round(py(s.seat.z))
+  const chair = (plain: View, leather: View | undefined, flip: boolean, z: number) => {
+    const v = has('chair') && leather ? leather : plain
+    const n = viewNode(v, flip)
+    if (has('chair') && !leather) for (const p of n.children) (p as Sprite).tint = LEATHER
+    n.position.set(seatX, seatY)
+    sorted.push(sortAt(n, z))
   }
+  const ch = DESK_ART.chair
+  if (side) chair(ch.side, ch.sideLeather, f.x < 0, seatY - 2)
+  // Người ngồi nhìn về camera: ghế sau lưng; ngồi quay lưng: lưng ghế che hông người ngồi
+  else if (f.z > 0) chair(ch.front, ch.frontLeather, false, seatY - 1)
+  else chair(ch.back, ch.backLeather, false, seatY + 1)
 }
 
 // ───────────────────────── Đồ cố định của phòng (FURNITURE trong layout.ts; đồ mua ở cửa hàng vẽ ở catalogArt.ts) ─────────────────────────
@@ -592,7 +559,7 @@ export function buildOffice(world: World, office: OfficeState): OfficeView {
   let fame: OfficeView['fame'] = null
   for (const p of office.items) {
     const i = itemById.get(p.item)
-    if (!i || p.stored || i.mount === 'door') continue
+    if (!i || p.stored) continue
     const fg = i.id === 'fame' ? new Graphics() : undefined
     const v = itemView(i, p.c, p.r, p.rot, fg)
     if (v.layer === 'floor') (i.mount === 'rug' ? rugs : hung).addChild(v.node)
@@ -602,9 +569,28 @@ export function buildOffice(world: World, office: OfficeState): OfficeView {
     itemHits.set(p.uid, v.hit)
     if (fg) fame = { g: fg, rect: v.hit, x: v.hit.x + v.hit.w / 2 }
   }
-  const walls = buildWalls(office)
+  const walls = buildWalls(building(office))
   sorted.push(...walls.sorted)
-  for (const [uid, r] of walls.doorHits) itemHits.set(uid, r)
+  // Phòng còn khoá: phủ tối cả sàn lẫn mặt tường bắc của phòng (trên mọi thứ, dưới ngày/đêm)
+  const locked = new Graphics()
+  for (const rm of ROOMS) {
+    if (isOpen(office, rm.id)) continue
+    for (const { x, y, w, h } of roomShade(rm)) {
+      locked.rect(x, y, w, h).fill({ color: 0x0b0a12, alpha: 0.78 })
+      // Sọc chéo thưa cho ra "chưa dùng tới" (theo toạ độ màn hình, để các dải nối liền nhau)
+      for (let yy = y; yy < y + h; yy++)
+        for (let xx = x + ((((x + yy - 8) % 12) + 12) % 12 ? 12 - ((((x + yy - 8) % 12) + 12) % 12) : 0); xx < x + w; xx += 12)
+          if ((xx & 1) === 0) locked.rect(xx, yy - 1, 1, 1).fill({ color: 0xffffff, alpha: 0.05 })
+    }
+  }
+  top.addChild(locked)
+  // Mỗi phòng đã mở (trừ phòng có cụm bàn, đã có đèn trên bàn) một đèn trần giữa khúc lớn nhất
+  for (const rm of ROOMS) {
+    if (rm.desks || !isOpen(office, rm.id)) continue
+    const m = rm.main
+    const clip = { x: px(m.minX), y: py(m.minZ) - WALL_FACE, w: (m.maxX - m.minX) * PPM, h: (m.maxZ - m.minZ) * PPM + WALL_FACE }
+    lights.push({ x: px((m.minX + m.maxX) / 2), y: py((m.minZ + m.maxZ) / 2), r: 3.6 * PPM, kind: 'ceiling', clip })
+  }
 
   return { floor, sorted, top, screens, kanban: kb.content, sun, panes, stars, lights, boards: { kanban: kb.rect }, walls, itemHits, fame }
 }

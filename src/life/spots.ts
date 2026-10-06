@@ -1,13 +1,13 @@
 import { footprint, itemById, type Item } from '../data/catalog'
-import { cellsOf } from '../data/decor'
-import { CELL, JOBS, cellKey, cellX, cellZ, colOf, isClean, rowOf, type OfficeState, type Placed } from '../data/officeState'
+import { CELL, cellKey, cellX, cellZ, colOf, rowOf, type OfficeState, type Placed } from '../data/officeState'
 import { cellIndex, flood, snapFree, type Nav } from '../world/nav'
-import { BOARD, OFFICE, SPAWN, WINDOWS, type Activity, type Vec2, type World } from '../world/layout'
+import { BOARD, OFFICE, PODS, SPAWN, WINDOWS, type Activity, type Vec2, type World } from '../world/layout'
+import { building, openRooms, roomAt } from '../world/rooms'
 
 /**
- * Những chỗ agent rảnh đi tới: cửa sổ, bảng ticket, góc tán gẫu, (khi văn phòng còn bẩn) chỗ bụi bẩn để đứng than thở,
+ * Những chỗ agent rảnh đi tới (chỉ trong phòng đã mở): cửa sổ, bảng ticket, góc tán gẫu,
  * và đồ đã mua ở cửa hàng: ngồi sofa / ghế bành, pha cà phê, mở tủ lạnh, chơi máy game, đánh bi-a, vuốt mèo...
- * Dựng lại khi bố cục hoặc chỗ đã dọn đổi. Bạn (người chơi) cũng dùng được các chỗ của đồ đã mua (phím E).
+ * Dựng lại khi bố cục hoặc phòng đã mở đổi. Bạn (người chơi) cũng dùng được các chỗ của đồ đã mua (phím E).
  */
 export interface Spot extends Vec2 {
   id: string
@@ -24,6 +24,8 @@ export interface Spot extends Vec2 {
   weight?: number
   /** Món đồ (uid) của chỗ này: bạn bấm E ở gần thì dùng được */
   item?: string
+  /** Phòng chứa chỗ này (id trong house.json) */
+  room?: string
 }
 
 let list: Spot[] = []
@@ -45,31 +47,6 @@ const FACE: { x: number; z: number; yaw: number }[] = [
   { x: 0, z: 1, yaw: 0 }, { x: -1, z: 0, yaw: -E }, { x: 0, z: -1, yaw: N }, { x: 1, z: 0, yaw: E },
 ]
 
-/**
- * Đồ ngồi được: số chỗ, khoảng cách giữa các chỗ (m), việc làm khi ngồi.
- * `back`: bước vào từ phía sau (ghế họp kê sát bàn: phía trước là mặt bàn)
- * `sink`: lùi chỗ ngồi về phía lưng ghế bao nhiêu mét (hình ghế họp nằm sát mép dưới ô)
- */
-const SEATS: Record<string, { n: number; gap: number; act: Activity; back?: boolean; sink?: number }> = {
-  sofa: { n: 2, gap: 0.76, act: 'sofa' },
-  armRed: { n: 1, gap: 0, act: 'sofa' },
-  armBlue: { n: 1, gap: 0, act: 'sofa' },
-  bench: { n: 2, gap: 0.5, act: 'stool' },
-  stool: { n: 1, gap: 0, act: 'stool' },
-  meetingChair: { n: 1, gap: 0, act: 'meeting', back: true, sink: 0.2 },
-}
-
-/** Đồ đứng dùng: đứng phía trước, nhìn vào đồ. `n` chỗ cạnh nhau, `dist` cách mép trước (m) */
-const USES: Record<string, { act: Activity; n?: number; dist?: number }> = {
-  coffeeBar: { act: 'coffee' }, waterCooler: { act: 'water' }, vending: { act: 'snack' },
-  kitFridge: { act: 'fridge' }, fridge: { act: 'fridge' },
-  kitCounter: { act: 'cook' }, kitSink: { act: 'cook' }, kitStove: { act: 'cook' },
-  arcade1: { act: 'game' }, arcade2: { act: 'game' },
-  bookshelf: { act: 'books' }, bookshelfWide: { act: 'books', n: 2 },
-  whiteboard: { act: 'board' }, chalkboard: { act: 'board' },
-  tvStand: { act: 'tv', n: 2, dist: 1.3 }, highTable: { act: 'snack', n: 2 },
-}
-
 /** Chỗ ngồi / chỗ dùng của một món đã đặt (toạ độ mét) */
 function itemSpots(n: Nav, i: Item, p: Placed): Spot[] {
   const out: Spot[] = []
@@ -82,8 +59,9 @@ function itemSpots(n: Nav, i: Item, p: Placed): Spot[] {
   const depth = (f.x ? w : d) * CELL
   const id = (k: number | string) => `${p.uid}:${k}`
   const area = `item-${p.uid}`
-  const seat = SEATS[i.id]
-  if (seat) {
+  const use = i.use
+  if (use?.kind === 'seat') {
+    const seat = use
     // Ngồi ở hàng ghế phía trước của món, nhìn theo hướng món; bước vào từ phía trước
     const fwd = depth / 2 - CELL / 2 - (seat.sink ?? 0)
     const row = { x: cx + f.x * fwd, z: cz + f.z * fwd }
@@ -96,8 +74,7 @@ function itemSpots(n: Nav, i: Item, p: Placed): Spot[] {
     }
     return out
   }
-  const use = USES[i.id]
-  if (use) {
+  if (use?.kind === 'stand') {
     // Đứng trước mặt đồ, quay mặt vào đồ
     const cnt = use.n ?? 1
     const span = (f.x ? d : w) * CELL
@@ -108,9 +85,9 @@ function itemSpots(n: Nav, i: Item, p: Placed): Spot[] {
     }
     return out
   }
-  if (i.id === 'pingpong' || i.id === 'pool') {
+  if (use?.kind === 'pair') {
     // Hai người hai đầu bàn (bóng bàn dọc: bắc / nam; bi-a ngang: tây / đông), cùng khu nên hay rủ nhau
-    const act: Activity = i.id === 'pool' ? 'pool' : 'foos'
+    const act = use.act
     const along = d > w ? { x: 0, z: 1 } : { x: 1, z: 0 }
     const half = ((d > w ? d : w) * CELL) / 2 + 0.26
     for (const sgn of [-1, 1]) {
@@ -119,35 +96,37 @@ function itemSpots(n: Nav, i: Item, p: Placed): Spot[] {
     }
     return out
   }
-  if (i.id === 'cat') {
+  if (use?.kind === 'pet') {
     const q = at({ x: cx + 0.15, z: cz + d * CELL / 2 + 0.35 })
-    out.push({ id: id(0), ...q, yaw: Math.atan2(cx - q.x, cz - q.z), act: 'pet', area, weight: 1.3, item: p.uid })
+    out.push({ id: id(0), ...q, yaw: Math.atan2(cx - q.x, cz - q.z), act: use.act, area, weight: 1.3, item: p.uid })
     return out
   }
-  if (i.id === 'tvWall') {
-    // TV treo tường bắc: đứng xem cách tường một đoạn
-    for (const dx of [-0.45, 0.45]) out.push({ id: id(dx < 0 ? 'L' : 'R'), ...at({ x: cx + dx, z: BOARD.z + 1.6 }), yaw: N, act: 'tv', area, weight: 1.2, item: p.uid })
+  if (use?.kind === 'bed') {
+    // Nằm: đầu trên gối (ô trên cùng), bước vào từ cạnh giường (bên phải, chật thì bên trái). Bạn không nằm được (không có `item`)
+    const head = { x: cx, z: cz - depth / 2 + CELL / 2 }
+    const side = (s: number) => at({ x: cx + s * (w * CELL / 2 + 0.35), z: cz })
+    const r = side(1), l = side(-1)
+    const via = Math.hypot(r.x - cx, r.z - cz) <= Math.hypot(l.x - cx, l.z - cz) ? r : l
+    out.push({ id: id(0), ...head, yaw: 0, act: use.act, area, sit: 0, via, weight: 0.7 })
+    return out
+  }
+  if (use?.kind === 'watch') {
+    // Đồ treo tường bắc (TV): đứng xem cách tường một đoạn
+    for (const dx of [-0.45, 0.45]) out.push({ id: id(dx < 0 ? 'L' : 'R'), ...at({ x: cx + dx, z: BOARD.z + 1.6 }), yaw: N, act: use.act, area, weight: 1.2, item: p.uid })
   }
   return out
-}
-
-/** Số giả ngẫu nhiên cố định theo chuỗi (chỗ đứng không nhảy lung tung mỗi lần dựng lại) */
-function seeded(s: string) {
-  let h = 2166136261
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
-  return () => {
-    h = Math.imul(h ^ (h >>> 15), 2246822507)
-    h = Math.imul(h ^ (h >>> 13), 3266489909)
-    return ((h ^= h >>> 16) >>> 0) / 4294967296
-  }
 }
 
 export function officeSpots(world: World, office: OfficeState): Spot[] {
   const n = world.nav
   const at = (p: Vec2) => snapFree(n, p)
   const out: Spot[] = []
-  // Cửa sổ: đứng ngay dưới, nhìn ra ngoài (về phía bắc)
-  WINDOWS.forEach((x, i) => out.push({ id: `win${i}`, ...at({ x, z: OFFICE.minZ + 0.75 }), yaw: N, act: 'window', area: 'window' }))
+  const open = new Set(openRooms(office).map((r) => r.id))
+  // Cửa sổ (của phòng đã mở): đứng ngay dưới, nhìn ra ngoài (về phía bắc)
+  WINDOWS.forEach((x, i) => {
+    const rm = roomAt(x, OFFICE.minZ + 0.25)
+    if (rm && open.has(rm.id)) out.push({ id: `win${i}`, ...at({ x, z: OFFICE.minZ + 0.75 }), yaw: N, act: 'window', area: 'window' })
+  })
   // Bảng ticket
   for (const dx of [-0.8, 0.8]) out.push({ id: `kanban${dx < 0 ? 'L' : 'R'}`, ...at({ x: BOARD.x + dx, z: BOARD.z + 1.25 }), yaw: N, act: 'kanban', area: 'kanban' })
   // Bảng vinh danh (nếu đã mua): đứng xem xếp hạng
@@ -157,8 +136,19 @@ export function officeSpots(world: World, office: OfficeState): Spot[] {
     const cx = cellX(p.c) + (i.w * CELL) / 2
     for (const dx of [-0.8, 0.8]) out.push({ id: `fame${dx < 0 ? 'L' : 'R'}`, ...at({ x: cx + dx, z: BOARD.z + 1.25 }), yaw: N, act: 'fame', area: 'fame' })
   }
-  // Góc tán gẫu: hai chỗ đứng đối mặt, ở khoảng trống hai bên phòng
-  ;[[-9.6, -3.6], [9.6, -3.6], [-9.6, 3.4], [9.6, 3.4]].forEach(([x, z], i) => {
+  // Góc tán gẫu: hai chỗ đứng đối mặt. Phòng có cụm bàn: khoảng trống hai bên dãy cụm bàn; phòng khác: gần mép nam.
+  // Phòng ngủ thì không (người khác đang ngủ)
+  const chats: Vec2[] = []
+  for (const rm of openRooms(office)) {
+    const m = rm.main
+    if (rm.use === 'sleep') continue
+    if (!rm.desks) { chats.push({ x: (m.minX + m.maxX) / 2, z: m.maxZ - 1.6 }); continue }
+    const zs = PODS.filter((p) => roomAt(p.x, p.z) === rm).map((p) => p.z)
+    const z0 = Math.min(...zs), z1 = Math.max(...zs)
+    chats.push({ x: m.minX + 1.1, z: z0 }, { x: m.maxX - 1.1, z: z0 })
+    if (z1 > z0) chats.push({ x: m.minX + 1.1, z: z1 }, { x: m.maxX - 1.1, z: z1 })
+  }
+  chats.forEach(({ x, z }, i) => {
     out.push({ id: `chat${i}a`, ...at({ x: x - 0.55, z }), yaw: E, act: 'chat', area: `chat${i}` })
     out.push({ id: `chat${i}b`, ...at({ x: x + 0.55, z }), yaw: -E, act: 'chat', area: `chat${i}` })
   })
@@ -166,17 +156,13 @@ export function officeSpots(world: World, office: OfficeState): Spot[] {
   // Vách bao sát món: chỗ đứng bị đẩy ra ngoài vòng vách (snapFree) nên vẫn tới được, phải kiểm thêm vách nằm giữa chỗ đứng và món
   const reach = flood(n, SPAWN)
   const ok = (p: Vec2) => reach[cellIndex(n, snapFree(n, p))] === 1
-  const doors = new Set<string>()
-  for (const p of office.items) {
-    const i = itemById.get(p.item)
-    if (i?.mount === 'door' && !p.stored) for (const [c, r] of cellsOf(i, p.c, p.r, p.rot)) doors.add(cellKey(c, r))
-  }
+  const walls = building(office).walls
   const wallBetween = (a: Vec2, b: Vec2) => {
     const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / (CELL / 4))
     for (let s = 0; s <= steps; s++) {
       const t = steps ? s / steps : 0
       const k = cellKey(colOf(a.x + (b.x - a.x) * t), rowOf(a.z + (b.z - a.z) * t))
-      if (office.walls[k] && !doors.has(k)) return true
+      if (walls.has(k)) return true
     }
     return false
   }
@@ -188,12 +174,6 @@ export function officeSpots(world: World, office: OfficeState): Spot[] {
     // Đồ treo tường (TV): đứng xem từ xa, không cần sát món
     for (const sp of itemSpots(n, i, p)) if (ok(sp.via ?? sp) && (i.mount === 'wall' || !wallBetween(sp.via ?? sp, mid))) out.push(sp)
   }
-  // Mảng sàn còn bẩn: một chỗ đứng nhìn xuống sàn
-  for (const j of JOBS) {
-    if (j.kind !== 'floor' || !j.rect || isClean(office, j.id)) continue
-    const r = seeded(j.id)
-    const p = at({ x: j.rect.minX + 1 + r() * (j.rect.maxX - j.rect.minX - 2), z: j.rect.minZ + 1 + r() * (j.rect.maxZ - j.rect.minZ - 2) })
-    out.push({ id: `dust-${j.id}`, ...p, yaw: r() * Math.PI * 2, act: 'dust', area: `dust-${j.id}` })
-  }
+  for (const s of out) s.room = roomAt(s.x, s.z)?.id
   return out
 }

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'rea
 import { Application, Container, Graphics, Sprite } from 'pixi.js'
 import { ranking, useExp } from '../data/exp'
 import { COLUMNS, groupIssues } from '../data/kanban'
-import { isClean, jobById } from '../data/officeState'
 import { useOffice } from '../data/officeSync'
 import type { AgentStatus } from '../data/types'
 import { agentPos, input, player } from '../runtime'
@@ -11,13 +10,12 @@ import { BOARD, resolveCircle, type World } from '../world/layout'
 import { assetsReady, loadSheets } from './assets'
 import { PLAYER_ID } from '../characters/look'
 import { charSheet, frameAt, type CharSheet } from './chars'
-import { CleanOverlay, cleanHover, jobAt } from './CleanMode'
-import { DecoOverlay, decoClick, decoCtx, decoDown, decoLeave, decoMove, decoUp } from './Decorate'
+import { RoomOverlay, lockedAt, roomHover } from './RoomMode'
+import { DecoOverlay, decoClick, decoCtx, decoLeave, decoMove } from './Decorate'
 import { useDeco } from '../ui/decoStore'
 import { nearestUse, using } from '../life/playerUse'
 import { spotById } from '../life/spots'
 import { SIT_BACK_DROP, SIT_DROP, SIT_SIDE_DROP } from './Agents'
-import { buildDirt, jobBox, wipe, type DirtView } from './dirt'
 import { partsOf, usePixelLooks } from './look'
 import { stage, ticks, toScreen } from './stage'
 import { hits, makeOutline, personHit, pickAt, setOutline } from './pick'
@@ -99,7 +97,6 @@ export function PixelScene({ world, statusOfSlot, children }: {
   const appRef = useRef<Application | null>(null)
   const layers = useRef<{ root: Container; floor: Container; sorted: Container; top: Container } | null>(null)
   const office = useRef<OfficeView | null>(null)
-  const dirt = useRef<DirtView | null>(null)
   const light = useRef<Lighting | null>(null)
   const statusRef = useRef(statusOfSlot)
   statusRef.current = statusOfSlot
@@ -115,7 +112,6 @@ export function PixelScene({ world, statusOfSlot, children }: {
     let lastNear: string | null = null
     let t = 0
     let screenAcc = 0
-    let offUp: (() => void) | null = null
     let camShift = 0
 
     ;(async () => {
@@ -154,10 +150,10 @@ export function PixelScene({ world, statusOfSlot, children }: {
         const p = mapAt(cx, cy)
         return p ? pickAt(p.x, p.y) : null
       }
-      /** Chế độ dọn dẹp: chỗ bẩn dưới chuột (người đứng trên chỗ đó vẫn ưu tiên mở người) */
-      const jobClient = (cx: number, cy: number) => {
-        const p = useCoop.getState().cleanOpen ? mapAt(cx, cy) : null
-        return p ? jobAt(p.x, p.y) ?? null : null
+      /** Phòng khoá dưới chuột (không tính lúc đang trang trí) */
+      const roomClient = (cx: number, cy: number) => {
+        const p = useDeco.getState().open ? null : mapAt(cx, cy)
+        return p ? lockedAt(p.x, p.y) ?? null : null
       }
       app.canvas.addEventListener('pointermove', (e) => {
         mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true
@@ -165,16 +161,6 @@ export function PixelScene({ world, statusOfSlot, children }: {
         if (p) decoMove(p.x, p.y)
       })
       app.canvas.addEventListener('pointerleave', () => { mouse.in = false; decoLeave() })
-      app.canvas.addEventListener('pointerdown', (e) => {
-        const p = e.button === 0 && useDeco.getState().open ? mapAt(e.clientX, e.clientY) : null
-        if (p) decoDown(p.x, p.y)
-      })
-      const onUp = (e: PointerEvent) => {
-        const p = e.button === 0 && useDeco.getState().open ? mapAt(e.clientX, e.clientY) : null
-        if (p) decoUp(p.x, p.y)
-      }
-      window.addEventListener('pointerup', onUp)
-      offUp = () => window.removeEventListener('pointerup', onUp)
       app.canvas.addEventListener('click', (e) => {
         if (e.button !== 0) return
         if (useDeco.getState().open) {
@@ -183,10 +169,10 @@ export function PixelScene({ world, statusOfSlot, children }: {
           return
         }
         const id = pickClient(e.clientX, e.clientY)
-        const job = jobClient(e.clientX, e.clientY)
-        // Chế độ dọn: bảng ticket còn bẩn thì bấm vào là chọn chỗ dọn, không mở bảng
-        if (id && !(id === '#board' && job?.id === 'board')) return activate(id)
-        if (job) useCoop.getState().pickClean(job.id)
+        if (id) return activate(id)
+        // Phòng khoá: mở bảng Mở phòng, chọn sẵn phòng đó
+        const room = roomClient(e.clientX, e.clientY)
+        if (room) useCoop.getState().showRoom(room.id)
       })
       await loadSheets()
       playerSheet.current = await charSheet(partsOf(PLAYER_ID, 'Bạn', false))
@@ -320,15 +306,15 @@ export function PixelScene({ world, statusOfSlot, children }: {
 
         // ── Chuột: thứ đang được rê lên (người, bạn, bảng) ──
         const hv = mouse.in ? pickClient(mouse.x, mouse.y) : null
-        // Chế độ dọn dẹp: chỗ bẩn dưới chuột (khi không rê lên người / bảng)
-        const job = mouse.in && !hv ? jobClient(mouse.x, mouse.y)?.id ?? null : null
-        if (job !== cleanHover.id) {
-          cleanHover.id = job
-          app.canvas.style.cursor = hv || job ? 'pointer' : ''
+        // Phòng khoá dưới chuột (khi không rê lên người / bảng)
+        const room = mouse.in && !hv ? roomClient(mouse.x, mouse.y)?.id ?? null : null
+        if (room !== roomHover.id) {
+          roomHover.id = room
+          app.canvas.style.cursor = hv || room ? 'pointer' : ''
         }
         if (hv !== stage.hover) {
           stage.hover = hv
-          app.canvas.style.cursor = hv || job ? 'pointer' : ''
+          app.canvas.style.cursor = hv || room ? 'pointer' : ''
           useCoop.getState().setHover(hv)
           boardHl.clear()
           const b = hv?.startsWith('#') ? hits.get(hv) : undefined
@@ -383,15 +369,13 @@ export function PixelScene({ world, statusOfSlot, children }: {
 
     return () => {
       dead = true
-      offUp?.()
       Object.assign(stage, { app: null, root: null, sorted: null, top: null, fx: null, overlay: null, hover: null })
       hits.delete('player')
       useCoop.getState().setHover(null)
       appRef.current = null
       layers.current = null
       office.current = null
-      dirt.current = null
-      cleanHover.id = null
+      roomHover.id = null
       decoCtx.view = null
       light.current = null
       try { app.destroy(true, { children: true }) } catch { /* chưa init xong */ }
@@ -413,11 +397,10 @@ export function PixelScene({ world, statusOfSlot, children }: {
     if (phase !== 'ready' || !L) return
     const old = office.current
     if (old) {
-      // Chỉ gỡ đồ của văn phòng cũ: người, bong bóng, mũi tên đánh dấu, bụi bẩn cũng nằm trong các lớp này
+      // Chỉ gỡ đồ của văn phòng cũ: người, bong bóng, mũi tên đánh dấu cũng nằm trong các lớp này
       for (const c of [old.floor, old.top, ...old.sorted]) { c.removeFromParent(); c.destroy({ children: true }) }
     }
     const v = buildOffice(world, useOffice.getState().office)
-    // Sàn văn phòng nằm dưới cùng: lớp bụi bẩn (thêm sau) luôn phủ lên trên
     L.floor.addChildAt(v.floor, 0)
     L.top.addChildAt(v.top, 0)
     for (const c of v.sorted) L.sorted.addChild(c)
@@ -434,32 +417,6 @@ export function PixelScene({ world, statusOfSlot, children }: {
     decoCtx.view = v
     redrawBoards()
   }, [phase, world])
-
-  // ── Bụi bẩn: dựng khi đã biết chỗ nào sạch; dọn chỗ nào thì gỡ chỗ đó (mờ dần, lấp lánh) ──
-  const officeState = useOffice((s) => s.office)
-  const officeReady = useOffice((s) => s.ready)
-  useEffect(() => {
-    const L = layers.current
-    if (phase !== 'ready' || !L) return
-    const cur = dirt.current
-    const clean = (id: string) => isClean(officeState, id)
-    // Có chỗ bẩn mà lớp bụi đang vẽ không có (lần đầu, đổi công ty, demo bắt đầu lại): dựng lại cả lớp
-    const missing = [...jobById.keys()].some((id) => !clean(id) && !cur?.parts.has(id))
-    if (!officeReady || !cur || missing) {
-      if (cur) for (const c of [cur.floor, ...cur.sorted]) { c.removeFromParent(); c.destroy({ children: true }) }
-      dirt.current = null
-      if (!officeReady) return
-      const d = buildDirt(clean)
-      L.floor.addChild(d.floor)
-      for (const c of d.sorted) L.sorted.addChild(c)
-      dirt.current = d
-      return
-    }
-    for (const id of [...cur.parts.keys()]) {
-      const j = jobById.get(id)
-      if (j && clean(id)) wipe(cur, id, jobBox(j), stage.fx)
-    }
-  }, [phase, officeState, officeReady])
 
   // ── Bảng ticket, bảng vinh danh trên tường: vẽ lại khi dữ liệu đổi ──
   const issues = useCoop((s) => s.issues)
@@ -491,7 +448,7 @@ export function PixelScene({ world, statusOfSlot, children }: {
         <HoverTip el={tip} />
       </div>
       {phase === 'ready' && children}
-      {phase === 'ready' && <CleanOverlay />}
+      {phase === 'ready' && <RoomOverlay />}
       {phase === 'ready' && <DecoOverlay />}
       {phase === 'missing' && <MissingAssets />}
       {phase === 'error' && (

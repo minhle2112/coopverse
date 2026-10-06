@@ -38,7 +38,7 @@ for (const sub of ['latin', 'latin-ext', 'vietnamese']) {
 if (process.argv.includes('--with-art')) bundleArt()
 
 /**
- * Chép đúng những hình app dùng: các sheet trong atlas.json, ảnh của các tileset bản đồ (maps/tilesets, trỏ tới
+ * Chép đúng những hình app dùng: các sheet trong atlas.json, ảnh đồ trang trí + bàn ghế + đồ trên bàn (src/data/items.json), ảnh của các tileset bản đồ (maps/tilesets, trỏ tới
  * maps/art/... = cùng đường dẫn trong gói LimeZu) + bộ phận nhân vật 16x16 (tủ đồ chọn được mọi kiểu)
  */
 function bundleArt() {
@@ -46,6 +46,12 @@ function bundleArt() {
   const dst = path.join(out, 'limezu')
   const atlas = JSON.parse(readFileSync(at('src', 'pixel', 'atlas.json'), 'utf8'))
   const files = new Set(Object.values(atlas.sheets))
+  const items = JSON.parse(readFileSync(at('src', 'data', 'items.json'), 'utf8'))
+  const addView = (v) => v?.parts.forEach((p) => p.src && files.add(p.src[0]))
+  for (const i of items.items) i.art.views?.forEach(addView)
+  for (const t of [items.desk.top, items.desk.side]) if (t) files.add(t.src[0])
+  Object.values(items.desk.chair).forEach(addView)
+  for (const t of items.desk.things ?? []) Object.values(t.views).forEach(addView)
   for (const f of readdirSync(at('maps', 'tilesets'))) {
     if (!f.endsWith('.tsj')) continue
     const image = path.posix.join('maps/tilesets', JSON.parse(readFileSync(at('maps', 'tilesets', f), 'utf8')).image)

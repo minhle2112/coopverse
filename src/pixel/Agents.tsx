@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { titleOf, useExp, useLevel } from '../data/exp'
 import { useOffice } from '../data/officeSync'
+import { leadIdsOf } from '../data/hire'
 import { STATUS_COLOR, STATUS_LABEL, type Agent, type AgentStatus } from '../data/types'
 import { actorFor, placeActor, dropActor, stepActor, type Asking, type Body } from '../life/brain'
 import type { LifeActor } from '../life/actors'
@@ -29,6 +30,8 @@ export const SIT_DROP = 11
 export const SIT_BACK_DROP = -7
 /** Ngồi nghiêng (ghế ăn, ghế đẩu): khung ngồi có sẵn của LimeZu */
 export const SIT_SIDE_DROP = 1
+/** Nằm giường: chỗ nằm ở giữa ô gối, đầu (hàng 4–19 của khung) hạ xuống cho nằm trên gối, chăn che cằm */
+const LIE_DROP = 17
 /** Đỉnh đầu cách chân bao nhiêu pixel (khung 32, người cao ~24) */
 const HEAD = 24
 /** Ứng viên quay sang nhìn khi bạn lại gần */
@@ -48,6 +51,8 @@ interface Framing {
   dy: number
   /** Ngồi quay lưng về camera (đầu nhô khỏi lưng ghế) */
   back?: boolean
+  /** Nằm giường: xếp lớp trên giường, dưới chăn */
+  lie?: boolean
 }
 
 /** Chọn động tác + khung hình theo dáng mà "bộ não" quyết định */
@@ -55,6 +60,7 @@ function framing(a: LifeActor, b: Body, t: number): Framing {
   const dir = dirOf(a.yaw)
   const ph = a.phase
   if (b.mode === 'walk') return { anim: 'walk', dir, i: frameAt('walk', t, ph), dy: 0 }
+  if (b.lie) return { anim: 'sleep', dir: 'down', i: frameAt('sleep', t, ph), dy: LIE_DROP, lie: true }
   if (b.seat) {
     if (dir === 'left' || dir === 'right') return { anim: 'sit', dir, i: frameAt('sit', t, ph), dy: SIT_SIDE_DROP }
     // Đang ngủ gật (tạm dừng) thì đứng yên một khung
@@ -290,7 +296,8 @@ function PixelAgent({ agent, slot, isLead }: { agent: Agent; slot: DeskSlot; isL
       v.body.position.set(X, Y + f.dy)
       // Ngồi bàn: xếp đúng ở ghế để mép bàn / lưng ghế che phần dưới người.
       // Ngồi ghế đẩu / ghế ăn (nghiêng hoặc quay ra): người vẽ đè lên ghế. Sofa (quay lưng): lưng sofa che người.
-      v.body.zIndex = a.where === 'seat' ? Math.round(py(a.slot.seat.z)) : b.seat && !f.back ? Y + 10 : Y
+      // Nằm giường: trên giường (xếp lớp ở mép dưới giường), dưới chăn (mép dưới + 3, catalogArt frontNode)
+      v.body.zIndex = a.where === 'seat' ? Math.round(py(a.slot.seat.z)) : f.lie ? Y + 25 : b.seat && !f.back ? Y + 10 : Y
       v.shadow.visible = !b.seat
       v.shadow.position.set(0, -f.dy)
       personHit(a.id, X, Y + f.dy, HEAD, v.body.zIndex)
@@ -479,7 +486,7 @@ export function PixelAgents({ world }: { world: World }) {
     return () => { ticks.delete(f); ticks.delete(lay) }
   }, [])
 
-  const leadIds = useMemo(() => new Set(agents.filter((a) => !a.candidate).map((a) => a.reportsTo).filter(Boolean)), [agents])
+  const leadIds = useMemo(() => leadIdsOf(agents), [agents])
   // Ứng viên chờ duyệt thuê: đứng ở sảnh (tối đa số chỗ ở sảnh, còn lại xem trong danh sách Q)
   const candidates = agents.filter((a) => a.candidate && a.status !== 'terminated').slice(0, LOBBY.length)
   return (

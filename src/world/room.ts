@@ -13,11 +13,13 @@ export interface AABB { minX: number; maxX: number; minZ: number; maxZ: number; 
 
 export interface DeskSlot {
   id: string
-  /** side = bàn phụ của agent con, nối dài dãy bàn của agent cha */
-  zone: 'open' | 'side'
+  /** open = bàn trong cụm bàn; lead = bàn riêng của Lead */
+  zone: 'open' | 'lead'
   seat: Vec2
   /** Hướng agent nhìn khi ngồi (bàn nằm phía trước). forward = (sin yaw, cos yaw) */
   yaw: number
+  /** Bàn bạn đã dời: chỗ gốc (ghế + hướng) để đưa về */
+  home?: { x: number; z: number; yaw: number }
 }
 
 /** Việc agent làm khi dừng ở một chỗ (quyết định dáng, đồ cầm tay, câu nói) */
@@ -25,21 +27,35 @@ export type Activity =
   | 'coffee' | 'fridge' | 'water' | 'window' | 'tv' | 'foos' | 'books' | 'sofa' | 'beanbag' | 'stool' | 'meeting' | 'kanban' | 'fame'
   // Đồ mua ở cửa hàng: máy game, bi-a, mèo, bảng trắng, bếp, máy bán nước
   | 'game' | 'pool' | 'pet' | 'board' | 'cook' | 'snack'
-  // Phòng trống: đứng tán gẫu, đứng nhìn chỗ bụi bẩn
-  | 'chat' | 'dust'
+  // Đứng tán gẫu
+  | 'chat'
+  // Nằm ngủ trên giường
+  | 'sleep'
 
-/** 27 × 15 m */
-export const OFFICE = { minX: -13.5, maxX: 13.5, minZ: -8, maxZ: 7, wallH: 3.2, wallT: 0.3 }
+/** Pixel của bản đồ mỗi mét (1 m = 2 ô 16 px) */
+const MAP_PPM = 2 * M.tile
 
-/** Pixel của bản đồ mỗi mét: mốc "room" (sàn) phủ đúng cả phòng */
-const MAP_PPM = M.room.w / (OFFICE.maxX - OFFICE.minX)
-if (M.room.h !== (OFFICE.maxZ - OFFICE.minZ) * MAP_PPM) throw new Error('maps/office.tmj: mốc "room" phải có tỉ lệ đúng như phòng 27 × 15 m')
+/**
+ * Cả toà nhà (mét), lấy từ mốc "room" (sàn) của bản đồ: x giữa toà = 0, tường bắc ở z = -8.
+ * Bên trong chia thành các phòng (src/world/rooms.ts).
+ */
+export const OFFICE = {
+  minX: -M.room.w / MAP_PPM / 2, maxX: M.room.w / MAP_PPM / 2, minZ: -8, maxZ: -8 + M.room.h / MAP_PPM, wallH: 3.2, wallT: 0.3,
+}
+if (M.room.w % M.tile || M.room.h % M.tile) throw new Error('maps/office.tmj: mốc "room" phải phủ trọn ô')
 /** Toạ độ pixel trong bản đồ → mét, làm tròn để khỏi lệch ô lưới (5.1999… thay vì 5.2) */
 const round = (v: number) => Math.round(v * 1e4) / 1e4
 const mx = (p: number) => round((p - M.room.x) / MAP_PPM + OFFICE.minX)
 const mz = (p: number) => round((p - M.room.y) / MAP_PPM + OFFICE.minZ)
 
 export const SPAWN: Vec2 = { x: mx(M.spawn.x), z: mz(M.spawn.y) }
+
+/** Tâm các cụm bàn của agent (mốc pod1, pod2... trong bản đồ), lấp theo thứ tự tên */
+export const PODS: Vec2[] = M.pods.map((p) => ({ x: mx(p.x), z: mz(p.y) }))
+
+/** Bàn riêng của Lead (mốc lead1, lead2... trong bản đồ, đặt ở trang thiết kế nhà): chỗ ngồi + hướng nhìn */
+const FACE_YAW = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }
+export const LEAD_DESKS: DeskSlot[] = M.leads.map((p, i) => ({ id: `lead${i}`, zone: 'lead', seat: { x: mx(p.x), z: mz(p.y) }, yaw: FACE_YAW[p.face] }))
 
 /** Sảnh chờ bên phải cửa vào: ứng viên đứng chờ bạn duyệt hồ sơ, mặt nhìn vào văn phòng (hơi xoay vào giữa). */
 const LOBBY_YAW = [Math.PI - 0.2, Math.PI + 0.25]
@@ -58,7 +74,7 @@ export const WINDOWS = M.windows.map((w) => mx(w.x + w.w / 2))
 export const DOOR_X = mx(M.door.x + M.door.w / 2)
 
 /**
- * Vùng chặn cố định vẽ trong layer Collision của bản đồ (cột, quầy xây sẵn...): không đi qua, không đặt đồ / xây vách lên.
+ * Vùng chặn cố định vẽ trong layer Collision của bản đồ (cột, quầy xây sẵn...): không đi qua, không đặt đồ lên.
  * Không ghi chiều cao thì cao như tường, chặn cả camera bản 3D.
  */
 export const BLOCKS: AABB[] = M.blocks.map((b) => {

@@ -53,10 +53,10 @@ interface CoopState {
   /** Tủ đồ đang mở cho ai ('player' = bạn, hoặc id agent) */
   wardrobeId: string | null
   settingsOpen: boolean
-  /** Chế độ dọn dẹp (phím B): hiện giá từng chỗ bẩn, bấm chỗ nào để trả Xu dọn chỗ đó */
-  cleanOpen: boolean
-  /** Chỗ bẩn đang chọn trong chế độ dọn dẹp (id trong src/data/officeState.ts) */
-  cleanPick: string | null
+  /** Bảng mở phòng (phím B): phòng khoá hiện giá, bấm phòng nào để trả Xu mở phòng đó */
+  roomsOpen: boolean
+  /** Phòng khoá đang chọn (id trong src/world/rooms.ts) */
+  roomPick: string | null
   /** Danh sách "Chờ duyệt" (phím Q) đang mở */
   inboxOpen: boolean
   /** Thẻ duyệt nhanh đang mở (id việc chờ): mở từ danh sách, không cần đi tới bàn */
@@ -96,10 +96,12 @@ interface CoopState {
   openWardrobe: (id?: string) => void
   closeWardrobe: () => void
   toggleSettings: () => void
-  toggleClean: () => void
-  /** Chế độ trang trí (phím T): cửa hàng, đặt / dời đồ, xây vách, dời bàn. Trạng thái chi tiết ở src/ui/decoStore.ts */
+  toggleRooms: () => void
+  /** Chế độ trang trí (phím T): cửa hàng, đặt / dời đồ, dời bàn. Trạng thái chi tiết ở src/ui/decoStore.ts */
   toggleDeco: () => void
-  pickClean: (id: string | null) => void
+  pickRoom: (id: string | null) => void
+  /** Bấm vào phòng khoá trên bản đồ: mở bảng mở phòng, chọn sẵn phòng đó */
+  showRoom: (id: string) => void
   /** Esc: đóng lớp đang mở trên cùng. Trả về false nếu không có gì để đóng. */
   closeTop: () => boolean
   /** Chỉ bản demo: bấm vào tên trong danh sách để đổi trạng thái */
@@ -133,8 +135,8 @@ export const useCoop = create<CoopState>((set, get) => ({
   using: null,
   wardrobeId: null,
   settingsOpen: false,
-  cleanOpen: false,
-  cleanPick: null,
+  roomsOpen: false,
+  roomPick: null,
   inboxOpen: false,
   askId: null,
   locked: false,
@@ -244,34 +246,39 @@ export const useCoop = create<CoopState>((set, get) => ({
   toggleSettings: () => {
     if (!get().settingsOpen && document.pointerLockElement) document.exitPointerLock()
     if (useDeco.getState().open) useDeco.getState().toggle()
-    set((s) => ({ settingsOpen: !s.settingsOpen, wardrobeId: null, cleanOpen: false, cleanPick: null }))
+    set((s) => ({ settingsOpen: !s.settingsOpen, wardrobeId: null, roomsOpen: false, roomPick: null }))
   },
   // Như cài đặt: bảng nhỏ bên cạnh, vẫn đi lại được
-  toggleClean: () => {
-    if (!get().cleanOpen && document.pointerLockElement) document.exitPointerLock()
+  toggleRooms: () => {
+    if (!get().roomsOpen && document.pointerLockElement) document.exitPointerLock()
     if (useDeco.getState().open) useDeco.getState().toggle()
-    set((s) => ({ cleanOpen: !s.cleanOpen, cleanPick: null, settingsOpen: false }))
+    set((s) => ({ roomsOpen: !s.roomsOpen, roomPick: null, settingsOpen: false }))
   },
-  // Như dọn dẹp: bảng cửa hàng bên trái, vẫn đi lại được để xem các góc phòng
+  // Như bảng mở phòng: bảng cửa hàng bên trái, vẫn đi lại được để xem các góc phòng
   toggleDeco: () => {
     if (document.pointerLockElement) document.exitPointerLock()
-    set({ cleanOpen: false, cleanPick: null, settingsOpen: false })
+    set({ roomsOpen: false, roomPick: null, settingsOpen: false })
     useDeco.getState().toggle()
   },
-  pickClean: (id) => set({ cleanPick: id }),
+  pickRoom: (id) => set({ roomPick: id }),
+  showRoom: (id) => {
+    if (document.pointerLockElement) document.exitPointerLock()
+    if (useDeco.getState().open) useDeco.getState().toggle()
+    set({ roomsOpen: true, roomPick: id, settingsOpen: false })
+  },
   closeTop: () => {
     const s = get()
-    // Màn hình đang thấy (CLI, bảng to, tủ đồ, phiếu duyệt) đóng trước; bảng dọn / trang trí / cài đặt nằm dưới, đang bị ẩn
+    // Màn hình đang thấy (CLI, bảng to, tủ đồ, phiếu duyệt) đóng trước; bảng mở phòng / trang trí / cài đặt nằm dưới, đang bị ẩn
     if (s.askId) set({ askId: null })
     else if (s.wardrobeId) set({ wardrobeId: null })
     else if (s.focusId) set({ focusId: null })
     else if (s.boardOpen) set({ boardOpen: false })
     else if (s.fameOpen) set({ fameOpen: false })
-    else if (s.cleanPick) set({ cleanPick: null })
+    else if (s.roomPick) set({ roomPick: null })
     else if (s.inboxOpen) set({ inboxOpen: false })
     else if (s.settingsOpen) set({ settingsOpen: false })
     else if (useDeco.getState().back()) { /* bỏ chỗ đặt thử / món đang cầm / đóng chế độ trang trí */ }
-    else if (s.cleanOpen) set({ cleanOpen: false })
+    else if (s.roomsOpen) set({ roomsOpen: false })
     else return false
     return true
   },

@@ -4,7 +4,7 @@ import { damp, lerpAngle, rand } from '../lib/math'
 import { agentPos, lobbyPos, player } from '../runtime'
 import { navRef, route } from '../world/nav'
 import { forward, type Activity, type DeskSlot, type Vec2 } from '../world/layout'
-import { actors, chooseSpot, newActor, release, resetToSeat, type LifeActor } from './actors'
+import { actors, chooseBed, chooseSpot, hasAgentRooms, newActor, release, resetToSeat, type LifeActor } from './actors'
 import { excuse, onArrive } from './director'
 import { spotById } from './spots'
 import { clock, forget, isSpeaking } from './store'
@@ -21,7 +21,7 @@ const PERSONAL = 0.85
 const VISIT_BACK = 0.62
 
 /** Dáng khi dừng ở một chỗ */
-const ACT_POSE: Partial<Record<Activity, PoseMode>> = { coffee: 'drink', water: 'drink', foos: 'play', pool: 'play', game: 'play', books: 'read' }
+const ACT_POSE: Partial<Record<Activity, PoseMode>> = { coffee: 'drink', water: 'drink', foos: 'play', pool: 'play', game: 'play', books: 'read', sleep: 'sleep' }
 
 /** Agent đang chờ bạn: 'approval' = có phiếu duyệt, 'question' = chỉ có câu hỏi */
 export type Asking = 'approval' | 'question' | null
@@ -34,6 +34,8 @@ export interface Body {
   seat: boolean
   /** Ngồi cao/thấp hơn ghế văn phòng (m) */
   lift: number
+  /** Nằm ngủ trên giường */
+  lie?: boolean
 }
 
 /** Chỗ đứng sau ghế đồng nghiệp */
@@ -98,17 +100,33 @@ function wander(a: LifeActor) {
   walkTo(a, s, 'spot', s.via)
 }
 
+/** Đang ở / đang đi tới một giường */
+const bedBound = (a: LifeActor) => spotById(a.spot)?.act === 'sleep' && (a.where === 'spot' || (a.where === 'walk' && a.dest === 'spot'))
+
 /**
- * Một bước mô phỏng. Đang làm / tạm dừng / lỗi / chờ bạn duyệt → ngồi ở bàn (chờ duyệt thì giơ tay).
- * Rảnh → đi tới các chỗ trong văn phòng (cửa sổ, bảng ticket, góc tán gẫu...), tụ tập nói chuyện, thỉnh thoảng về bàn.
+ * Một bước mô phỏng. Đang làm / lỗi / chờ bạn duyệt → ngồi ở bàn (chờ duyệt thì giơ tay).
+ * Tạm dừng → về giường trống ở phòng ngủ mà ngủ; hết giường thì ngủ gục ở bàn.
+ * Rảnh → đi tới các chỗ chơi, tụ tập nói chuyện. Văn phòng có phòng nghỉ / phòng ngủ (house.json `use`) thì chỉ chơi
+ * ở đó và không về bàn ngồi chơi; không có thì chơi khắp văn phòng (cửa sổ, bảng ticket, góc tán gẫu...), thỉnh thoảng về bàn.
  */
 export function stepActor(a: LifeActor, st: AgentStatus, ask: Asking, rawDt: number): Body {
   const dt = Math.min(rawDt, 0.05)
   const slot = a.slot
   const t = clock.t
-  // Có việc chờ bạn: về bàn ngồi giơ tay, để bạn biết tìm ở đâu
-  const wantsSeat = st !== 'idle' || ask !== null
   const talking = a.talkUntil > t
+  // Tạm dừng: tìm giường (vài giây thử lại một lần nếu hết giường)
+  const napping = st === 'paused' && ask === null
+  if (napping && !bedBound(a) && !talking && t >= a.bedAt) {
+    a.bedAt = t + 4
+    const bed = spotById(chooseBed(a))
+    if (bed) {
+      a.cmd = null
+      a.spot = bed.id
+      walkTo(a, bed, 'spot', bed.via)
+    }
+  }
+  // Có việc chờ bạn: về bàn ngồi giơ tay, để bạn biết tìm ở đâu
+  const wantsSeat = (st !== 'idle' || ask !== null) && !(napping && bedBound(a))
   const toSeat = () => {
     release(a.id)
     a.spot = null
@@ -138,8 +156,9 @@ export function stepActor(a: LifeActor, st: AgentStatus, ask: Asking, rawDt: num
     if (wantsSeat) toSeat()
     else if (!talking) {
       a.timer -= dt
-      if (a.timer <= 0) {
-        if (Math.random() < 0.3 || a.where === 'visit') toSeat()
+      if (napping) a.timer = Math.max(a.timer, 1)
+      else if (a.timer <= 0) {
+        if (a.where === 'visit' || (!hasAgentRooms() && Math.random() < 0.3)) toSeat()
         else wander(a)
       }
     }
@@ -201,7 +220,7 @@ export function stepActor(a: LifeActor, st: AgentStatus, ask: Asking, rawDt: num
           a.where = 'spot'
           const here = spotById(a.spot)
           a.exit = here?.via ? { ...here.via } : null
-          a.timer = here?.sit !== undefined ? rand(18, 34) : rand(12, 26)
+          a.timer = here?.act === 'sleep' ? rand(40, 80) : here?.sit !== undefined ? rand(18, 34) : rand(12, 26)
           onArrive(a)
         }
       }
@@ -252,5 +271,5 @@ export function stepActor(a: LifeActor, st: AgentStatus, ask: Asking, rawDt: num
   if (a.mood && a.moodUntil > t) mood = a.mood
 
   agentPos.set(a.id, { x: a.x, z: a.z })
-  return { mode, mood, seat, lift }
+  return { mode, mood, seat, lift, lie: here?.act === 'sleep' && a.where === 'spot' }
 }

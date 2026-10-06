@@ -1,24 +1,26 @@
 import { footprint, itemById } from '../data/catalog'
-import { cellsOf, deskCells } from '../data/decor'
-import { CELL, cellKey, cellX, cellZ, type OfficeState } from '../data/officeState'
+import { deskCells } from '../data/decor'
+import { CELL, cellKey, cellX, cellZ, emptyOffice, type OfficeState } from '../data/officeState'
 import type { Agent } from '../data/types'
 import { buildNav, flood, snapFree, cellIndex, type Nav } from './nav'
 
 /*
- * Sơ đồ văn phòng (nhìn từ trên, bắc = -z): một phòng lớn trống, chưa có vách ngăn.
- * Lúc đầu chỉ có bàn làm việc của agent (xếp thành cụm 4 chỗ), bảng ticket và cửa sổ trên tường bắc, cửa vào ở tường nam.
- * Phòng phủ bụi; bạn trả Xu để dọn (src/data/officeState.ts), rồi mua đồ, xây vách, dời bàn (src/data/decor.ts).
- * Đồ, vách, bàn đã dời đều thành hộp va chạm và chặn lối đi của agent.
+ * Sơ đồ văn phòng (nhìn từ trên, bắc = -z): toà nhà chia nhiều phòng (maps/office.tmj, src/world/rooms.ts).
+ * Lúc đầu mở văn phòng chung (cụm bàn của agent, bảng ticket trên tường bắc) và sảnh (cửa vào, ứng viên chờ);
+ * các phòng khác khoá, trả Xu để mở. Rồi mua đồ, dời bàn (src/data/decor.ts).
+ * Tường giữa các phòng, vách trong phòng (trang thiết kế nhà), đồ, bàn đã dời đều thành hộp va chạm và chặn lối đi của agent.
  *
- *   x: -13.5 ................ 0 ................ 13.5
- *   z=-8  ┌──── cửa sổ ─ bảng ─── cửa sổ ─ cửa sổ ───── cửa sổ ┐
- *         │                                                   │
- *         │          (cụm bàn)            (cụm bàn)           │
- *   z=7   └────────────────────── cửa vào ────────────────────┘
+ *   ┌─ cửa sổ ─ bảng ─ cửa sổ ─┬─ cửa sổ ──┬─ cửa sổ ──┐
+ *   │  Văn phòng chung          │ Phòng họp │ Phòng sếp │
+ *   │   (cụm bàn) (cụm bàn)     │           │           │
+ *   ├──── lối ────┬──── cửa ────┴───────────┴── cửa ────┤
+ *   │ Sảnh        │ Pantry            │ Phòng nghỉ      │
+ *   └─ cửa vào ───┴───────────────────┴─────────────────┘
  */
 
 export * from './room'
-import { BLOCKS, BOARD, DESK_D, DESK_W, DOOR_X, OFFICE, SPAWN, box, deskCenter, turned, type AABB, type DeskSlot, type Vec2 } from './room'
+import { BLOCKS, BOARD, DESK_D, DESK_W, DOOR_X, LEAD_DESKS, OFFICE, PODS, SPAWN, box, deskCenter, turned, type AABB, type DeskSlot, type Vec2 } from './room'
+import { building } from './rooms'
 
 // ───────────────────────── Đồ đạc ─────────────────────────
 
@@ -66,15 +68,11 @@ const SIZE: Record<FurnitureKind, [number, number, number] | null> = {
 }
 
 /** Đồ có sẵn từ đầu: chỉ cửa vào */
-export const FURNITURE: Furniture[] = [{ kind: 'door', x: DOOR_X, z: 6.85 }]
+export const FURNITURE: Furniture[] = [{ kind: 'door', x: DOOR_X, z: OFFICE.maxZ - 0.15 }]
 
 // ───────────────────────── Chỗ ngồi ─────────────────────────
 
-// Thứ tự lấp: hàng gần bảng (tường bắc) trước, rồi hàng gần cửa vào
-const PODS: Vec2[] = [
-  { x: -3.5, z: -3.5 }, { x: 3.5, z: -3.5 },
-  { x: -3.5, z: 1.5 }, { x: 3.5, z: 1.5 },
-]
+// Cụm bàn: mốc pod1..pod4 trong bản đồ (PODS), lấp theo thứ tự: hàng gần bảng (tường bắc) trước
 
 const podRows = [
   { dz: -1.2, yaw: 0 },
@@ -87,13 +85,6 @@ function podSlots(p: Vec2, pi: number): DeskSlot[] {
   )
 }
 
-/** Bàn phụ ở hai đầu dãy bàn (mỗi cụm 4 chỗ: trái/phải × hai hàng) */
-const SIDE_DX = 2.1
-function sideSlot(p: Vec2, pi: number, ri: number, side: -1 | 1): DeskSlot {
-  const r = podRows[ri]
-  return { id: `side${pi}-${ri}${side < 0 ? 'L' : 'R'}`, zone: 'side', seat: { x: p.x + side * SIDE_DX, z: p.z + r.dz }, yaw: r.yaw }
-}
-
 export interface World {
   /** Bàn được vẽ (kể cả bàn trống) */
   slots: DeskSlot[]
@@ -103,19 +94,21 @@ export interface World {
   pods: Vec2[]
   /** Lưới tìm đường cho agent */
   nav: Nav
-  /** Ô (lưới đặt đồ 0,5 m, khoá cellKey) bàn làm việc đang chiếm: không đặt đồ / vách lên được */
+  /** Ô (lưới đặt đồ 0,5 m, khoá cellKey) bàn làm việc đang chiếm: không đặt đồ lên được */
   deskCells: Set<string>
 }
 
-/** Phần trạng thái văn phòng làm đổi bố cục hoặc hình (đồ đang đặt, vách, bàn đã dời, đồ để bàn); bụi, Xu thì không */
+/** Phần trạng thái văn phòng làm đổi bố cục hoặc hình (phòng đã mở, đồ đang đặt, bàn đã dời, đồ để bàn); Xu thì không */
 export function layoutKey(o: OfficeState) {
-  return JSON.stringify([o.items.filter((p) => !p.stored).map((p) => [p.uid, p.c, p.r, p.rot]), o.walls, o.desks, o.deskItems])
+  return JSON.stringify([Object.keys(o.rooms).sort(), o.items.filter((p) => !p.stored).map((p) => [p.uid, p.c, p.r, p.rot]), o.desks, o.deskItems])
 }
 
 /**
  * Xếp chỗ theo sơ đồ tổ chức (duyệt cây reportsTo): mỗi agent một bàn miễn phí trong các cụm bàn,
- * Lead ngồi trước, thành viên theo nhóm của Lead.
- * Agent con (báo cáo cho một thành viên) ngồi bàn phụ ngay cạnh bàn agent cha; cha giữ nguyên chỗ.
+ * Lead ngồi trước, thành viên theo nhóm của Lead. Bàn riêng của Lead (trang thiết kế nhà) chia cho các Lead
+ * (agent gốc, có thành viên trước); Lead nào không còn bàn riêng thì ngồi cụm bàn như thành viên.
+ * Bàn riêng luôn được vẽ, kể cả khi chưa có Lead ngồi. Không có agent con: ai báo cáo cho một thành viên
+ * (dữ liệu cũ) cũng ngồi cụm bàn như thành viên, ngay sau người đó.
  * Ứng viên chưa được duyệt không có bàn (đứng ở sảnh).
  */
 export function buildWorld(all: Agent[], office?: OfficeState): World {
@@ -125,50 +118,28 @@ export function buildWorld(all: Agent[], office?: OfficeState): World {
     const k = agents.some((b) => b.id === a.reportsTo) ? a.reportsTo : null
     children.set(k, [...(children.get(k) ?? []), a])
   }
-  const parentOf = new Map(agents.map((a) => [a.id, agents.find((b) => b.id === a.reportsTo)]))
   const roots = children.get(null) ?? []
   const ordered: Agent[] = []
   const visit = (a: Agent) => { ordered.push(a); (children.get(a.id) ?? []).forEach(visit) }
   roots.forEach(visit)
 
   const seatOf = new Map<string, DeskSlot>()
-  // Agent con = cha của nó cũng báo cáo cho người khác
-  const isSub = (a: Agent) => !!parentOf.get(a.id) && !!parentOf.get(parentOf.get(a.id)!.id)
-  const subs = ordered.filter(isSub)
-  const openAgents = ordered.filter((a) => !isSub(a))
+  const leads = [...roots].sort((a, b) => Number(children.has(b.id)) - Number(children.has(a.id))).slice(0, LEAD_DESKS.length)
+  leads.forEach((a, i) => seatOf.set(a.id, LEAD_DESKS[i]))
+  const openAgents = ordered.filter((a) => !seatOf.has(a.id))
 
-  const podCount = Math.min(PODS.length, Math.max(1, Math.ceil(openAgents.length / 4)))
-  const pods = PODS.slice(0, podCount)
+  // Mọi cụm bàn đặt ở trang thiết kế nhà đều vẽ sẵn, kể cả khi chưa đủ agent ngồi
+  const pods = PODS
   const openSlots = pods.flatMap(podSlots)
   openAgents.slice(0, openSlots.length).forEach((a, i) => seatOf.set(a.id, openSlots[i]))
 
-  // Bàn phụ: ưu tiên cùng phía với ghế cha, cùng hàng trước rồi hàng đối diện
-  const sideSlots: DeskSlot[] = []
-  const taken = new Set<string>()
-  const homeless: Agent[] = []
-  for (const a of subs) {
-    const ps = seatOf.get(parentOf.get(a.id)!.id)
-    const m = ps && /^pod(\d+)-(\d)(\d)$/.exec(ps.id)
-    if (!m) { homeless.push(a); continue }
-    const pi = +m[1], ri = +m[2], side: -1 | 1 = m[3] === '0' ? -1 : 1
-    const order: [number, -1 | 1][] = [[ri, side], [1 - ri, side], [ri, -side as -1 | 1], [1 - ri, -side as -1 | 1]]
-    const pick = order.map(([r, sd]) => sideSlot(pods[pi], pi, r, sd)).find((s) => !taken.has(s.id))
-    if (!pick) { homeless.push(a); continue }
-    taken.add(pick.id)
-    sideSlots.push(pick)
-    seatOf.set(a.id, pick)
-  }
-  // Hết bàn phụ: ngồi chỗ trống ở cụm bàn như thành viên thường
-  const used = new Set(seatOf.values())
-  const free = openSlots.filter((s) => !used.has(s))
-  homeless.slice(0, free.length).forEach((a, i) => seatOf.set(a.id, free[i]))
 
   // Bàn bạn đã dời: giữ id chỗ ngồi, đổi vị trí ghế và hướng
   const moved = (sl: DeskSlot): DeskSlot => {
     const p = office?.desks[sl.id]
-    return p ? { ...sl, seat: { x: p.x, z: p.z }, yaw: p.yaw } : sl
+    return p ? { ...sl, seat: { x: p.x, z: p.z }, yaw: p.yaw, home: { x: sl.seat.x, z: sl.seat.z, yaw: sl.yaw } } : sl
   }
-  const slots = [...openSlots, ...sideSlots].map(moved)
+  const slots = [...LEAD_DESKS, ...openSlots].map(moved)
   const byId = new Map(slots.map((sl) => [sl.id, sl]))
   for (const [id, sl] of seatOf) seatOf.set(id, byId.get(sl.id) ?? sl)
   const colliders = buildColliders(slots, office)
@@ -178,16 +149,16 @@ export function buildWorld(all: Agent[], office?: OfficeState): World {
 }
 
 /** Vách cao bao nhiêu (m) để chặn đường / camera */
-const WALL_H = { low: 1.0, glass: 1.2, tall: OFFICE.wallH }
+const WALL_H = { low: 1.0, tall: OFFICE.wallH }
 
 function buildColliders(slots: DeskSlot[], office?: OfficeState): AABB[] {
   const { minX, maxX, minZ, maxZ, wallH, wallT } = OFFICE
-  const w = maxX - minX, d = maxZ - minZ
+  const w = maxX - minX, d = maxZ - minZ, cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2
   const out: AABB[] = [
-    box(0, minZ, w + wallT, wallT, wallH, true),
-    box(0, maxZ, w + wallT, wallT, wallH, true),
-    box(minX, 0, wallT, d + wallT, wallH, true),
-    box(maxX, 0, wallT, d + wallT, wallH, true),
+    box(cx, minZ, w + wallT, wallT, wallH, true),
+    box(cx, maxZ, w + wallT, wallT, wallH, true),
+    box(minX, cz, wallT, d + wallT, wallH, true),
+    box(maxX, cz, wallT, d + wallT, wallH, true),
     ...BLOCKS,
   ]
   for (const f of FURNITURE) {
@@ -202,21 +173,17 @@ function buildColliders(slots: DeskSlot[], office?: OfficeState): AABB[] {
     const [dw, dd] = turned(s.yaw) ? [DESK_D, DESK_W] : [DESK_W, DESK_D]
     out.push(box(c.x, c.z, dw, dd, 0.75))
   }
-  if (!office) return out
+  const o = office ?? emptyOffice()
   // Đồ mua ở cửa hàng: hộp theo các ô nó chiếm (thu vào một chút cho agent lách qua khe giữa hai món)
-  const doors = new Set<string>()
-  for (const p of office.items) {
+  for (const p of o.items) {
     const i = itemById.get(p.item)
-    if (!i || p.stored) continue
-    if (i.mount === 'door') { for (const [c, r] of cellsOf(i, p.c, p.r, p.rot)) doors.add(cellKey(c, r)); continue }
-    if (i.mount !== 'floor' || i.h <= 0) continue
+    if (!i || p.stored || i.mount !== 'floor' || i.h <= 0) continue
     const { w, d } = footprint(i, p.rot)
     const x0 = cellX(p.c), z0 = cellZ(p.r)
     out.push({ minX: x0 + 0.06, maxX: x0 + w * CELL - 0.06, minZ: z0 + 0.06, maxZ: z0 + d * CELL - 0.06, h: i.h })
   }
-  // Vách: mỗi ô một hộp đầy (ô có cửa thì đi qua được)
-  for (const [k, kind] of Object.entries(office.walls)) {
-    if (doors.has(k)) continue
+  // Tường giữa các phòng (phòng khoá thì kín), vách trong phòng: mỗi ô một hộp đầy (ô cửa không nằm trong này)
+  for (const [k, kind] of building(o).walls) {
     const [c, r] = k.split(',').map(Number)
     out.push({ minX: cellX(c), maxX: cellX(c) + CELL, minZ: cellZ(r), maxZ: cellZ(r) + CELL, h: WALL_H[kind], cam: kind === 'tall' })
   }
@@ -225,7 +192,7 @@ function buildColliders(slots: DeskSlot[], office?: OfficeState): AABB[] {
 
 /**
  * Còn lối đi từ cửa vào tới mọi bàn làm việc và bảng ticket không. Trả về lý do nếu bị chặn kín
- * (để không cho đặt đồ / xây vách nhốt agent).
+ * (để không cho đặt đồ nhốt agent).
  */
 export function blockedReason(w: World): string | null {
   const n = w.nav

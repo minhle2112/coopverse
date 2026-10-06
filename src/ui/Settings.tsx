@@ -46,8 +46,8 @@ export function Toolbar() {
   const openWardrobe = useCoop((s) => s.openWardrobe)
   const toggleSettings = useCoop((s) => s.toggleSettings)
   const settingsOpen = useCoop((s) => s.settingsOpen)
-  const toggleClean = useCoop((s) => s.toggleClean)
-  const cleanOpen = useCoop((s) => s.cleanOpen)
+  const toggleRooms = useCoop((s) => s.toggleRooms)
+  const roomsOpen = useCoop((s) => s.roomsOpen)
   const toggleDeco = useCoop((s) => s.toggleDeco)
   const decoOpen = useDeco((s) => s.open)
   const tap = (fn: () => void) => () => { unlockAudio(); fn(); uiTick() }
@@ -62,10 +62,10 @@ export function Toolbar() {
       <button className="tb-btn" onClick={tap(() => openWardrobe('player'))} title="Tủ đồ (phím C)" aria-label="Tủ đồ" aria-keyshortcuts="C">
         <span aria-hidden>🎨</span>
       </button>
-      <button className={`tb-btn${cleanOpen ? ' on' : ''}`} onClick={tap(toggleClean)} title="Dọn dẹp văn phòng (phím B)" aria-label="Dọn dẹp" aria-expanded={cleanOpen} aria-keyshortcuts="B">
-        <span aria-hidden>🧹</span>
+      <button className={`tb-btn${roomsOpen ? ' on' : ''}`} onClick={tap(toggleRooms)} title="Mở phòng mới (phím B)" aria-label="Mở phòng" aria-expanded={roomsOpen} aria-keyshortcuts="B">
+        <span aria-hidden>🔑</span>
       </button>
-      <button className={`tb-btn${decoOpen ? ' on' : ''}`} onClick={tap(toggleDeco)} title="Trang trí: cửa hàng, đặt đồ, xây vách (phím T)" aria-label="Trang trí" aria-expanded={decoOpen} aria-keyshortcuts="T">
+      <button className={`tb-btn${decoOpen ? ' on' : ''}`} onClick={tap(toggleDeco)} title="Trang trí: cửa hàng, đặt đồ (phím T)" aria-label="Trang trí" aria-expanded={decoOpen} aria-keyshortcuts="T">
         <span aria-hidden>🛋️</span>
       </button>
       <button className={`tb-btn${settingsOpen ? ' on' : ''}`} onClick={tap(toggleSettings)} title="Cài đặt" aria-label="Cài đặt" aria-expanded={settingsOpen}>
@@ -116,7 +116,7 @@ function DesktopSection() {
         <button type="button" className="desk-btn" onClick={update}>Kiểm tra bản mới</button>
       </div>
       <p className="set-hint" aria-live="polite">
-        {note || 'Nhập EXP cũ: chọn thư mục .coopverse của bản chạy bằng trình duyệt để giữ điểm, Xu và văn phòng đã dọn. F11: toàn màn hình.'}
+        {note || 'Nhập EXP cũ: chọn thư mục .coopverse của bản chạy bằng trình duyệt để giữ điểm, Xu và văn phòng đã sắm. F11: toàn màn hình.'}
       </p>
       <p className="set-hint">
         Hình pixel: LimeZu (

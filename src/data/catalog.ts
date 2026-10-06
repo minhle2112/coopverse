@@ -1,6 +1,6 @@
 /**
- * Cửa hàng đồ trang trí: mọi món bán được, giá, chỗ chiếm trên lưới. Không phụ thuộc React hay PixiJS:
- * server dùng chung để kiểm giá. Hình của từng món (LimeZu) nằm ở src/pixel/catalogArt.ts.
+ * Cửa hàng đồ trang trí: mọi món bán được, giá, chỗ chiếm trên lưới, công dụng, hình (vùng cắt từ ảnh LimeZu).
+ * Dữ liệu ở items.json; không phụ thuộc React hay PixiJS: server dùng chung để kiểm giá. Vẽ hình: src/pixel/catalogArt.ts.
  *
  * Lưới đặt đồ: ô 0,5 m (= một ô 16 px của LimeZu). Đồ treo tường chỉ treo trên tường bắc, theo cột ô.
  *
@@ -8,10 +8,13 @@
  * Đồ nhỏ mua được ngay ngày đầu; món đắt nhất (mèo văn phòng) cần dành dụm khoảng một tuần.
  */
 
-export type Group = 'plant' | 'wall' | 'lounge' | 'fun' | 'build'
+import data from './items.json'
+import type { Activity } from '../world/room'
 
-/** floor: đứng trên sàn, chặn đường · rug: trải sàn, đi qua được, đồ khác đặt lên được · wall: treo tường bắc · door: lắp vào vách */
-export type Mount = 'floor' | 'rug' | 'wall' | 'door'
+export type Group = 'plant' | 'wall' | 'lounge' | 'fun' | 'bed'
+
+/** floor: đứng trên sàn, chặn đường · rug: trải sàn, đi qua được, đồ khác đặt lên được · wall: treo tường bắc */
+export type Mount = 'floor' | 'rug' | 'wall'
 
 /**
  * Xoay: four = 4 hướng (LimeZu có đủ hình) · two = quay mặt / quay lưng · flip = lật gương trái/phải · none = không xoay.
@@ -33,105 +36,142 @@ export interface Item {
   h: number
   /** Toả sáng ban đêm */
   light?: 'lamp' | 'screen'
+  /** Agent và bạn dùng món này thế nào (không có = chỉ để trang trí) */
+  use?: Use
+  art: Art
 }
+
+/**
+ * Công dụng của món:
+ * - seat: ngồi được, `n` chỗ cách nhau `gap` mét ở hàng ghế phía trước; `back` = bước vào từ phía sau (ghế kê sát bàn),
+ *   `sink` = lùi chỗ ngồi về phía lưng ghế bao nhiêu mét
+ * - stand: đứng trước mặt món dùng, `n` chỗ cạnh nhau, cách mép trước `dist` mét (mặc định 0,4)
+ * - pair: hai người hai đầu món (bóng bàn, bi-a) · pet: ngồi vuốt ve (mèo) · watch: đứng xem từ xa (TV treo tường)
+ * - bed: giường một người (đầu giường phía bắc): agent nằm ngủ, đầu trên gối, chăn (`front` của hình) đắp đè lên
+ */
+export type Use =
+  | { kind: 'seat'; act: Activity; n: number; gap: number; back?: boolean; sink?: number }
+  | { kind: 'stand'; act: Activity; n?: number; dist?: number }
+  | { kind: 'pair' | 'pet' | 'watch' | 'bed'; act: Activity }
+
+/** Một vùng cắt từ ảnh LimeZu: [đường dẫn trong gói hình, x, y, rộng, cao] (pixel) */
+export type Src = [string, number, number, number, number]
+
+/**
+ * Một mảnh hình của món. (x, y): góc trên trái so với điểm neo, pixel. Điểm neo: giữa mép dưới khung chân món
+ * (đồ treo tường: giữa mép trên mặt tường; ghế làm việc: chỗ ngồi; đồ trên bàn làm việc: chỗ đặt món).
+ * Hình động: `frames` khung xếp ngang liền nhau trong ảnh, khung đầu là `src`; `speed` khung mỗi nhịp (0,05–0,1).
+ * Không có `src` thì là khối màu `box` = [rộng, cao, màu "#rrggbb"] (bàn phím, màn hình nhìn ngang).
+ */
+export interface Part { src?: Src; box?: [number, number, string]; x: number; y: number; frames?: number; speed?: number }
+
+/** Cỡ một mảnh (khung đầu nếu là hình động) */
+export const partWH = (p: Part): [number, number] => (p.src ? [p.src[3], p.src[4]] : p.box ? [p.box[0], p.box[1]] : [0, 0])
+
+/**
+ * Hình một hướng: các mảnh vẽ theo thứ tự (mảnh sau đè mảnh trước).
+ * - flip: lật gương quanh điểm neo
+ * - fit: kéo mảnh đầu tiên cho vừa khung chân (rộng + dw, cao + dh pixel), giữ nguyên 4 mép l/r/t/b;
+ *   `repeat` lặp lại phần giữa (bàn họp), `stretch` giãn phần giữa (thảm). (x, y) của mảnh là độ lệch thêm.
+ * - front: số hàng pixel dưới cùng vẽ đè lên người đang ngồi (tay ghế phía camera)
+ */
+export interface View {
+  parts: Part[]
+  flip?: boolean
+  fit?: { mode: 'repeat' | 'stretch'; l: number; r: number; t: number; b: number; dw?: number; dh?: number }
+  front?: number
+}
+
+/**
+ * Hình của món. `views[rot]` theo hướng (0 xuống, 1 trái, 2 lên, 3 phải); hướng thiếu dùng `views[0]`
+ * (món lật: hướng 1 tự lật gương `views[0]`). `shadow`: bóng đổ dưới chân (mặc định: món cao từ 0,5 m; đồ treo tường có).
+ * `code`: hình vẽ bằng code, không sửa ở trang cắt hình (bảng vinh danh).
+ */
+export interface Art { views?: (View | null)[]; shadow?: boolean; code?: 'fame' }
+
+/** Bàn làm việc: mặt bàn kéo cho vừa cỡ bàn (giữ 4 mép, lặp phần giữa); `side` = hình riêng khi bàn quay ngang */
+export interface DeskTop { src: Src; l: number; r: number; t: number; b: number }
+/**
+ * Ghế làm việc, điểm neo ở chỗ ngồi: front = ghế sau lưng người ngồi nhìn về camera, back = ghế nhìn từ sau
+ * (lưng ghế che hông người ngồi), side = ghế bàn quay ngang (vẽ cho người nhìn sang phải, tự lật khi nhìn sang trái).
+ * Bản "Leather" dùng khi agent đã mua ghế da; thiếu thì nhuộm nâu bản thường.
+ */
+export interface DeskArt {
+  top: DeskTop
+  side?: DeskTop
+  chair: { front: View; back: View; side: View; frontLeather?: View; backLeather?: View; sideLeather?: View }
+  things: DeskThing[]
+}
+
+/** Kiểu bàn: front = agent ngồi phía bắc nhìn về camera, back = agent quay lưng về camera, side = bàn quay ngang */
+export type DeskKind = 'front' | 'back' | 'side'
+export const DESK_KINDS: DeskKind[] = ['front', 'back', 'side']
+
+/**
+ * Chỗ đặt một món trên bàn: điểm neo của món, pixel so với góc trên trái hình mặt bàn.
+ * `if`: chỉ dùng khi agent có đủ các đồ để bàn này (chỗ dùng được mà nhiều `if` nhất thắng, bằng nhau thì chỗ ghi trước);
+ * `hide`: không vẽ món (bàn chật).
+ */
+export interface DeskAt { x: number; y: number; if?: string[]; hide?: boolean }
+
+/** Hình một món ở một kiểu bàn + chỗ đặt; `screen` = mặt màn hình sáng [x, y, rộng, cao] so với điểm neo */
+export interface DeskThingView extends View { at: DeskAt[]; screen?: [number, number, number, number] }
+
+/**
+ * Một món trên bàn làm việc. Có `price` = đồ để bàn agent mua (mở khoá ở cấp `level`), không có = luôn có trên bàn
+ * (máy tính, bàn phím, cốc). Kiểu bàn thiếu hình thì không vẽ món ở kiểu đó. `light`: đèn bàn, quầng sáng ấm
+ * ban đêm tại [x, y] so với điểm neo. Ghế da (`chair`) không vẽ trên bàn: hình ở `chair.*Leather`.
+ */
+export interface DeskThing {
+  id: string
+  name: string
+  icon?: string
+  price?: number
+  level?: number
+  light?: [number, number]
+  views: Partial<Record<DeskKind, DeskThingView>>
+}
+
+/** Món này ở kiểu bàn `kind` của một agent có các đồ `has`: hình + chỗ đặt, hoặc null (không vẽ) */
+export function deskPlace(t: DeskThing, kind: DeskKind, has: (id: string) => boolean): { view: DeskThingView; at: DeskAt } | null {
+  if (t.price !== undefined && !has(t.id)) return null
+  const view = t.views[kind]
+  if (!view?.parts.length) return null
+  let best: DeskAt | null = null
+  for (const a of view.at) if ((a.if ?? []).every(has) && (!best || (a.if?.length ?? 0) > (best.if?.length ?? 0))) best = a
+  return best && !best.hide ? { view, at: best } : null
+}
+
+export interface ItemsFile { desk: DeskArt; items: Item[] }
 
 export const GROUPS: { id: Group; name: string; icon: string }[] = [
   { id: 'plant', name: 'Cây & đồ nhỏ', icon: '🪴' },
   { id: 'wall', name: 'Treo tường', icon: '🖼️' },
   { id: 'lounge', name: 'Nghỉ ngơi & bếp', icon: '🛋️' },
   { id: 'fun', name: 'Giải trí', icon: '🎮' },
-  { id: 'build', name: 'Xây vách', icon: '🧱' },
+  { id: 'bed', name: 'Phòng ngủ', icon: '🛏️' },
 ]
 
-const it = (id: string, name: string, group: Group, price: number, w: number, d: number, mount: Mount, turn: Turn, h: number, light?: Item['light']): Item =>
-  ({ id, name, group, price, w, d, mount, turn, h, light })
+/** Mọi món và hình bàn ghế làm việc nằm trong items.json (sửa bằng trang cắt hình cutter.html khi chạy dev) */
+const FILE = data as unknown as ItemsFile
 
-export const ITEMS: Item[] = [
-  // ── Cây & đồ nhỏ ──
-  it('plantSmall', 'Chậu cây nhỏ', 'plant', 30, 1, 1, 'floor', 'flip', 0.8),
-  it('plantBig', 'Chậu cây lá to', 'plant', 60, 1, 1, 'floor', 'flip', 1.4),
-  it('plantTree', 'Cây cảnh cao', 'plant', 90, 1, 1, 'floor', 'flip', 1.8),
-  it('plantPalm', 'Cây cọ', 'plant', 100, 1, 1, 'floor', 'flip', 1.8),
-  it('lampFloor', 'Đèn đứng chụp vải', 'plant', 60, 1, 1, 'floor', 'flip', 1.6, 'lamp'),
-  it('floorLamp', 'Đèn cây hiện đại', 'plant', 75, 1, 1, 'floor', 'flip', 1.6, 'lamp'),
-  it('cabinet', 'Tủ thấp', 'plant', 80, 2, 1, 'floor', 'none', 1.0),
-  it('bookshelf', 'Kệ sách', 'plant', 120, 2, 1, 'floor', 'none', 2.0),
-  it('bookshelfWide', 'Kệ sách lớn', 'plant', 180, 3, 1, 'floor', 'none', 2.0),
-  it('waterCooler', 'Bình nước', 'plant', 100, 1, 1, 'floor', 'none', 1.2),
-  it('vending', 'Máy bán nước', 'plant', 220, 2, 1, 'floor', 'none', 1.9, 'screen'),
-  it('whiteboard', 'Bảng trắng', 'plant', 110, 2, 1, 'floor', 'none', 1.6),
-  it('chalkboard', 'Bảng đen', 'plant', 90, 2, 1, 'floor', 'none', 1.6),
-  it('rugGrey', 'Thảm xám', 'plant', 70, 3, 2, 'rug', 'none', 0),
-  it('rugGreen', 'Thảm xanh lá', 'plant', 80, 3, 2, 'rug', 'none', 0),
-  it('rugBorder', 'Thảm viền', 'plant', 90, 3, 2, 'rug', 'none', 0),
-  it('rugRed', 'Thảm đỏ lớn', 'plant', 120, 5, 3, 'rug', 'none', 0),
-  it('rugBlue', 'Thảm xanh lớn', 'plant', 120, 5, 3, 'rug', 'none', 0),
-
-  // ── Treo tường (tường bắc) ──
-  it('corkboard', 'Bảng ghim', 'wall', 40, 2, 0, 'wall', 'none', 0),
-  it('painting1', 'Tranh phong cảnh', 'wall', 50, 2, 0, 'wall', 'none', 0),
-  it('painting2', 'Tranh trừu tượng', 'wall', 60, 2, 0, 'wall', 'none', 0),
-  it('painting3', 'Tranh hoa', 'wall', 60, 2, 0, 'wall', 'none', 0),
-  it('moChart', 'Biểu đồ tăng trưởng', 'wall', 55, 2, 0, 'wall', 'none', 0),
-  it('moChart2', 'Biểu đồ cột', 'wall', 55, 2, 0, 'wall', 'none', 0),
-  it('clock', 'Đồng hồ cúc cu', 'wall', 130, 1, 0, 'wall', 'none', 0),
-  it('tvWall', 'TV treo tường', 'wall', 250, 2, 0, 'wall', 'none', 0, 'screen'),
-  it('fame', 'Bảng vinh danh', 'wall', 300, 6, 0, 'wall', 'none', 0),
-
-  // ── Nghỉ ngơi & bếp (agent rảnh và bạn dùng được: ngồi, pha cà phê, mở tủ lạnh...) ──
-  it('sofa', 'Sofa xám', 'lounge', 240, 3, 2, 'floor', 'four', 0.8),
-  it('armRed', 'Ghế bành đỏ', 'lounge', 100, 1, 1, 'floor', 'four', 0.8),
-  it('armBlue', 'Ghế bành xanh', 'lounge', 100, 1, 1, 'floor', 'four', 0.8),
-  it('coffeeTable', 'Bàn trà', 'lounge', 70, 3, 1, 'floor', 'none', 0.4),
-  it('tableHoney', 'Bàn ăn gỗ', 'lounge', 120, 3, 2, 'floor', 'none', 0.75),
-  it('meetingTable', 'Bàn họp', 'lounge', 300, 4, 2, 'floor', 'none', 0.75),
-  it('meetingChair', 'Ghế họp', 'lounge', 35, 1, 1, 'floor', 'two', 0),
-  it('highTable', 'Bàn cao', 'lounge', 80, 2, 1, 'floor', 'none', 1.05),
-  it('stool', 'Ghế đẩu', 'lounge', 25, 1, 1, 'floor', 'none', 0),
-  it('bench', 'Ghế băng', 'lounge', 50, 2, 1, 'floor', 'flip', 0.5),
-  it('kitCounter', 'Tủ bếp', 'lounge', 70, 2, 1, 'floor', 'none', 0.95),
-  it('kitSink', 'Bồn rửa', 'lounge', 100, 1, 1, 'floor', 'none', 0.95),
-  it('kitStove', 'Bếp nấu', 'lounge', 120, 1, 1, 'floor', 'none', 0.95),
-  it('kitFridge', 'Tủ lạnh nhỏ', 'lounge', 150, 1, 1, 'floor', 'none', 1.9),
-  it('fridge', 'Tủ lạnh lớn', 'lounge', 220, 2, 1, 'floor', 'none', 1.9),
-  it('coffeeBar', 'Quầy cà phê', 'lounge', 260, 2, 1, 'floor', 'none', 1.2),
-
-  // ── Giải trí ──
-  it('arcade1', 'Máy game thùng', 'fun', 380, 1, 1, 'floor', 'none', 1.6, 'screen'),
-  it('arcade2', 'Máy game đỏ', 'fun', 380, 1, 1, 'floor', 'none', 1.6, 'screen'),
-  it('tvStand', 'Kệ TV', 'fun', 330, 4, 1, 'floor', 'none', 1.0, 'screen'),
-  it('pingpong', 'Bàn bóng bàn', 'fun', 550, 2, 3, 'floor', 'none', 0.9),
-  it('pool', 'Bàn bi-a', 'fun', 750, 3, 2, 'floor', 'none', 0.9),
-  it('cat', 'Mèo văn phòng', 'fun', 1000, 2, 1, 'floor', 'flip', 0.3),
-
-  // ── Xây vách ──
-  it('door', 'Cửa kính', 'build', 100, 2, 1, 'door', 'none', 0),
-]
+/** Danh sách món theo thứ tự hiện trong cửa hàng */
+export const ITEMS: Item[] = FILE.items
+/** Hình bàn + ghế làm việc của agent */
+export const DESK_ART: DeskArt = FILE.desk
 
 export const itemById = new Map(ITEMS.map((i) => [i.id, i]))
 
-/** Vách tự xây: thấp ngang hông, kính, hoặc cao đầy đủ (che người phía sau, tự mờ đi) */
-export type WallKind = 'low' | 'glass' | 'tall'
-export const WALLS: { kind: WallKind; name: string; price: number; hint: string }[] = [
-  { kind: 'low', name: 'Vách thấp', price: 4, hint: 'Ngang hông, luôn thấy người' },
-  { kind: 'glass', name: 'Vách kính', price: 7, hint: 'Kính trong, luôn thấy người' },
-  { kind: 'tall', name: 'Tường cao', price: 10, hint: 'Như tường thật, mờ đi khi có người phía sau' },
-]
-export const wallPrice = (k: WallKind) => WALLS.find((w) => w.kind === k)!.price
+/** Vách (tường giữa các phòng, vách trong phòng vẽ ở trang thiết kế nhà): thấp ngang hông, hoặc cao đầy đủ (che người phía sau, tự mờ đi) */
+export type WallKind = 'low' | 'tall'
 
 /**
  * Đồ để bàn: của riêng từng agent (đi theo agent khi đổi chỗ), mở khoá khi agent đạt cấp `level`, rồi mới mua bằng Xu.
- * Mỗi món một chỗ cố định trên bàn. Thứ tự = thứ tự hiện trong bảng chọn.
+ * Là các món có giá trong `desk.things` của items.json (hình, chỗ đặt trên bàn ở đó). Thứ tự = thứ tự hiện trong bảng chọn.
  */
 export interface DeskItem { id: string; name: string; icon: string; price: number; level: number }
-export const DESK_ITEMS: DeskItem[] = [
-  { id: 'plant', name: 'Cây để bàn', icon: '🌱', price: 25, level: 2 },
-  { id: 'frame', name: 'Khung ảnh', icon: '🖼️', price: 20, level: 2 },
-  { id: 'monitor', name: 'Màn hình thứ hai', icon: '🖥️', price: 120, level: 3 },
-  { id: 'lamp', name: 'Đèn bàn', icon: '💡', price: 60, level: 3 },
-  { id: 'chair', name: 'Ghế da', icon: '🪑', price: 140, level: 4 },
-  { id: 'trophy', name: 'Cúp vàng', icon: '🏆', price: 200, level: 5 },
-]
+export const DESK_ITEMS: DeskItem[] = DESK_ART.things.flatMap((t) =>
+  t.price === undefined ? [] : [{ id: t.id, name: t.name, icon: t.icon ?? '🎁', price: t.price, level: t.level ?? 1 }])
 export const deskItemById = new Map(DESK_ITEMS.map((d) => [d.id, d]))
 
 /** Tên món giữa câu ("Đã mua sofa xám"), giữ nguyên chữ viết tắt ("TV treo tường") */

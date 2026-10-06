@@ -1,13 +1,14 @@
 import { create } from 'zustand'
-import { cleaned } from '../life/director'
+import { roomOpened } from '../life/director'
 import { useCoop } from '../store'
 import { useExp } from './exp'
-import { apply, type Action, type PlaceOpts } from './decor'
-import { emptyOffice, jobById, normOffice, spentXu, type OfficeState } from './officeState'
+import { apply, fitHouse, type Action, type PlaceOpts } from './decor'
+import { emptyOffice, normOffice, spentXu, type OfficeState } from './officeState'
+import { isOpen, roomById } from '../world/rooms'
 import { earnings, xuGained, type Earnings } from './xu'
 
 /**
- * Văn phòng phía trang: chỗ đã dọn + Xu. Xu kiếm được tính lại từ sổ EXP mỗi khi sổ đổi; Xu đã tiêu nằm trong
+ * Văn phòng phía trang: phòng đã mở, đồ + Xu. Xu kiếm được tính lại từ sổ EXP mỗi khi sổ đổi; Xu đã tiêu nằm trong
  * trạng thái văn phòng (server Coopverse lưu file, bản demo lưu trong trình duyệt).
  */
 
@@ -50,9 +51,10 @@ function onLedger() {
 function loadDemo(): OfficeState {
   try {
     const raw = localStorage.getItem(DEMO_KEY)
-    if (raw) return normOffice(JSON.parse(raw) as Partial<OfficeState>)
+    // Nhà đã sửa (trang thiết kế nhà): đồ hết chỗ cất kho, phòng không còn thì trả Xu
+    if (raw) return fitHouse(normOffice(JSON.parse(raw) as Partial<OfficeState>))
   } catch { /* trình duyệt chặn bộ nhớ: bắt đầu lại từ đầu */ }
-  return emptyOffice()
+  return fitHouse(emptyOffice())
 }
 
 async function fetchOffice(cid: string): Promise<OfficeState> {
@@ -94,7 +96,7 @@ export function startOfficeSync(): () => void {
 }
 
 /**
- * Gửi một lệnh văn phòng (dọn, mua, dời, cất, bán, xây vách, dời bàn, đồ để bàn: src/data/decor.ts). Bản demo làm ngay trong trình duyệt;
+ * Gửi một lệnh văn phòng (mở phòng, mua, dời, cất, bán, dời bàn, đồ để bàn: src/data/decor.ts). Bản demo làm ngay trong trình duyệt;
  * bản thật gửi server Coopverse (server kiểm lại Xu và chỗ đặt). Lỗi (chưa đủ Xu, vướng, mất kết nối) thì ném ra để giao diện báo.
  * `opts.blocked`: ô bàn làm việc (chỉ trang biết) để kiểm trước khi gửi.
  */
@@ -134,16 +136,16 @@ export function demoGift(xu: number) {
   useOffice.setState({ office: next })
 }
 
-/** Trả Xu dọn một chỗ */
-export async function cleanJob(id: string): Promise<void> {
-  const job = jobById.get(id)
-  if (!job) throw new Error('Không có chỗ này')
-  if (useOffice.getState().office.cleaned[id] !== undefined) return
-  await act({ action: 'clean', job: id })
-  cleaned(job)
+/** Trả Xu mở một phòng */
+export async function openRoom(id: string): Promise<void> {
+  const room = roomById.get(id)
+  if (!room) throw new Error('Không có phòng này')
+  if (isOpen(useOffice.getState().office, id)) return
+  await act({ action: 'room', room: id })
+  roomOpened(room)
 }
 
-/** Bản demo: bắt đầu lại văn phòng bẩn (nút trong bảng Dọn dẹp) */
+/** Bản demo: bắt đầu lại văn phòng như lúc đầu (nút trong bảng Mở phòng) */
 export function resetDemoOffice() {
   if (!isDemo()) return
   try { localStorage.removeItem(DEMO_KEY) } catch { /* bỏ qua */ }

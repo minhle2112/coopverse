@@ -58,12 +58,12 @@ export function useControls(stage: RefObject<HTMLDivElement | null>) {
         useCoop.getState().openWardrobe()
         return
       }
-      // B: chế độ dọn dẹp (trả Xu dọn chỗ bẩn)
+      // B: bảng mở phòng (trả Xu mở phòng khoá)
       if (shortcut && e.code === 'KeyB' && !focused()) {
-        useCoop.getState().toggleClean()
+        useCoop.getState().toggleRooms()
         return
       }
-      // T: chế độ trang trí (cửa hàng, đặt đồ, xây vách) · R: xoay món đang cầm / đang chọn · Enter: mua chỗ đặt thử
+      // T: chế độ trang trí (cửa hàng, đặt đồ, dời bàn) · R: xoay món đang cầm / đang chọn · Enter: mua chỗ đặt thử
       if (shortcut && e.code === 'KeyT' && !focused()) {
         useCoop.getState().toggleDeco()
         return

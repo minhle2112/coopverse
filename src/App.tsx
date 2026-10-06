@@ -22,7 +22,7 @@ export default function App() {
   const agents = useCoop((s) => s.agents)
   // Bố cục chỉ dựng lại khi sơ đồ tổ chức đổi, không phải khi trạng thái đổi
   const orgKey = agents.map((a) => `${a.id}>${a.reportsTo}${a.candidate ? '?' : ''}`).join('|')
-  // ...và khi bạn đặt / dời đồ, xây vách, dời bàn (không phải khi dọn bụi hay Xu đổi)
+  // ...và khi bạn đặt / dời đồ, dời bàn (không phải khi Xu đổi)
   const office = useOffice((s) => s.office)
   const decoKey = layoutKey(office)
   const world = useMemo(() => {

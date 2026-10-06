@@ -1,62 +1,86 @@
 import { AnimatedSprite, Container, Graphics, NineSliceSprite, Sprite } from 'pixi.js'
-import { footprint, type Item } from '../data/catalog'
+import { DESK_ART, footprint, partWH, type Item, type Part, type Src, type View } from '../data/catalog'
 import { CELL, cellX, cellZ } from '../data/officeState'
 import atlas from './atlas.json'
-import { cut, frames, sheet, sprite, stitch, type SpriteName } from './assets'
+import { region, sheet, srcTex, stitch, stitchSrc } from './assets'
 import { PPM, px, py } from './geom'
-import { sortAt, spr, wallTop, type Light, type Rect } from './office'
+import { sortAt, wallTop, type Light, type Rect } from './office'
 
 /**
- * Hình của từng món trong cửa hàng (src/data/catalog.ts), toàn bộ là hình LimeZu:
- * món 4 hướng dùng đúng hình từng hướng của gói (ghế bành, sofa), món lật thì lật gương.
+ * Hình của từng món trong cửa hàng, toàn bộ là hình LimeZu: các mảnh cắt ghi trong src/data/items.json
+ * (trang cắt hình cutter.html). Món 4 hướng có hình từng hướng (ghế bành, sofa), món lật thì lật gương.
  */
 
-/** Hình theo hướng: [nhìn xuống, nhìn trái, nhìn lên, nhìn phải]; một phần tử = mọi hướng dùng chung */
-const VIEWS: Record<string, SpriteName[][]> = {
-  plantSmall: [['plantSmall']], plantBig: [['plantBig']], plantTree: [['plantTree']], plantPalm: [['plantPalm']],
-  lampFloor: [['lampFloor']], floorLamp: [['floorLamp']], cabinet: [['cabinet']],
-  bookshelf: [['bookshelf']], bookshelfWide: [['bookshelfWide']], waterCooler: [['moCooler']], vending: [['vending']],
-  whiteboard: [['whiteboard']], chalkboard: [['chalkboard']],
-  corkboard: [['corkboard']], painting1: [['painting1']], painting2: [['painting2']], painting3: [['painting3']],
-  moChart: [['moChart']], moChart2: [['moChart2']], tvWall: [['tv']],
-  sofa: [['sofaF'], ['sofaSL'], ['sofaB'], ['sofaSR']],
-  armRed: [['armRedF'], ['armRedL'], ['armRedB'], ['armRedR']],
-  armBlue: [['armBlueF'], ['armBlueL'], ['armBlueB'], ['armBlueR']],
-  coffeeTable: [['coffeeTable']], tableHoney: [['tableHoney']], highTable: [['highTable']], stool: [['stool']],
-  bench: [['bench']], kitCounter: [['kitCounter']], kitSink: [['kitSink']], kitStove: [['kitStove']],
-  kitFridge: [['kitFridge']], fridge: [['fridge']],
-  arcade1: [['arcade1']], arcade2: [['arcade2']], tvStand: [['tvStand', 'tvStand2']],
-  pingpong: [['pingpongBig']], pool: [['pool']],
+/** Món chưa có hình: hộp giấy */
+const BOX: View = { parts: [{ src: atlas.sprites.boxSmall as Src, x: -6, y: -12 }] }
+
+/** Hình hướng rot của món (hướng thiếu dùng hình hướng 0; món lật thì hướng 1 lật gương hình hướng 0) */
+export function viewOf(i: Item, rot: number): { view: View; flip: boolean } {
+  const vs = i.art.views
+  const own = vs?.[rot]
+  if (own) return { view: own, flip: !!own.flip }
+  const v = vs?.[0] ?? BOX
+  return { view: v, flip: !!v.flip !== (i.turn === 'flip' && rot === 1) }
 }
 
-/** Thảm: mép giữ nguyên khi kéo dãn (trái/phải, trên/dưới, pixel) */
-const RUGS: Record<string, [SpriteName, number, number]> = {
-  rugGrey: ['rugGrey', 6, 6], rugGreen: ['rugGreen', 6, 6], rugBorder: ['rugBorder', 8, 8], rugRed: ['rugRed', 14, 12], rugBlue: ['rugBlue', 14, 12],
+/** Một mảnh: hình tĩnh, hình động (các khung xếp ngang trong ảnh), hoặc khối màu */
+function partNode(p: Part): Container {
+  let s: Container
+  if (!p.src) {
+    const [w, h, col] = p.box ?? [0, 0, '#000000']
+    s = new Graphics().rect(0, 0, w, h).fill(col)
+  } else if (p.frames && p.frames > 1) {
+    const [k, sx, sy, w, h] = p.src
+    const a = new AnimatedSprite(Array.from({ length: p.frames }, (_, f) => region(k, sx + f * w, sy, w, h)))
+    a.animationSpeed = p.speed ?? 0.08
+    a.play()
+    s = a
+  } else s = new Sprite(srcTex(p.src))
+  s.position.set(p.x, p.y)
+  return s
 }
 
-/** Đồ treo tường: cách mép trên mặt tường bao nhiêu pixel */
-const WALL_Y: Record<string, number> = { corkboard: 10, painting1: 8, painting2: 8, painting3: 8, moChart: 4, moChart2: 4, clock: 0, tvWall: 6, fame: 3 }
-
-const viewOf = (i: Item, rot: number): { names: SpriteName[]; flip: boolean } => {
-  const v = VIEWS[i.id] ?? [['boxSmall']]
-  if (i.turn === 'flip') return { names: v[0], flip: rot === 1 }
-  return { names: v[rot] ?? v[0], flip: false }
-}
-
-/** Nhiều mảnh ghép ngang, căn giữa tại cx, chân ở bottom */
-function strip(names: SpriteName[], cx: number, bottom: number, flip: boolean) {
+/**
+ * Dựng hình một hướng, gốc toạ độ = điểm neo (giữa mép dưới khung chân). `fw`, `fh`: cỡ khung chân (pixel),
+ * để kéo mảnh `fit` cho vừa. Dùng chung cho đồ trang trí và ghế làm việc (office.ts).
+ */
+export function viewNode(v: View, flip: boolean, fw = 0, fh = 0): Container {
   const c = new Container()
-  const total = names.reduce((w, n) => w + sprite(n).width, 0)
-  let x = -total / 2
-  for (const n of names) {
-    const t = sprite(n)
-    const s = new Sprite(t)
-    s.position.set(Math.round(x), -t.height)
+  v.parts.forEach((p, k) => {
+    if (k > 0 || !v.fit || !p.src) return void c.addChild(partNode(p))
+    const f = v.fit
+    const W = fw + (f.dw ?? 0), H = fh + (f.dh ?? 0)
+    let s: Container
+    if (f.mode === 'stretch') {
+      const n = new NineSliceSprite({ texture: srcTex(p.src), leftWidth: f.l, rightWidth: f.r, topHeight: f.t, bottomHeight: f.b })
+      n.width = W
+      n.height = H
+      s = n
+    } else s = new Sprite(stitchSrc(p.src, W, H, f.l, f.r, f.t, f.b))
+    s.position.set(-W / 2 + p.x, -H + p.y)
     c.addChild(s)
-    x += t.width
-  }
-  c.position.set(Math.round(cx), Math.round(bottom))
+  })
   if (flip) c.scale.x = -1
+  return c
+}
+
+/** Phần trước của ghế (`front` hàng pixel dưới cùng, vd tay ghế phía camera): vẽ đè lên người đang ngồi */
+function frontNode(v: View, flip: boolean, cx: number, bottom: number): Container {
+  const H = v.front ?? 0
+  const c = new Container()
+  for (const p of v.parts) {
+    if (!p.src) continue
+    const [k, sx, sy, w, h] = p.src
+    const top = Math.max(p.y, -H), bot = Math.min(p.y + h, 0)
+    if (bot <= top) continue
+    const s = new Sprite(region(k, sx, sy + top - p.y, w, bot - top))
+    s.position.set(p.x, top)
+    c.addChild(s)
+  }
+  if (flip) c.scale.x = -1
+  c.position.set(Math.round(cx), Math.round(bottom))
+  // Người ngồi ghế xếp lớp ở chân + 10 (Agents.tsx), mép ghế nằm ngay trên
+  c.zIndex = Math.round(bottom) + 3
   return c
 }
 
@@ -73,8 +97,7 @@ export interface ItemView {
 
 /** Khung pixel của các ô một món chiếm trên sàn */
 export function footRect(i: Item, c: number, r: number, rot: number): Rect {
-  // Cửa: 2 ô theo vách (ngang 2×1, dọc 1×2)
-  const { w, d } = i.mount === 'door' ? (rot === 1 ? { w: 1, d: 2 } : { w: 2, d: 1 }) : footprint(i, rot)
+  const { w, d } = footprint(i, rot)
   return { x: Math.round(px(cellX(c))), y: Math.round(py(cellZ(r))), w: w * CELL * PPM, h: d * CELL * PPM }
 }
 
@@ -94,118 +117,35 @@ const bounds = (o: Container): Rect => {
 export function itemView(i: Item, c: number, r: number, rot: number, fame?: Graphics): ItemView {
   if (i.mount === 'wall') return wallItem(i, c, fame)
   const f = footRect(i, c, r, rot)
-  if (i.mount === 'door') return doorGhost(f, rot)
   const cx = f.x + f.w / 2, bottom = f.y + f.h
-  if (i.mount === 'rug') {
-    const [name, lr, tb] = RUGS[i.id]
-    const n = new NineSliceSprite({ texture: sprite(name), leftWidth: lr, rightWidth: lr, topHeight: tb, bottomHeight: tb })
-    n.width = f.w
-    n.height = f.h
-    n.position.set(f.x, f.y)
-    return { node: n, layer: 'floor', hit: f }
-  }
-  let node: Container
+  const { view, flip } = viewOf(i, rot)
+  const node = viewNode(view, flip, f.w, f.h)
+  node.position.set(Math.round(cx), Math.round(bottom))
+  if (i.mount === 'rug') return { node, layer: 'floor', hit: f }
   let light: Light | undefined
-  if (i.id === 'cat') {
-    const a = new AnimatedSprite(frames('cat', 32, 16))
-    a.anchor.set(0.5, 1)
-    a.animationSpeed = 0.07
-    a.play()
-    a.position.set(Math.round(cx), bottom - 1)
-    if (rot === 1) a.scale.x = -1
-    node = a
-  } else if (i.id === 'coffeeBar') {
-    // Tủ bếp, máy pha cà phê LimeZu (động) đặt trên mặt tủ
-    node = strip(['kitCounter2'], cx, bottom, false)
-    const m = new AnimatedSprite(frames('coffee', 16, 32))
-    m.anchor.set(0.5, 1)
-    m.animationSpeed = 0.08
-    m.play()
-    m.position.set(-3, -10)
-    node.addChild(m)
-  } else if (i.id === 'meetingTable') {
-    const lift = 9
-    const t = new Sprite(stitch('meetingTable', f.w, f.h - 6 + lift, 10, 12, 6, 12))
-    node = new Container()
-    t.position.set(-f.w / 2, -(f.h - 6 + lift))
-    node.addChild(t)
-    node.position.set(Math.round(cx), bottom - 2)
-  } else if (i.id === 'meetingChair' && rot === 2) {
-    // Ghế quay lưng: mặt ghế + lưng ghế phía trên
-    node = new Container()
-    node.addChild(spr('chairFront', 0, -2), spr('chairBack', 0, -9))
-    node.position.set(Math.round(cx), bottom)
-  } else if (i.id === 'meetingChair') {
-    node = strip(['chairFront'], cx, bottom - 1, false)
-  } else {
-    const v = viewOf(i, rot)
-    node = strip(v.names, cx, bottom, v.flip)
-    // Bàn bi-a: bộ bóng xếp sẵn trên mặt nỉ (ván đang chơi dở)
-    if (i.id === 'pool') node.addChild(spr('poolBalls', 9, -17))
-  }
   if (i.light === 'lamp') light = { x: Math.round(cx), y: bottom - 26, r: 40, kind: 'lamp' }
   else if (i.light === 'screen') light = { x: Math.round(cx), y: bottom - 18, r: 18, kind: 'screen' }
   sortAt(node, bottom)
-  // Bóng đổ nhạt sát chân (hình LimeZu không kèm bóng); thảm, ghế đẩu, ghế họp thì thôi
+  // Bóng đổ nhạt sát chân (hình LimeZu không kèm bóng); mặc định chỉ món cao từ 0,5 m (thảm, ghế đẩu, ghế họp thì thôi)
   const wrap = new Container()
-  if (i.h >= 0.5) {
+  if (i.art.shadow ?? i.h >= 0.5) {
     const g = new Graphics()
     g.ellipse(Math.round(cx), bottom - 1, Math.max(4, Math.round(f.w * 0.46)), 3).fill({ color: 0x000000, alpha: 0.2 })
     wrap.addChild(g)
   }
   wrap.addChild(node)
   wrap.zIndex = node.zIndex
-  return { node: wrap, layer: 'sorted', hit: bounds(wrap), light, front: armFront(i, rot, cx, bottom) }
-}
-
-/**
- * Bóng mờ cửa kính lúc đặt thử (cửa thật do walls.ts vẽ trên vách): vách ngang thì cửa LimeZu đóng như trên tường cao,
- * vách dọc thì tấm kính hẹp chạy dọc 2 ô, khớp với vách kính dọc
- */
-function doorGhost(f: Rect, rot: number): ItemView {
-  const node = new Container()
-  if (rot === 1) {
-    const g = new Graphics()
-    g.rect(f.x + 5, f.y - 20, 6, f.h + 20).fill({ color: 0xbfe3ff, alpha: 0.45 })
-    g.rect(f.x + 4, f.y - 20, 1, f.h + 20).fill(0x5b6475)
-    g.rect(f.x + 11, f.y - 20, 1, f.h + 20).fill(0x5b6475)
-    g.rect(f.x + 4, f.y + f.h / 2 - 11, 8, 2).fill(0x5b6475)
-    node.addChild(g)
-  } else {
-    const a = new Sprite(frames('door', 32, 48)[0])
-    a.position.set(f.x, f.y + f.h - 48)
-    node.addChild(a)
-  }
-  node.zIndex = f.y + f.h
-  return { node, layer: 'sorted', hit: f }
-}
-
-/** Ghế bành quay ngang: 7 px dưới cùng của hình (tay ghế + mép đệm phía camera) vẽ đè lên người ngồi */
-function armFront(i: Item, rot: number, cx: number, bottom: number): Container | undefined {
-  if ((i.id !== 'armRed' && i.id !== 'armBlue') || (rot !== 1 && rot !== 3)) return undefined
-  const [k, sx, sy, w, h] = atlas.sprites[VIEWS[i.id][rot][0]] as Frame
-  const H = 7
-  const s = new Sprite(cut(k, sx, sy + h - H, w, H))
-  s.position.set(Math.round(cx - w / 2), Math.round(bottom) - H)
-  // Người ngồi ghế xếp lớp ở chân + 10 (Agents.tsx), mép ghế nằm ngay trên
-  s.zIndex = Math.round(bottom) + 3
-  return s
+  return { node: wrap, layer: 'sorted', hit: bounds(wrap), light, front: view.front ? frontNode(view, flip, cx, bottom) : undefined }
 }
 
 function wallItem(i: Item, c: number, fame?: Graphics): ItemView {
   const R = wallRect(i, c)
   const cx = R.x + R.w / 2
-  const top = R.y + (WALL_Y[i.id] ?? 6)
   const node = new Container()
   let light: Light | undefined
-  if (i.id === 'clock') {
-    const a = new AnimatedSprite(frames('clock', 16, 32))
-    a.animationSpeed = 0.05
-    a.play()
-    a.position.set(Math.round(cx - 8), top)
-    node.addChild(a)
-  } else if (i.id === 'fame') {
+  if (i.art.code === 'fame') {
     // Bảng vinh danh: khung bảng phấn LimeZu, nội dung (3 agent nhiều EXP nhất) vẽ ở Scene
+    const top = R.y + 3
     const w = R.w, h = 26
     const shadow = new Graphics().rect(R.x + 1, top + h, w - 2, 2).fill({ color: 0x000000, alpha: 0.22 })
     const bd = new Sprite(stitch('chalkWall', w, h, 4, 4, 4, 5))
@@ -216,11 +156,15 @@ function wallItem(i: Item, c: number, fame?: Graphics): ItemView {
       node.addChild(fame)
     }
   } else {
-    const t = sprite(VIEWS[i.id][0][0])
-    const s = new Sprite(t)
-    s.position.set(Math.round(cx - t.width / 2), top)
-    node.addChild(new Graphics().rect(Math.round(cx - t.width / 2) + 1, top + t.height, t.width - 2, 1).fill({ color: 0x000000, alpha: 0.18 }), s)
-    if (i.light === 'screen') light = { x: Math.round(cx), y: top + t.height / 2, r: 18, kind: 'screen' }
+    // Điểm neo: giữa mép trên mặt tường; bóng một vạch mảnh dưới mảnh đầu
+    const { view, flip } = viewOf(i, 0)
+    const [w, h] = partWH(view.parts[0])
+    const p0 = view.parts[0], x = Math.round(cx)
+    if (i.art.shadow ?? true) node.addChild(new Graphics().rect(x + p0.x + 1, R.y + p0.y + h, w - 2, 1).fill({ color: 0x000000, alpha: 0.18 }))
+    const v = viewNode(view, flip, R.w, 0)
+    v.position.set(x, R.y)
+    node.addChild(v)
+    if (i.light === 'screen') light = { x, y: R.y + p0.y + h / 2, r: 18, kind: 'screen' }
   }
   return { node, layer: 'floor', hit: bounds(node), light }
 }
@@ -233,59 +177,61 @@ export const FAME_INNER = { w: 6 * CELL * PPM - 10, h: 16 }
 type Frame = [string, number, number, number, number]
 const thumbs = new Map<string, string>()
 
-/** Hình đồ để bàn (src/data/catalog.ts DESK_ITEMS) đúng như trên bàn, dùng cho nút chọn */
-const DESK_SPRITE: Record<string, SpriteName> = {
-  plant: 'plantDesk', frame: 'deskFrame', monitor: 'moMonFront', lamp: 'deskLamp', chair: 'moChairFrontL', trophy: 'trophy',
-}
-
-/** Ảnh nhỏ (data URL) của một đồ để bàn, kèm cỡ gốc (pixel) để phóng đúng bội số nguyên */
+/**
+ * Ảnh nhỏ (data URL) của một đồ để bàn (desk.things trong items.json, hình bàn agent quay lưng: thấy mặt trước món),
+ * kèm cỡ gốc (pixel) để phóng đúng bội số nguyên; ghế da lấy theo hình ghế làm việc
+ */
 export function deskThumb(id: string): { url: string; w: number; h: number } | null {
-  const name = DESK_SPRITE[id]
-  if (!name) return null
-  const [k, sx, sy, w, h] = atlas.sprites[name] as Frame
+  const t = DESK_ART.things.find((x) => x.id === id)
+  const parts = id === 'chair' ? (DESK_ART.chair.frontLeather ?? DESK_ART.chair.front).parts
+    : (t?.views.back ?? t?.views.front ?? t?.views.side)?.parts
+  if (!parts?.length) return null
   const key = `desk:${id}`
   const hit = thumbs.get(key)
-  if (hit) return { url: hit, w, h }
-  const cv = document.createElement('canvas')
-  cv.width = w
-  cv.height = h
-  const g = cv.getContext('2d')!
-  g.imageSmoothingEnabled = false
-  g.drawImage(sheet(k).source.resource as CanvasImageSource, sx, sy, w, h, 0, 0, w, h)
-  const url = cv.toDataURL()
-  thumbs.set(key, url)
+  const url = hit ?? composite(parts)
+  if (!hit) thumbs.set(key, url)
+  const [, , w, h] = bbox(parts)
   return { url, w, h }
 }
 
-/** Ảnh nhỏ (data URL) của một món ở hướng mặc định, vẽ thẳng từ sheet LimeZu */
-export function itemThumb(i: Item): string {
-  const hit = thumbs.get(i.id)
-  if (hit) return hit
-  const parts: Frame[] = []
-  const at = (n: SpriteName) => atlas.sprites[n] as Frame
-  if (i.id === 'cat') parts.push(['cat', 0, 0, 32, 16])
-  else if (i.id === 'clock') parts.push(['clock', 0, 0, 16, 32])
-  else if (i.id === 'coffeeBar') parts.push(at('kitCounter2'))
-  else if (i.id === 'door') parts.push(['door', 0, 0, 32, 48])
-  else if (i.id === 'fame') parts.push(at('chalkWall'))
-  else if (i.id === 'meetingTable') parts.push(at('meetingTable'))
-  else if (i.id === 'meetingChair') parts.push(at('chairFront'))
-  else if (RUGS[i.id]) parts.push(at(RUGS[i.id][0]))
-  else for (const n of viewOf(i, 0).names) parts.push(at(n))
-  const W = parts.reduce((w, p) => w + p[3], 0), H = Math.max(...parts.map((p) => p[4]))
+/** Khung bao các mảnh (khung đầu của hình động): [x, y, rộng, cao] */
+function bbox(parts: Part[]): [number, number, number, number] {
+  const x0 = Math.min(...parts.map((p) => p.x)), y0 = Math.min(...parts.map((p) => p.y))
+  const x1 = Math.max(...parts.map((p) => p.x + partWH(p)[0])), y1 = Math.max(...parts.map((p) => p.y + partWH(p)[1]))
+  return [x0, y0, x1 - x0, y1 - y0]
+}
+
+/** Ghép các mảnh thành một ảnh (data URL) */
+function composite(parts: Part[]): string {
+  const [x0, y0, W, H] = bbox(parts)
   const cv = document.createElement('canvas')
   cv.width = W
   cv.height = H
   const g = cv.getContext('2d')!
   g.imageSmoothingEnabled = false
-  let x = 0
-  for (const [k, sx, sy, w, h] of parts) {
-    g.drawImage(sheet(k).source.resource as CanvasImageSource, sx, sy, w, h, x, H - h, w, h)
-    x += w
+  for (const { src, box, x, y } of parts) {
+    if (src) {
+      const [k, sx, sy, w, h] = src
+      g.drawImage(sheet(k).source.resource as CanvasImageSource, sx, sy, w, h, x - x0, y - y0, w, h)
+    } else if (box) {
+      g.fillStyle = box[2]
+      g.fillRect(x - x0, y - y0, box[0], box[1])
+    }
   }
-  if (i.id === 'coffeeBar') g.drawImage(sheet('coffee').source.resource as CanvasImageSource, 0, 0, 16, 32, 4, -8, 16, 32)
-  const url = cv.toDataURL()
+  return cv.toDataURL()
+}
+
+/** Ảnh nhỏ (data URL) của một món ở hướng mặc định, vẽ thẳng từ ảnh LimeZu (thảm, bàn họp: hình gốc chưa kéo dãn) */
+export function itemThumb(i: Item): string {
+  const hit = thumbs.get(i.id)
+  if (hit) return hit
+  let parts: Part[]
+  if (i.art.code === 'fame') parts = [{ src: atlas.sprites.chalkWall as Frame, x: 0, y: 0 }]
+  else {
+    const { view } = viewOf(i, 0)
+    parts = view.fit ? [{ ...view.parts[0], x: 0, y: 0 }] : view.parts
+  }
+  const url = composite(parts)
   thumbs.set(i.id, url)
   return url
 }
-

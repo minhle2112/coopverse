@@ -1,4 +1,5 @@
 import { expForLevel, levelOf, titleOf, useExp } from '../data/exp'
+import { leadIdsOf } from '../data/hire'
 import type { Agent, Issue } from '../data/types'
 import type { Activity } from '../world/layout'
 import { sceneHour } from '../world/time'
@@ -36,6 +37,7 @@ const AT: Record<Activity, string[]> = {
   stool: ['Ăn vặt chút đã', 'Bánh mì hôm nay giòn ghê', 'Chiều nay ai đặt trà sữa không?'],
   meeting: ['Phòng họp trống, mượn ngồi chút', 'Tập thuyết trình tí', 'Ghế phòng họp êm hơn ghế mình'],
   kanban: ['Để xem bảng còn gì nào', 'Cột Xong dài ra rồi 😎', 'Chưa có ticket mới à?', 'Ai kéo thẻ này qua vậy?'],
+  sleep: ['Zzz…', 'Chợp mắt 15 phút thôi…', 'Đừng gọi tôi dậy nha', 'Ngủ trưa là để sạc pin'],
   fame: ['Tuần này ai dẫn đầu nhỉ?', 'Phải cày thêm mới lên top được 💪', 'Ủa ai cày dữ vậy?', 'Tên mình phải lên bảng vinh danh mới được'],
   game: ['Kỷ lục mới nè! 🕹️', 'Một ván thôi rồi làm tiếp', 'Máy này khó ghê', 'Ai phá kỷ lục của tôi vậy?'],
   pool: ['Bi số 8 vào lỗ góc!', 'Cú này khó đây…', 'Đánh nhẹ tay thôi', 'Ván này tôi thắng nha 🎱'],
@@ -44,7 +46,6 @@ const AT: Record<Activity, string[]> = {
   cook: ['Hâm lại hộp cơm chút', 'Mì gói buổi chiều là chân ái 🍜', 'Bếp này sạch ghê', 'Ai rửa giùm cái ly với'],
   snack: ['Một lon nước ngọt cho tỉnh', 'Máy nuốt tiền rồi! 😤', 'Hết vị đào rồi…', 'Snack rong biển ngon ghê'],
   chat: ['Phòng rộng mà trống trơn ghê', 'Bao giờ mới có sofa ta?', 'Mua cái máy cà phê đi sếp ơi ☕', 'Có chậu cây chắc đẹp hơn 🪴', 'Đứng duỗi chân tí', 'Làm thêm ticket là có Xu sắm đồ đó'],
-  dust: ['Chỗ này bụi quá… 🤧', 'Hắt xì! Ai dọn giùm với', 'Sàn này bao lâu rồi chưa lau vậy?', 'Sếp ơi, thuê người dọn đi 😅', 'Xong ticket là có Xu dọn chỗ này', 'Giẫm phải gì dính dính…'],
 }
 
 const SEAT_IDLE = ['Rảnh quá, ai giao việc đi', 'Dọn bàn chút', 'Đọc lại checklist cái', 'Hôm nay ăn trưa ở đâu ta?']
@@ -100,30 +101,27 @@ export const EXCUSE = ['Cho em qua với sếp 🙏', 'Xin lỗi sếp, mượn 
 export const LEVEL_UP = (level: number, title: string) => [`Lên cấp ${level} rồi! 🎉`, `Yeah! Giờ em là ${title} 😎`, `Cấp ${level}! Giờ mỗi ticket ra nhiều Xu hơn 😆`]
 
 /** Bạn vừa trả Xu dọn một chỗ */
-export const CLEANED: Record<'floor' | 'wall' | 'window' | 'board', string[]> = {
-  floor: ['Sạch bong! ✨', 'Sàn bóng loáng luôn', 'Ôi thơm tho ghê', 'Giờ mới dám ngồi bệt nè 😄'],
-  wall: ['Hết mạng nhện rồi! 🕸️❌', 'Tường sáng hẳn ra', 'Không còn con nhện nào nữa chứ?'],
-  window: ['Cửa sổ trong veo ✨', 'Giờ mới thấy rõ ngoài trời', 'Nắng vào sáng cả phòng'],
-  board: ['Bảng sạch rồi, dễ đọc ghê', 'Giờ mới thấy rõ ticket 📌'],
-}
+export const ROOM_OPENED = [
+  'Phòng mới! Vào xem thử đi 🎉', 'Văn phòng rộng ra rồi kìa', 'Ôi, có cả {x} luôn', 'Sếp chịu chi ghê 😄',
+  'Mai họp ở {x} nhé', 'Đi tham quan {x} thôi!',
+]
 
 /** Bạn vừa mua đồ mới: agent đứng gần khen (`{x}` = tên món) */
 export const BOUGHT = ['Ồ, {x} mới kìa! 😍', 'Văn phòng xịn dần lên rồi', '{x} đẹp ghê', 'Ai chọn {x} vậy, có gu ghê', 'Giờ mới ra dáng văn phòng 😄']
 /** Agent được mua đồ để bàn (`{x}` = tên món) */
 export const GIFT = ['Ôi {x} cho em hả? Cảm ơn sếp 🥹', 'Bàn mình xịn hẳn lên rồi 😍', 'Có {x} rồi, làm việc hăng hơn hẳn 💪', 'Sếp chu đáo ghê!']
-export const BUILT = ['Có vách rồi, riêng tư ghê', 'Ô, phòng mới hả?', 'Xây gì đây ta? 🤔']
 
 export const ACT_EMOTE: Record<Activity, string> = {
   coffee: '☕', fridge: '🧃', water: '💧', window: '🌤️', tv: '📺', foos: '🏓', books: '📖',
-  sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌', fame: '🏆', chat: '💬', dust: '🤧',
-  game: '🕹️', pool: '🎱', pet: '🐱', board: '✏️', cook: '🍜', snack: '🥤',
+  sofa: '🛋️', beanbag: '😌', stool: '🥐', meeting: '📊', kanban: '📌', fame: '🏆', chat: '💬',
+  game: '🕹️', pool: '🎱', pet: '🐱', board: '✏️', cook: '🍜', snack: '🥤', sleep: '😴',
 }
 
 const DIALOGUES: Dialogue[] = [
   [[0, fun('Trưa nay ăn gì?')], [1, fun('Cơm tấm đầu hẻm đi!')], [0, fun('Chốt!')]],
   [[0, fun('Phòng mình trống trơn ha')], [1, fun('Làm thêm ticket, có Xu sắm đồ')], [0, fun('Chiến thôi! 💪')]],
   [[0, fun('Cuối tuần làm gì?')], [1, fun('Ngủ bù thôi')], [0, fun('Chuẩn bài!')]],
-  [[0, fun('Bụi quá, hắt xì mãi 🤧')], [1, fun('Sếp sắp cho dọn rồi đó')], [0, fun('Mong lắm luôn')]],
+  [[0, fun('Bên kia còn phòng khoá kìa')], [1, fun('Đủ Xu là sếp mở thôi')], [0, fun('Mong có pantry ghê ☕')]],
   [[0, fun('Mạng hôm nay lag ghê')], [1, fun('Chắc ai đang tải game')], [0, fun('Nghi lắm…')]],
   [[0, fun('Đọc checklist mới chưa?')], [1, fun('Đọc rồi, dài phết')], [0, fun('Mà viết kỹ thật')]],
   [[0, fun('Context còn nhiều không?')], [1, fun('Còn 40%, thoải mái')], [0, fun('Sướng ghê')]],
@@ -145,7 +143,7 @@ export const latestIssueOf = (agent: Agent, w: World) =>
   (agent.issueId ? w.issues.find((i) => i.id === agent.issueId) : undefined) ??
   w.issues.filter((i) => i.assigneeId === agent.id).sort(byNewest)[0]
 
-const isLead = (agent: Agent, w: World) => w.agents.some((a) => a.reportsTo === agent.id)
+const isLead = (agent: Agent, w: World) => leadIdsOf(w.agents).has(agent.id)
 
 /** Những câu có thể nói từ dữ liệu thật của agent này */
 export function realFacts(agent: Agent, w: World): Line[] {

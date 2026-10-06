@@ -5,7 +5,7 @@ import path from 'node:path'
 import type { Plugin } from 'vite'
 import type { Handler } from './guard'
 import { emptyLedger, type Ledger } from '../src/data/ledger'
-import { apply, parseAction } from '../src/data/decor'
+import { apply, fitHouse, parseAction } from '../src/data/decor'
 import { normOffice, spentXu, type OfficeState } from '../src/data/officeState'
 import { agentExp, levelOf } from '../src/data/levels'
 import { earnings } from '../src/data/xu'
@@ -21,7 +21,7 @@ import { earnings } from '../src/data/xu'
  *
  * - GET  /coop/exp/:companyId     đọc thêm dữ liệu mới từ Paperclip vào sổ rồi trả cả sổ
  * - GET  /coop/office/:companyId  trạng thái văn phòng
- * - POST /coop/office/:companyId  một lệnh trong src/data/decor.ts (dọn, mua, dời, cất, bán, xây vách, dời bàn);
+ * - POST /coop/office/:companyId  một lệnh trong src/data/decor.ts (mở phòng, mua, dời, cất, bán, dời bàn, đồ để bàn);
  *                                  cần header x-coopverse + origin Coopverse
  */
 
@@ -77,7 +77,8 @@ const offices = new Map<string, OfficeState>()
 
 async function readOffice(file: string): Promise<OfficeState | null> {
   try {
-    return normOffice(JSON.parse(await readFile(file, 'utf8')) as Partial<OfficeState>)
+    // Nhà đã sửa (trang thiết kế nhà): đồ hết chỗ cất kho, phòng không còn thì trả Xu (ghi lại ở lần lưu sau)
+    return fitHouse(normOffice(JSON.parse(await readFile(file, 'utf8')) as Partial<OfficeState>))
   } catch {
     return null
   }
@@ -86,7 +87,7 @@ async function readOffice(file: string): Promise<OfficeState | null> {
 async function loadOffice(dir: string, cid: string): Promise<OfficeState> {
   let o = offices.get(cid)
   if (o) return o
-  o = (await readOffice(officeFileOf(dir, cid))) ?? normOffice(null)
+  o = (await readOffice(officeFileOf(dir, cid))) ?? fitHouse(normOffice(null))
   offices.set(cid, o)
   return o
 }
@@ -119,7 +120,7 @@ export async function importLedgers(from: string, dir: string): Promise<number> 
     if (!src) continue
     await serial(cid, async () => {
       const mine = await loadOffice(dir, cid)
-      if (mine.spent.length || Object.keys(mine.cleaned).length) return
+      if (mine.spent.length || Object.keys(mine.rooms).length) return
       offices.set(cid, src)
       await writeJson(officeFileOf(dir, cid), src)
     })

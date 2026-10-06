@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PAPERCLIP_UI } from '../data/paperclip'
 import { switchCompany } from '../data/sync'
+import { leadIdsOf } from '../data/hire'
 import { STATUS_COLOR, STATUS_LABEL } from '../data/types'
 import { useCoop } from '../store'
 import type { World } from '../world/layout'
@@ -11,7 +12,7 @@ import { useOffice } from '../data/officeSync'
 import { USE_LABEL } from '../life/playerUse'
 import { spotById } from '../life/spots'
 import { desktop } from '../desktop'
-import { CleanupPanel, XuBadge } from './Cleanup'
+import { RoomsPanel, XuBadge } from './Rooms'
 import { useDeco } from './decoStore'
 import { ShopPanel } from './Shop'
 import { FameView } from './FameView'
@@ -166,7 +167,7 @@ export function Hud({ world }: { world: World }) {
   const office = useOffice((s) => s.office)
   const boardOpen = useCoop((s) => s.boardOpen)
   const fameOpen = useCoop((s) => s.fameOpen)
-  const cleanOpen = useCoop((s) => s.cleanOpen)
+  const roomsOpen = useCoop((s) => s.roomsOpen)
   const decoOpen = useDeco((s) => s.open)
   const expStats = useExp((s) => s.stats)
   const wardrobeId = useCoop((s) => s.wardrobeId)
@@ -194,7 +195,7 @@ export function Hud({ world }: { world: World }) {
   }, [viewing])
   // Ảnh nhỏ trong danh sách nhân sự cập nhật khi chỉnh tủ đồ
   usePixelLooks((s) => s.custom)
-  const leadIds = new Set(agents.filter((a) => !a.candidate).map((a) => a.reportsTo).filter(Boolean))
+  const leadIds = leadIdsOf(agents)
   const working = agents.filter((a) => a.status === 'running').length
   const staff = agents.filter((a) => !a.candidate).length
   const demo = conn === 'demo'
@@ -212,7 +213,7 @@ export function Hud({ world }: { world: World }) {
         <Toolbar />
         <Inbox />
         {settingsOpen && <SettingsPanel />}
-        {cleanOpen && <CleanupPanel />}
+        {roomsOpen && <RoomsPanel />}
         {decoOpen && <ShopPanel />}
         <Notes />
       </div>
@@ -315,7 +316,7 @@ export function Hud({ world }: { world: World }) {
           <span><kbd>E</kbd> hoặc bấm chuột: mở CLI agent / bảng ticket</span>
           <span><kbd>E</kbd> cạnh đồ: ngồi / dùng</span>
           <span><kbd>Q</kbd> việc chờ duyệt</span>
-          <span><kbd>B</kbd> dọn dẹp</span>
+          <span><kbd>B</kbd> mở phòng</span>
           <span><kbd>T</kbd> trang trí</span>
           <span><kbd>C</kbd> tủ đồ</span>
           <span><kbd>M</kbd> nhạc</span>

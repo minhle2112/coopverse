@@ -1,5 +1,6 @@
 import { Assets, Rectangle, Texture, TextureSource } from 'pixi.js'
 import atlas from './atlas.json'
+import { DESK_ART, ITEMS, type Src, type View } from '../data/catalog'
 import { MAP_SHEETS } from './tilemap'
 
 /**
@@ -26,9 +27,21 @@ export async function assetsReady(): Promise<boolean> {
   }
 }
 
+/** Ảnh mà đồ trang trí, bàn ghế làm việc (items.json) dùng: khoá = đường dẫn trong gói hình */
+function itemSheets(): [string, string][] {
+  const s = new Set<string>()
+  const add = (v?: View | null) => v?.parts.forEach((p) => p.src && s.add(p.src[0]))
+  for (const i of ITEMS) i.art.views?.forEach(add)
+  s.add(DESK_ART.top.src[0])
+  if (DESK_ART.side) s.add(DESK_ART.side.src[0])
+  Object.values(DESK_ART.chair).forEach(add)
+  for (const t of DESK_ART.things) Object.values(t.views).forEach(add)
+  return [...s].map((rel) => [rel, rel])
+}
+
 export async function loadSheets() {
   await Promise.all(
-    [...Object.entries(atlas.sheets), ...Object.entries(MAP_SHEETS)].map(async ([k, rel]) => {
+    [...Object.entries(atlas.sheets), ...Object.entries(MAP_SHEETS), ...itemSheets()].map(async ([k, rel]) => {
       if (!sheets.has(k)) sheets.set(k, await Assets.load<Texture>(assetUrl(rel)))
     }),
   )
@@ -56,6 +69,15 @@ export function sprite(name: SpriteName): Texture {
   return t
 }
 
+/** Texture của một vùng cắt trong items.json (dùng chung, không tạo lại) */
+const srcs = new Map<string, Texture>()
+export function srcTex(src: Src): Texture {
+  const key = src.join('|')
+  let t = srcs.get(key)
+  if (!t) srcs.set(key, (t = region(...src)))
+  return t
+}
+
 /**
  * Cắt một vùng ra canvas riêng: TilingSprite (sàn, tường lặp lại) cần texture đứng một mình,
  * không phải một khung trong sheet lớn.
@@ -76,9 +98,14 @@ export function cut(k: SheetKey | string, x: number, y: number, w: number, h: nu
  */
 const stitched = new Map<string, Texture>()
 export function stitch(name: SpriteName, w: number, h: number, l: number, r: number, t: number, b: number): Texture {
-  const [k, sx, sy, sw, sh] = atlas.sprites[name] as [string, number, number, number, number]
+  return stitchSrc(atlas.sprites[name] as Src, w, h, l, r, t, b)
+}
+
+/** Như stitch, với vùng cắt [ảnh, x, y, rộng, cao] */
+export function stitchSrc(src: Src, w: number, h: number, l: number, r: number, t: number, b: number): Texture {
+  const [k, sx, sy, sw, sh] = src
   const W = Math.round(w), H = Math.round(h)
-  const key = `${name}:${W}x${H}`
+  const key = `${src.join('|')}:${W}x${H}:${l},${r},${t},${b}`
   const hit = stitched.get(key)
   if (hit) return hit
   const c = document.createElement('canvas')

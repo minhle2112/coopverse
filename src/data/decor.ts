@@ -1,23 +1,26 @@
-import { deskItemById, footprint, itemById, resale, wallPrice, type Item, type WallKind } from './catalog'
+import { deskItemById, footprint, itemById, resale, type Item } from './catalog'
 import {
-  COLS, ROWS, CELL, cellKey, cellX, cellZ, colOf, isClean, jobById, patchAt, rowOf,
+  COLS, ROWS, CELL, cellKey, cellX, cellZ, colOf, rowOf,
   type DeskPos, type OfficeState, type Placed, type Spend,
 } from './officeState'
 import { BLOCKS, BOARD, DESK_D, DESK_W, DOOR_X, LOBBY, OFFICE, SPAWN, WINDOWS, deskCenter, turned } from '../world/room'
+import { cellOpen, isFixedWall, kitOf, nextRoomPrice, northOpen, partAt, roomById, ROOMS, unlockBlock, type Cell } from '../world/rooms'
 
 /**
  * Luật trang trí văn phòng, dùng chung cho server (kiểm trước khi trừ Xu) và trang (khung xanh / đỏ khi đặt thử):
- * đặt đồ ở đâu được, xây / dỡ vách, dời bàn, mua / cất / bán. Không phụ thuộc React hay PixiJS.
+ * đặt đồ ở đâu được, dời bàn, mua / cất / bán. Không phụ thuộc React hay PixiJS.
  *
- * - Đồ đặt trên sàn đã dọn; đồ treo tường cần tường bắc đã dọn, không đè cửa sổ, bảng ticket hay món khác.
+ * - Đồ đặt trên sàn phòng đã mở (không lên tường giữa các phòng, vách trong phòng, ô cửa trên vách); đồ treo trên tường bắc của phòng đã mở,
+ *   không đè cửa sổ, bảng ticket hay món khác.
+ * - Mở phòng: phòng có cửa thông với phòng đã mở, giá theo số phòng đã mở (src/world/rooms.ts).
  * - Cửa vào và sảnh chờ ứng viên luôn để trống.
  * - Thảm nằm dưới đồ: đồ khác đặt lên thảm được, nhưng thảm không chồng thảm.
- * - Cửa kính lắp vào 2 ô vách liền nhau.
+ * - Tường, vách, cửa là của toà nhà (trang thiết kế nhà), người chơi không xây / dỡ.
  * Server không biết bàn của agent nằm đâu (bàn xếp theo sơ đồ tổ chức ở trang), nên trang kiểm thêm phần đó
  * (tham số `blocked`) và kiểm lối đi tới mọi bàn không bị chặn kín (src/world/layout.ts).
  */
 
-export type Cell = [number, number]
+export type { Cell }
 
 interface Zone { c0: number; r0: number; c1: number; r1: number }
 const zone = (minX: number, maxX: number, minZ: number, maxZ: number): Zone =>
@@ -38,15 +41,9 @@ export const fixedBlock = (c: number, r: number) => {
 
 const inGrid = (c: number, r: number) => c >= 0 && r >= 0 && c < COLS && r < ROWS
 
-/** Mảng sàn chứa ô đã dọn chưa */
-const cleanCell = (o: OfficeState, c: number, r: number) => {
-  const p = patchAt(cellX(c) + CELL / 2, cellZ(r) + CELL / 2)
-  return !!p && isClean(o, p.id)
-}
 
-/** Các ô một món chiếm (đồ trên sàn, thảm, cửa) */
+/** Các ô một món chiếm (đồ trên sàn, thảm) */
 export function cellsOf(i: Item, c: number, r: number, rot: number): Cell[] {
-  if (i.mount === 'door') return rot === 1 ? [[c, r], [c, r + 1]] : [[c, r], [c + 1, r]]
   const { w, d } = footprint(i, rot)
   const out: Cell[] = []
   for (let dr = 0; dr < d; dr++) for (let dc = 0; dc < w; dc++) out.push([c + dc, r + dr])
@@ -73,20 +70,18 @@ export interface Occupancy {
   floor: Map<string, string>
   /** ô → uid thảm */
   rug: Map<string, string>
-  /** ô → uid cửa */
-  door: Map<string, string>
   /** cột tường bắc → uid đồ treo */
   wall: Map<number, string>
 }
 
 export function occupancy(o: OfficeState, ignore?: string): Occupancy {
-  const occ: Occupancy = { floor: new Map(), rug: new Map(), door: new Map(), wall: new Map() }
+  const occ: Occupancy = { floor: new Map(), rug: new Map(), wall: new Map() }
   for (const p of o.items) {
     if (p.stored || p.uid === ignore) continue
     const i = itemById.get(p.item)
     if (!i) continue
     if (i.mount === 'wall') { for (const c of wallItemCols(i, p.c)) occ.wall.set(c, p.uid); continue }
-    const m = i.mount === 'rug' ? occ.rug : i.mount === 'door' ? occ.door : occ.floor
+    const m = i.mount === 'rug' ? occ.rug : occ.floor
     for (const [c, r] of cellsOf(i, p.c, p.r, p.rot)) m.set(cellKey(c, r), p.uid)
   }
   return occ
@@ -105,13 +100,10 @@ export interface PlaceOpts {
   levelOf?: (agentId: string) => number
 }
 
-/** Cửa lắp theo hướng nào ở ô (c, r): 0 = vách ngang, 1 = vách dọc, null = không có 2 ô vách cùng loại liền nhau */
-export function doorRot(o: OfficeState, c: number, r: number): 0 | 1 | null {
-  const k = o.walls[cellKey(c, r)]
-  if (!k) return null
-  if (o.walls[cellKey(c + 1, r)] === k) return 0
-  if (o.walls[cellKey(c, r + 1)] === k) return 1
-  return null
+/** Ô vướng vách trong phòng / cửa trên vách: lý do, không vướng thì null */
+function partOf(cells: Cell[]): string | null {
+  const ks = cells.map(([c, r]) => partAt(c, r))
+  return ks.includes('door') ? 'Để trống lối cửa' : ks.some(Boolean) ? 'Vướng vách' : null
 }
 
 /** Đặt món `i` ở ô (c, r), hướng `rot` được không */
@@ -120,7 +112,7 @@ export function canPlace(o: OfficeState, i: Item, c: number, r: number, rot: num
   if (i.mount === 'wall') {
     const cols = wallItemCols(i, c)
     if (cols[0] < 0 || cols[cols.length - 1] >= COLS) return no('Ra ngoài tường')
-    if (!isClean(o, 'wall')) return no('Dọn tường bắc trước đã')
+    if (cols.some((k) => !northOpen(o, k))) return no('Chỉ treo trên tường bắc của phòng đã mở')
     if (cols.some((k) => FIXED_WALL_COLS.has(k))) return no('Vướng cửa sổ hoặc bảng ticket')
     if (cols.some((k) => occ.wall.has(k))) return no('Vướng đồ treo khác')
     const fame = i.id === 'fame' ? o.items.filter((p) => p.item === 'fame' && p.uid !== opts.ignore) : []
@@ -131,45 +123,15 @@ export function canPlace(o: OfficeState, i: Item, c: number, r: number, rot: num
   }
   const cells = cellsOf(i, c, r, rot)
   if (cells.some(([cc, rr]) => !inGrid(cc, rr))) return no('Ra ngoài phòng')
-  if (i.mount === 'door') {
-    if (doorRot(o, c, r) !== rot) {
-      const k = o.walls[cellKey(c, r)], next = o.walls[rot === 1 ? cellKey(c, r + 1) : cellKey(c + 1, r)]
-      return no(k && next && k !== next ? 'Cửa phải lắp vào 2 ô vách cùng loại' : 'Cửa phải lắp vào 2 ô vách liền nhau')
-    }
-    if (cells.some(([cc, rr]) => occ.door.has(cellKey(cc, rr)))) return no('Đã có cửa ở đây')
-    return ok
-  }
   if (cells.some(([cc, rr]) => reserved(cc, rr))) return no('Để trống lối vào và sảnh chờ')
   if (cells.some(([cc, rr]) => fixedBlock(cc, rr))) return no('Vướng chỗ cố định của văn phòng')
-  if (cells.some(([cc, rr]) => !cleanCell(o, cc, rr))) return no('Dọn sàn chỗ này trước đã')
-  if (cells.some(([cc, rr]) => o.walls[cellKey(cc, rr)])) return no('Vướng vách')
+  if (cells.some(([cc, rr]) => isFixedWall(cc, rr))) return no('Vướng tường')
+  if (cells.some(([cc, rr]) => !cellOpen(o, cc, rr))) return no('Phòng này chưa mở')
+  const part = partOf(cells)
+  if (part) return no(part)
   const mine = i.mount === 'rug' ? occ.rug : occ.floor
   if (cells.some(([cc, rr]) => mine.has(cellKey(cc, rr)))) return no(i.mount === 'rug' ? 'Thảm không chồng lên thảm' : 'Vướng đồ khác')
   if (i.mount === 'floor' && opts.blocked && cells.some(([cc, rr]) => opts.blocked!(cc, rr))) return no('Vướng bàn làm việc')
-  return ok
-}
-
-/** Xây vách ở các ô (bỏ qua ô đã có vách cùng loại) */
-export function canWall(o: OfficeState, cells: Cell[], kind: WallKind, opts: PlaceOpts = {}): Check {
-  if (!cells.length) return no('Chưa chọn ô nào')
-  const occ = occupancy(o)
-  for (const [c, r] of cells) {
-    const k = cellKey(c, r)
-    if (!inGrid(c, r)) return no('Ra ngoài phòng')
-    if (reserved(c, r)) return no('Để trống lối vào và sảnh chờ')
-    if (fixedBlock(c, r)) return no('Vướng chỗ cố định của văn phòng')
-    if (!cleanCell(o, c, r)) return no('Dọn sàn chỗ này trước đã')
-    if (o.walls[k] && o.walls[k] !== kind) return no('Đã có vách loại khác: dỡ ra trước')
-    if (occ.floor.has(k) || occ.rug.has(k)) return no('Vướng đồ: dời đi trước')
-    if (opts.blocked?.(c, r)) return no('Vướng bàn làm việc')
-  }
-  return ok
-}
-
-export function canUnwall(o: OfficeState, cells: Cell[]): Check {
-  const occ = occupancy(o)
-  if (!cells.some(([c, r]) => o.walls[cellKey(c, r)])) return no('Không có vách nào ở đây')
-  if (cells.some(([c, r]) => occ.door.has(cellKey(c, r)))) return no('Cất cửa trên vách này trước đã')
   return ok
 }
 
@@ -186,12 +148,16 @@ export function deskCells(p: DeskPos): Cell[] {
 
 export function canDesk(o: OfficeState, p: DeskPos, opts: PlaceOpts = {}): Check {
   const occ = occupancy(o)
+  const part = partOf(deskCells(p))
+  if (part) return no(part)
   for (const [c, r] of deskCells(p)) {
     const k = cellKey(c, r)
     if (!inGrid(c, r)) return no('Ra ngoài phòng')
     if (reserved(c, r)) return no('Để trống lối vào và sảnh chờ')
     if (fixedBlock(c, r)) return no('Vướng chỗ cố định của văn phòng')
-    if (o.walls[k] || occ.floor.has(k)) return no('Vướng đồ hoặc vách')
+    if (isFixedWall(c, r)) return no('Vướng tường')
+    if (!cellOpen(o, c, r)) return no('Phòng này chưa mở')
+    if (occ.floor.has(k)) return no('Vướng đồ khác')
     if (opts.blocked?.(c, r)) return no('Vướng bàn khác')
   }
   return ok
@@ -200,44 +166,37 @@ export function canDesk(o: OfficeState, p: DeskPos, opts: PlaceOpts = {}): Check
 // ───────────────────────── Lệnh ─────────────────────────
 
 export type Action =
-  | { action: 'clean'; job: string }
+  /** Mở một phòng đang khoá */
+  | { action: 'room'; room: string }
   | { action: 'buy'; item: string; c: number; r: number; rot: number }
   /** Dời một món đang đặt, hoặc lấy từ kho ra đặt (miễn phí) */
   | { action: 'place'; uid: string; c: number; r: number; rot: number }
   | { action: 'store'; uid: string }
   | { action: 'sell'; uid: string }
-  | { action: 'wall'; kind: WallKind; cells: Cell[] }
-  | { action: 'unwall'; cells: Cell[] }
   | { action: 'desk'; slot: string; x: number; z: number; yaw: number }
+  /** Đưa bàn đã dời về chỗ gốc (x, z, yaw = chỗ gốc, để kiểm còn trống không) */
+  | { action: 'deskReset'; slot: string; x: number; z: number; yaw: number }
   /** Đồ để bàn của một agent: mua (cần đủ cấp) / bán lại nửa giá */
   | { action: 'deskBuy' | 'deskSell'; agent: string; item: string }
 
 export type Result = { office: OfficeState } | { error: string; status: number }
 
 const int = (v: unknown) => typeof v === 'number' && Number.isInteger(v)
-const MAX_CELLS = 200
 const YAWS = [0, Math.PI, Math.PI / 2, -Math.PI / 2]
 
 /** Kiểm dạng lệnh gửi lên (server nhận JSON bất kỳ) */
 export function parseAction(v: unknown): Action | null {
   if (!v || typeof v !== 'object') return null
   const a = v as Record<string, unknown>
-  const cells = (x: unknown): Cell[] | null =>
-    Array.isArray(x) && x.length <= MAX_CELLS && x.every((p) => Array.isArray(p) && p.length === 2 && int(p[0]) && int(p[1])) ? (x as Cell[]) : null
   switch (a.action) {
-    case 'clean': return typeof a.job === 'string' ? { action: 'clean', job: a.job } : null
+    case 'room': return typeof a.room === 'string' && a.room.length < 40 ? { action: 'room', room: a.room } : null
     case 'buy': return typeof a.item === 'string' && int(a.c) && int(a.r) && int(a.rot) ? { action: 'buy', item: a.item, c: a.c as number, r: a.r as number, rot: a.rot as number } : null
     case 'place': return typeof a.uid === 'string' && int(a.c) && int(a.r) && int(a.rot) ? { action: 'place', uid: a.uid, c: a.c as number, r: a.r as number, rot: a.rot as number } : null
     case 'store': case 'sell': return typeof a.uid === 'string' ? { action: a.action, uid: a.uid } : null
-    case 'wall': {
-      const cs = cells(a.cells)
-      return cs && (a.kind === 'low' || a.kind === 'glass' || a.kind === 'tall') ? { action: 'wall', kind: a.kind, cells: cs } : null
-    }
-    case 'unwall': { const cs = cells(a.cells); return cs ? { action: 'unwall', cells: cs } : null }
-    case 'desk':
+    case 'desk': case 'deskReset':
       return typeof a.slot === 'string' && a.slot.length < 40 && typeof a.x === 'number' && typeof a.z === 'number' && typeof a.yaw === 'number'
         && Number.isFinite(a.x) && Number.isFinite(a.z) && YAWS.some((y) => Math.abs(y - (a.yaw as number)) < 1e-3)
-        ? { action: 'desk', slot: a.slot, x: a.x, z: a.z, yaw: a.yaw } : null
+        ? { action: a.action, slot: a.slot, x: a.x, z: a.z, yaw: a.yaw } : null
     case 'deskBuy': case 'deskSell':
       return typeof a.agent === 'string' && a.agent.length > 0 && a.agent.length < 80 && typeof a.item === 'string'
         ? { action: a.action, agent: a.agent, item: a.item } : null
@@ -248,24 +207,23 @@ export function parseAction(v: unknown): Action | null {
 /** Giá của một lệnh (âm = được trả lại Xu) */
 export function costOf(o: OfficeState, a: Action): number {
   switch (a.action) {
-    case 'clean': return isClean(o, a.job) ? 0 : jobById.get(a.job)?.price ?? 0
+    case 'room': return unlockBlock(o, a.room) ? 0 : nextRoomPrice(o)
     case 'buy': return itemById.get(a.item)?.price ?? 0
     case 'sell': {
       const p = o.items.find((x) => x.uid === a.uid)
-      return -resale(itemById.get(p?.item ?? '')?.price ?? 0)
+      return p ? -sellValue(p) : 0
     }
-    case 'wall': return newWallCells(o, a.cells).length * wallPrice(a.kind)
-    case 'unwall': return -a.cells.reduce((s, [c, r]) => { const k = o.walls[cellKey(c, r)]; return s + (k ? resale(wallPrice(k)) : 0) }, 0)
     case 'deskBuy': return hasDeskItem(o, a.agent, a.item) ? 0 : deskItemById.get(a.item)?.price ?? 0
     case 'deskSell': return hasDeskItem(o, a.agent, a.item) ? -resale(deskItemById.get(a.item)?.price ?? 0) : 0
     default: return 0
   }
 }
 
+/** Bán lại một món được bao nhiêu Xu: nửa giá, đồ có sẵn khi mở phòng thì 0 */
+export const sellValue = (p: Placed) => (p.kit ? 0 : resale(itemById.get(p.item)?.price ?? 0))
+
 export const hasDeskItem = (o: OfficeState, agent: string, item: string) => !!o.deskItems[agent]?.includes(item)
 
-const uniq = (cells: Cell[]) => [...new Map(cells.map((p) => [cellKey(p[0], p[1]), p])).values()]
-const newWallCells = (o: OfficeState, cells: Cell[]) => uniq(cells).filter(([c, r]) => !o.walls[cellKey(c, r)])
 
 /**
  * Làm một lệnh. `have` = Xu còn trong quỹ (tính từ sổ EXP), `uid` tạo id mới.
@@ -278,11 +236,12 @@ export function apply(o: OfficeState, a: Action, have: number, now: number, uid:
   if (price > 0 && have < price) return err(`Chưa đủ Xu: cần ${price}, quỹ còn ${have}`)
 
   switch (a.action) {
-    case 'clean': {
-      const job = jobById.get(a.job)
-      if (!job) return err('Không có việc dọn này', 400)
-      if (isClean(o, job.id)) return { office: o }
-      return { office: { ...o, cleaned: { ...o.cleaned, [job.id]: now }, spent: pay('clean', job.id, job.price) } }
+    case 'room': {
+      const rm = roomById.get(a.room)
+      if (!rm) return err('Không có phòng này', 400)
+      const why = unlockBlock(o, rm.id)
+      if (why) return err(why)
+      return { office: { ...o, rooms: { ...o.rooms, [rm.id]: now }, items: [...o.items, ...kitOf(rm, uid, now)], spent: pay('room', rm.id, price) } }
     }
     case 'buy': {
       const i = itemById.get(a.item)
@@ -310,27 +269,19 @@ export function apply(o: OfficeState, a: Action, have: number, now: number, uid:
       if (!p) return err('Không có món này', 400)
       return { office: { ...o, items: o.items.filter((x) => x !== p), spent: pay('sell', p.item, price) } }
     }
-    case 'wall': {
-      const chk = canWall(o, a.cells, a.kind, opts)
-      if (!chk.ok) return err(chk.why!)
-      const add = newWallCells(o, a.cells)
-      if (!add.length) return { office: o }
-      const walls = { ...o.walls }
-      for (const [c, r] of add) walls[cellKey(c, r)] = a.kind
-      return { office: { ...o, walls, spent: pay('wall', a.kind, price) } }
-    }
-    case 'unwall': {
-      const chk = canUnwall(o, a.cells)
-      if (!chk.ok) return err(chk.why!)
-      const walls = { ...o.walls }
-      for (const [c, r] of a.cells) delete walls[cellKey(c, r)]
-      return { office: { ...o, walls, spent: pay('unwall', 'wall', price) } }
-    }
     case 'desk': {
       const p: DeskPos = { x: a.x, z: a.z, yaw: a.yaw }
       const chk = canDesk(o, p, opts)
       if (!chk.ok) return err(chk.why!)
       return { office: { ...o, desks: { ...o.desks, [a.slot]: p } } }
+    }
+    case 'deskReset': {
+      if (!o.desks[a.slot]) return { office: o }
+      const chk = canDesk(o, { x: a.x, z: a.z, yaw: a.yaw }, opts)
+      if (!chk.ok) return err(`Chỗ cũ không còn trống: ${chk.why}`)
+      const desks = { ...o.desks }
+      delete desks[a.slot]
+      return { office: { ...o, desks } }
     }
     case 'deskBuy': {
       const d = deskItemById.get(a.item)
@@ -350,4 +301,57 @@ export function apply(o: OfficeState, a: Action, have: number, now: number, uid:
       return { office: { ...o, deskItems, spent: pay('deskSell', `${a.agent}:${a.item}`, price) } }
     }
   }
+}
+
+// ───────────────────────── Sửa nhà ─────────────────────────
+
+/**
+ * Văn phòng lưu theo bố cục nhà cũ, nay nhà đã sửa (trang thiết kế nhà): phòng đã mở mà nay không còn (hoặc thành phòng
+ * mở sẵn) thì trả lại Xu đã mở; đồ hết chỗ (ngoài phòng, vướng tường / vách mới, phòng chưa mở) cất vào kho; bàn đã dời
+ * sai chỗ thì về chỗ cũ. Đồ có sẵn (kit) của phòng mở sẵn chưa từng đặt thì đặt vào (vướng thì cất kho), mỗi món một lần.
+ * Không có gì sai thì trả lại đúng object cũ.
+ */
+export function fitHouse(o: OfficeState): OfficeState {
+  let changed = false
+  const rooms: OfficeState['rooms'] = {}
+  const gone = new Set<string>()
+  for (const [id, at] of Object.entries(o.rooms)) {
+    const rm = roomById.get(id)
+    if (rm && !rm.start) rooms[id] = at
+    else { gone.add(id); changed = true }
+  }
+  const spent = gone.size ? o.spent.filter((s) => !(s.kind === 'room' && gone.has(s.ref))) : o.spent
+  let next: OfficeState = { ...o, rooms, spent, items: o.items.filter((p) => p.stored), desks: {} }
+
+  for (const p of o.items.filter((x) => !x.stored)) {
+    const i = itemById.get(p.item)
+    const fits = !!i && canPlace(next, i, p.c, p.r, p.rot).ok
+    if (!fits) changed = true
+    next = { ...next, items: [...next.items, fits ? p : { ...p, stored: true }] }
+  }
+  // Giữ thứ tự món như cũ
+  const byUid = new Map(next.items.map((p) => [p.uid, p]))
+  next.items = o.items.flatMap((p) => byUid.get(p.uid) ?? [])
+
+  for (const [slot, d] of Object.entries(o.desks)) {
+    if (canDesk(next, d).ok) next.desks[slot] = d
+    else changed = true
+  }
+
+  const kits = new Set(o.kits ?? [])
+  for (const rm of ROOMS) {
+    if (!rm.start) continue
+    const keys = rm.kit.map((k) => `${rm.id}:${k.item}:${k.c}:${k.r}`)
+    let n = 0
+    kitOf(rm, () => `kit-${keys[n++]}`, 0).forEach((p, k) => {
+      if (kits.has(keys[k])) return
+      kits.add(keys[k])
+      const i = itemById.get(p.item)
+      const fits = !!i && canPlace(next, i, p.c, p.r, p.rot).ok
+      next = { ...next, items: [...next.items, fits ? p : { ...p, stored: true }] }
+      changed = true
+    })
+  }
+  if (kits.size) next.kits = [...kits]
+  return changed ? next : o
 }
